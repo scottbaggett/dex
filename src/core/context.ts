@@ -1,14 +1,17 @@
 import { GitExtractor } from './git';
-import { DexOptions, ExtractedContext, GitChange, TaskContext, Metadata, ContextLevel } from '../types';
+import { DexOptions, ExtractedContext, GitChange, TaskContext, Metadata } from '../types';
 import { minimatch } from 'minimatch';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { TaskExtractor, TaskSource } from './task-extractor';
 
 export class ContextEngine {
   private gitExtractor: GitExtractor;
+  private taskExtractor: TaskExtractor;
 
   constructor(workingDir: string = process.cwd()) {
     this.gitExtractor = new GitExtractor(workingDir);
+    this.taskExtractor = new TaskExtractor();
   }
 
   async extract(options: DexOptions): Promise<ExtractedContext> {
@@ -84,8 +87,8 @@ export class ContextEngine {
       }
     }
 
-    // Extended context or specific full files
-    if (options.context === 'extended' || options.fullFiles) {
+    // Extended depth or specific full files
+    if (options.depth === 'extended' || options.fullFiles) {
       const patterns = options.fullFiles || ['**/*'];
       
       for (const change of changes) {
@@ -118,17 +121,47 @@ export class ContextEngine {
   }
 
   private async buildTaskContext(options: DexOptions): Promise<TaskContext | undefined> {
-    if (!options.task && !options.issue) {
+    // Check if any task source is provided
+    if (!options.task && !options.taskFile && !options.taskUrl && !options.taskStdin && !options.issue) {
       return undefined;
     }
 
-    const context: TaskContext = {
-      description: options.task || '',
-    };
+    // Determine task source
+    let taskSource: TaskSource | undefined;
+    
+    if (options.task) {
+      // Direct text input
+      taskSource = { type: 'text', source: options.task };
+    } else if (options.taskFile) {
+      // File input
+      taskSource = { type: 'file', source: options.taskFile };
+    } else if (options.taskUrl) {
+      // URL input
+      taskSource = { type: 'url', source: options.taskUrl };
+    } else if (options.taskStdin) {
+      // Stdin input
+      taskSource = { type: 'stdin', source: '' };
+    }
 
-    // TODO: Implement GitHub issue fetching
-    if (options.issue) {
+    // Extract task context
+    let context: TaskContext | undefined;
+    
+    if (taskSource) {
+      try {
+        context = await this.taskExtractor.extract(taskSource);
+      } catch (error) {
+        throw new Error(`Failed to extract task: ${error instanceof Error ? error.message : error}`);
+      }
+    }
+
+    // Legacy issue support (will be deprecated)
+    if (options.issue && context) {
       context.issueUrl = options.issue;
+    } else if (options.issue) {
+      context = {
+        description: `Task from issue ${options.issue}`,
+        issueUrl: options.issue,
+      };
     }
 
     return context;
@@ -162,7 +195,7 @@ export class ContextEngine {
         commit,
       },
       extraction: {
-        context: options.context || 'focused',
+        depth: options.depth || 'focused',
         filters: {
           path: options.path,
           type: options.type,

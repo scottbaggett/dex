@@ -13,7 +13,7 @@ export class GptFormatter extends Formatter {
       sections.push('**Metadata:**');
       sections.push(`- Generated: ${context.metadata.generated}`);
       sections.push(`- Repository: ${context.metadata.repository.name} (${context.metadata.repository.branch}@${context.metadata.repository.commit})`);
-      sections.push(`- Context Level: ${context.metadata.extraction.context}`);
+      sections.push(`- Extraction Depth: ${context.metadata.extraction.depth}`);
       sections.push(`- Estimated Tokens: ~${context.metadata.tokens.estimated.toLocaleString()}`);
       sections.push(`- Tool: ${context.metadata.tool.name} v${context.metadata.tool.version}\n`);
     }

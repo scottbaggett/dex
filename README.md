@@ -29,16 +29,19 @@ dex --staged
 dex --since=main
 
 # Extract with full file context
-dex --context=extended
+dex --depth=extended
 
 # Copy to clipboard for AI tools
-dex --clipboard
+dex -c
 
 # Format for Claude
 dex --format=claude
 
 # Bootstrap mode for new AI sessions
 dex --bootstrap --task="Implement user authentication"
+
+# Interactive task input
+dex -i --staged
 ```
 
 ## Features
@@ -62,7 +65,7 @@ Options:
   -V, --version            output the version number
   -s, --staged             Include only staged changes
   --since <commit>         Show changes since a specific commit
-  -c, --context <level>    Context level: minimal, focused, full, extended (default: "focused")
+  -d, --depth <level>      Extraction depth: minimal, focused, full, extended (default: "focused")
   --full-files <pattern>   Include full files matching pattern
   --bootstrap              Bootstrap mode for new AI sessions
   -p, --path <pattern>     Filter by file path pattern
@@ -71,10 +74,12 @@ Options:
   --symbols                Include symbol references
   -f, --format <format>    Output format: markdown, json, claude, gpt (default: "markdown")
   --json                   Output as JSON (alias for --format json)
-  --clipboard              Copy output to clipboard
+  -c, --clipboard          Copy output to clipboard
   --github-pr              Format for GitHub PR description
   --task <description>     Task description for context
-  --issue <url>            GitHub issue URL or number
+  --task-file <path>       Read task from file (markdown, text, or JSON)
+  --task-url <url>         Fetch task from URL (not yet implemented)
+  --issue <url>            GitHub issue URL or number (deprecated, use --task-url)
   -i, --interactive        Interactive mode for task input
   --compress <type>        Compression type: aid
   --map <type>             Mapping type: symbols
@@ -82,7 +87,7 @@ Options:
   -h, --help               display help for command
 ```
 
-## Context Levels
+## Extraction Depth Levels
 
 - **minimal**: Just the changes/diffs
 - **focused**: Changes with immediate surrounding code (default)
@@ -112,8 +117,8 @@ dex --staged --json
 # Only TypeScript files in src/
 dex --path="src/**/*.ts" --type=ts,tsx
 
-# Changes since main branch, full context
-dex --since=main --context=full
+# Changes since main branch, full depth
+dex --since=main --depth=full
 ```
 
 ### AI Workflow Integration
@@ -122,7 +127,7 @@ dex --since=main --context=full
 dex --bootstrap --task="Refactor authentication system" --format=claude
 
 # Quick copy for chat
-dex --clipboard --context=minimal
+dex -c --depth=minimal
 
 # PR review context
 dex HEAD~3..HEAD --github-pr
@@ -136,7 +141,7 @@ import { ContextEngine, MarkdownFormatter } from 'dex';
 const engine = new ContextEngine();
 const context = await engine.extract({
   since: 'main',
-  context: 'focused',
+  depth: 'focused',
   task: 'Fix authentication bug'
 });
 

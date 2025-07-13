@@ -13,7 +13,7 @@ export class ClaudeFormatter extends Formatter {
       sections.push('<metadata>');
       sections.push(`  <generated>${this.escapeXml(context.metadata.generated)}</generated>`);
       sections.push(`  <repository name="${this.escapeXml(context.metadata.repository.name)}" branch="${this.escapeXml(context.metadata.repository.branch)}" commit="${this.escapeXml(context.metadata.repository.commit)}" />`);
-      sections.push(`  <extraction context="${this.escapeXml(context.metadata.extraction.context)}" />`);
+      sections.push(`  <extraction depth="${this.escapeXml(context.metadata.extraction.depth)}" />`);
       sections.push(`  <tokens estimated="${context.metadata.tokens.estimated}" />`);
       sections.push(`  <tool name="${this.escapeXml(context.metadata.tool.name)}" version="${this.escapeXml(context.metadata.tool.version)}" />`);
       sections.push('</metadata>');

@@ -1,4 +1,4 @@
-export type ContextLevel = 'minimal' | 'focused' | 'full' | 'extended';
+export type DepthLevel = 'minimal' | 'focused' | 'full' | 'extended';
 export type OutputFormat = 'markdown' | 'json' | 'claude' | 'gpt' | 'github-pr';
 export type ExtractMode = 'changes' | 'functions' | 'symbols';
 
@@ -8,8 +8,8 @@ export interface DexOptions {
   range?: string;
   staged?: boolean;
   
-  // Context options
-  context?: ContextLevel;
+  // Depth options
+  depth?: DepthLevel;
   fullFiles?: string[];
   bootstrap?: boolean;
   
@@ -28,8 +28,11 @@ export interface DexOptions {
   githubPr?: boolean;
   
   // Task integration
-  task?: string;
-  issue?: string;
+  task?: string;          // Direct task description
+  taskFile?: string;      // Path to task file
+  taskUrl?: string;       // URL to fetch task from
+  taskStdin?: boolean;    // Read task from stdin (--task=-)
+  issue?: string;         // GitHub issue (legacy, will be replaced by taskUrl)
   interactive?: boolean;
   
   // Optimization
@@ -58,7 +61,7 @@ export interface Metadata {
     commit: string;
   };
   extraction: {
-    context: ContextLevel;
+    depth: DepthLevel;
     filters?: {
       path?: string;
       type?: string[];

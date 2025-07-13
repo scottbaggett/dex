@@ -27,7 +27,7 @@ export class MarkdownFormatter extends Formatter {
     }
 
     // Impact analysis (placeholder for future AST analysis)
-    if (options.bootstrap || options.context === 'extended') {
+    if (options.bootstrap || options.depth === 'extended') {
       sections.push(this.formatImpactAnalysis());
     }
 
@@ -47,7 +47,7 @@ export class MarkdownFormatter extends Formatter {
     lines.push(`- **Generated:** ${metadata.generated}`);
     lines.push(`- **Repository:** ${metadata.repository.name} (${metadata.repository.branch})`);
     lines.push(`- **Commit:** ${metadata.repository.commit}`);
-    lines.push(`- **Context Level:** ${metadata.extraction.context}`);
+    lines.push(`- **Extraction Depth:** ${metadata.extraction.depth}`);
     
     if (metadata.extraction.filters?.path || metadata.extraction.filters?.type) {
       lines.push('- **Filters:**');

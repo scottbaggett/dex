@@ -28,7 +28,7 @@ describe('Formatters', () => {
         commit: 'abc1234',
       },
       extraction: {
-        context: 'focused',
+        depth: 'focused',
       },
       tokens: {
         estimated: 100,
@@ -41,7 +41,7 @@ describe('Formatters', () => {
   };
 
   const mockOptions: DexOptions = {
-    context: 'focused',
+    depth: 'focused',
     format: 'markdown',
   };
 
