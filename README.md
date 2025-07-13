@@ -1,3 +1,5 @@
+# Dex 
+- Context engineering for code changes - Extract and format code changes with surgical precision for LLM consumption.
 ```
 ██████   ███████  ██   ██
 ██   ██  ██        ██ ██
@@ -6,9 +8,6 @@
 ██████   ███████  ██   ██
 
 ```
-
-
-Context engineering for code changes - Extract and format code changes with surgical precision for LLM consumption.
 
 ## Installation
 
