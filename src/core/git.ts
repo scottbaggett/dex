@@ -34,6 +34,11 @@ export class GitExtractor {
     }
   }
 
+  async getUntrackedFiles(): Promise<string[]> {
+    const result = await this.git.raw(['ls-files', '--others', '--exclude-standard']);
+    return result.trim().split('\n').filter(Boolean);
+  }
+
   private parseDiff(diffOutput: string): GitChange[] {
     if (!diffOutput) return [];
 

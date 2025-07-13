@@ -7,11 +7,16 @@ export interface DexOptions {
   since?: string;
   range?: string;
   staged?: boolean;
+  all?: boolean;
   
   // Depth options
   depth?: DepthLevel;
   fullFiles?: string[];
   bootstrap?: boolean;
+  
+  // Untracked files
+  includeUntracked?: boolean;
+  untrackedPattern?: string;
   
   // Filter options
   path?: string;

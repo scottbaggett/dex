@@ -26,6 +26,9 @@ program
   .version(packageJson.version)
   .argument('[range]', 'Git commit range (e.g., HEAD~5..HEAD)', '')
   .option('-s, --staged', 'Include only staged changes')
+  .option('-a, --all', 'Include both staged and unstaged changes')
+  .option('--include-untracked', 'Include untracked files as new files')
+  .option('--untracked-pattern <pattern>', 'Pattern for untracked files to include')
   .option('--since <commit>', 'Show changes since a specific commit')
   .option('-d, --depth <level>', 'Extraction depth: minimal, focused, full, extended', 'focused')
   .option('--full-files <pattern>', 'Include full files matching pattern')
@@ -60,14 +63,23 @@ program
         process.exit(1);
       }
 
+      // Validate options
+      if (options.staged && options.all) {
+        spinner.fail(chalk.red('Error: Cannot use --staged and --all together'));
+        process.exit(1);
+      }
+
       // Parse options
       const dexOptions: DexOptions = {
         range,
         staged: options.staged,
+        all: options.all,
         since: options.since,
         depth: options.depth,
         fullFiles: options.fullFiles ? [options.fullFiles] : undefined,
         bootstrap: options.bootstrap,
+        includeUntracked: options.includeUntracked,
+        untrackedPattern: options.untrackedPattern,
         path: options.path,
         type: options.type ? options.type.split(',') : undefined,
         extract: options.extract,

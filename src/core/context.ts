@@ -22,12 +22,50 @@ export class ContextEngine {
       changes = await this.gitExtractor.getChangesInRange(from, to || 'HEAD');
     } else if (options.since) {
       changes = await this.gitExtractor.getChangesSince(options.since);
+    } else if (options.all) {
+      // Get both staged and unstaged changes
+      const [staged, unstaged] = await Promise.all([
+        this.gitExtractor.getCurrentChanges(true),
+        this.gitExtractor.getCurrentChanges(false)
+      ]);
+      
+      // Merge and deduplicate changes
+      const changeMap = new Map<string, GitChange>();
+      
+      // Add staged changes first
+      for (const change of staged) {
+        changeMap.set(change.file, change);
+      }
+      
+      // Add or update with unstaged changes
+      for (const change of unstaged) {
+        const existing = changeMap.get(change.file);
+        if (existing) {
+          // File has both staged and unstaged changes
+          // Combine the diffs
+          existing.additions += change.additions;
+          existing.deletions += change.deletions;
+          if (change.diff) {
+            existing.diff = existing.diff ? existing.diff + '\n' + change.diff : change.diff;
+          }
+        } else {
+          changeMap.set(change.file, change);
+        }
+      }
+      
+      changes = Array.from(changeMap.values());
     } else {
       changes = await this.gitExtractor.getCurrentChanges(options.staged);
     }
 
     // Apply filters
     changes = this.applyFilters(changes, options);
+
+    // Handle untracked files if requested
+    if (options.includeUntracked) {
+      const untrackedChanges = await this.getUntrackedChanges(options);
+      changes = [...changes, ...untrackedChanges];
+    }
 
     // Extract full files if requested
     const fullFiles = await this.extractFullFiles(changes, options);
@@ -86,6 +124,17 @@ export class ContextEngine {
         }
       }
     }
+    
+    // Always include untracked files as full files
+    if (options.includeUntracked) {
+      for (const change of changes) {
+        if (change.status === 'added' && change.diff === '') {
+          // This is an untracked file
+          const content = await this.gitExtractor.getFileContent(change.file);
+          fullFiles.set(change.file, content);
+        }
+      }
+    }
 
     // Extended depth or specific full files
     if (options.depth === 'extended' || options.fullFiles) {
@@ -106,6 +155,45 @@ export class ContextEngine {
     }
 
     return fullFiles;
+  }
+
+  private async getUntrackedChanges(options: DexOptions): Promise<GitChange[]> {
+    const untrackedFiles = await this.gitExtractor.getUntrackedFiles();
+    const changes: GitChange[] = [];
+    
+    for (const file of untrackedFiles) {
+      // Apply pattern filter if specified
+      if (options.untrackedPattern && !minimatch(file, options.untrackedPattern, { matchBase: true })) {
+        continue;
+      }
+      
+      // Apply general path filter
+      if (options.path && !minimatch(file, options.path, { matchBase: true })) {
+        continue;
+      }
+      
+      // Apply type filter
+      if (options.type && options.type.length > 0) {
+        const extensions = options.type.map(t => `.${t}`);
+        if (!extensions.some(ext => file.endsWith(ext))) {
+          continue;
+        }
+      }
+      
+      // Read file content to count lines
+      const content = await this.gitExtractor.getFileContent(file);
+      const lines = content.split('\n').length;
+      
+      changes.push({
+        file,
+        status: 'added',
+        additions: lines,
+        deletions: 0,
+        diff: '', // We'll include as full file
+      });
+    }
+    
+    return changes;
   }
 
   private calculateScope(changes: GitChange[]) {
