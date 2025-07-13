@@ -116,6 +116,12 @@ program
     await initCommand();
   });
 
+// Import snapshot command at the top level
+import { createSnapshotCommand } from './commands/snapshot';
+
+// Add snapshot command
+program.addCommand(createSnapshotCommand());
+
 // Prompts command with subcommands
 const promptsCmd = program
   .command('prompts')
@@ -396,6 +402,24 @@ async function extractCommand(range: string, options: Record<string, any>) {
       process.exit(1);
     }
 
+    // Check if range is a snapshot reference
+    let isSnapshot = false;
+    if (range) {
+      // Check for snapshot patterns: @-1, @2h, or snapshot names/IDs
+      if (range.startsWith('@') || !range.includes('..')) {
+        const { SnapshotManager } = await import('./core/snapshot');
+        const snapshotManager = new SnapshotManager(process.cwd());
+        try {
+          const snapshot = await snapshotManager.get(range);
+          if (snapshot) {
+            isSnapshot = true;
+          }
+        } catch (err) {
+          // Not a snapshot, continue as git ref
+        }
+      }
+    }
+
     // Validate options
     if (options.staged && options.all) {
       spinner.fail(chalk.red('Error: Cannot use --staged and --all together'));
@@ -436,7 +460,9 @@ async function extractCommand(range: string, options: Record<string, any>) {
 
     // Parse options
     let dexOptions: DexOptions = {
-      range,
+      range: isSnapshot ? undefined : range,
+      snapshot: isSnapshot ? range : undefined,
+      isSnapshot,
       staged: options.staged,
       all: options.all,
       since: options.since,

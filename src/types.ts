@@ -8,6 +8,10 @@ export interface DexOptions {
   staged?: boolean;
   all?: boolean;
   
+  // Snapshot options
+  snapshot?: string;
+  isSnapshot?: boolean;
+  
   // Depth options
   depth?: DepthLevel;
   fullFiles?: string[];
@@ -116,4 +120,45 @@ export interface FormatterOptions {
 
 export interface Formatter {
   format(options: FormatterOptions): string;
+}
+
+// Snapshot-related types
+export interface SnapshotMetadata {
+  id: string;
+  time: string; // ISO timestamp
+  description?: string;
+  tags?: string[];
+  filesCount: number;
+  totalSize: number;
+}
+
+export interface SnapshotTree {
+  files: {
+    [path: string]: {
+      hash: string;
+      size: number;
+      mode: string;
+    };
+  };
+}
+
+export interface Snapshot {
+  metadata: SnapshotMetadata;
+  tree: SnapshotTree;
+}
+
+export interface SnapshotDiff {
+  added: string[];
+  modified: string[];
+  deleted: string[];
+  renamed: Array<{ from: string; to: string }>;
+}
+
+export interface SnapshotOptions {
+  message?: string;
+  tags?: string[];
+  includeUntracked?: boolean;
+  path?: string;
+  ignorePatterns?: string[];
+  onProgress?: (progress: { current: number; total: number; file: string }) => void;
 }

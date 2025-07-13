@@ -31,6 +31,12 @@ dex -a
 # Extract changes since main branch
 dex --since main
 
+# Extract changes since last snapshot
+dex @-1
+
+# Extract changes since 2 hours ago
+dex @2h
+
 # Copy to clipboard
 dex -c
 
@@ -55,6 +61,7 @@ dex -i
 - **Flexible Context Levels**: From minimal diffs to full file dumps
 - **Task Integration**: Embed task descriptions and GitHub issues
 - **LLM Optimization**: Reduce token usage while maintaining context quality
+- **Snapshot System**: Track changes without git commits for AI workflows
 
 ## Project Setup
 
@@ -64,11 +71,13 @@ Run `dex init` to create the `.dex/` directory structure in your project:
 .dex/
 ├── config.yml        # Main configuration
 ├── .dexignore        # Files to exclude
-└── prompts/          # Custom prompt templates
-    ├── security.yml
-    ├── performance.yml
-    ├── refactor.yml
-    └── ...
+├── prompts/          # Custom prompt templates
+│   ├── security.yml
+│   ├── performance.yml
+│   ├── refactor.yml
+│   └── ...
+└── snapshots/        # Code snapshots (managed automatically)
+    └── objects/      # Compressed file storage
 ```
 
 ### Configuration
@@ -164,13 +173,115 @@ dex prompts show security
 dex prompts init "Migration Guide"
 ```
 
+## Snapshot System
+
+Dex includes a powerful snapshot system that allows you to track changes without creating git commits. This is perfect for AI-assisted coding workflows where you want to reference previous states without polluting your git history.
+
+### Why Snapshots?
+
+- **Token Efficiency**: Avoid repeatedly sending full context to AI
+- **Clean Git History**: No temporary commits cluttering your repository
+- **Fast Comparisons**: Quickly see what changed since any snapshot
+- **Flexible References**: Use relative times (@2h) or positions (@-1)
+- **Persistent Context**: Maintain conversation continuity across sessions
+
+### Creating Snapshots
+
+```bash
+# Create a snapshot with a message
+dex snapshot create -m "Before refactoring auth module"
+
+# Create with tags for organization
+dex snapshot create -t feature,auth,wip
+
+# Snapshot only specific paths
+dex snapshot create -p src/auth -m "Auth module baseline"
+
+# Include untracked files
+dex snapshot create --include-untracked
+```
+
+### Using Snapshots in Diffs
+
+The real power comes from using snapshots as reference points:
+
+```bash
+# Changes since last snapshot
+dex @-1
+
+# Changes since 2nd most recent snapshot
+dex @-2
+
+# Changes since 2 hours ago
+dex @2h
+
+# Changes since 1 day ago
+dex @1d
+
+# Changes since a week ago
+dex @1w
+```
+
+### Managing Snapshots
+
+```bash
+# List all snapshots
+dex snapshot list
+
+# List snapshots with specific tags
+dex snapshot list -t wip
+
+# View snapshot details
+dex snapshot view <id>
+
+# Compare two snapshots
+dex snapshot diff @-2 @-1
+
+# Clean old snapshots
+dex snapshot clean --older-than 7d
+
+# Keep snapshots with certain tags
+dex snapshot clean --older-than 7d --keep-tags important
+```
+
+### Smart Resolution
+
+Dex intelligently resolves snapshot references:
+- **Exact ID**: `abc123` - Direct snapshot ID
+- **Relative Position**: `@-1`, `@-2` - Nth most recent snapshot
+- **Relative Time**: `@2h`, `@1d`, `@1w` - Most recent before time
+- **Name Match**: `auth-refactor` - Partial match on description
+- **Fallback**: If no snapshot matches, falls back to git refs
+
+### Example Workflow
+
+```bash
+# Start working on a feature
+dex snapshot create -m "Starting auth refactor" -t auth,baseline
+
+# Make some changes, get AI feedback
+dex @-1 -f claude --prompt-template refactor
+
+# Continue working...
+dex snapshot create -m "Implemented JWT validation"
+
+# See all changes since baseline
+dex @baseline -f claude
+
+# Compare progress between snapshots
+dex snapshot diff @-2 @-1
+
+# Clean up old work-in-progress snapshots
+dex snapshot clean --older-than 3d --keep-tags baseline
+```
+
 ## CLI Usage
 
 ```
 Usage: dex [options] [range]
 
 Arguments:
-  range                       Git commit range (e.g., HEAD~5..HEAD)
+  range                       Git commit range or snapshot reference (e.g., HEAD~5..HEAD, @-1, @2h)
 
 Options:
   -V, --version               Output version
@@ -197,6 +308,7 @@ Options:
 Subcommands:
   extract [range]             Extract and format code changes (default)
   init                        Initialize dex configuration
+  snapshot                    Manage code snapshots
   prompts list                List available prompt templates
   prompts show <id>           Show prompt template details
   prompts init <name>         Create new prompt template
@@ -274,6 +386,25 @@ dex -d extended --full "*"
 dex -u
 ```
 
+### Snapshot Examples
+```bash
+# Track progress without commits
+dex snapshot create -m "Start feature"
+# ... work on code ...
+dex @-1 -f claude --prompt-template feature
+
+# Time-based references
+dex @2h   # Changes in last 2 hours
+dex @1d   # Changes since yesterday
+dex @1w   # Changes in past week
+
+# Compare snapshots
+dex snapshot diff @-3 @-1  # What changed between snapshots
+
+# Clean up workspace
+dex snapshot clean --older-than 7d --keep-tags baseline,milestone
+```
+
 ### Advanced Examples
 ```bash
 # Review changes since main with security focus
@@ -287,6 +418,13 @@ dex --full "*.ts" --prompt-template refactor
 
 # Interactive mode with performance template
 dex -i --prompt-template performance
+
+# Combine snapshots with templates
+dex @baseline --prompt-template security -f claude
+
+# Track incremental progress
+dex snapshot create -m "Added auth middleware"
+dex @-1 --prompt "Review auth implementation for security"
 ```
 
 ## Prompt Template System

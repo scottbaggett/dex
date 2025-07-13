@@ -4,20 +4,29 @@ import { minimatch } from 'minimatch';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { TaskExtractor, TaskSource } from './task-extractor';
+import { SnapshotManager } from './snapshot';
 
 export class ContextEngine {
   private gitExtractor: GitExtractor;
   private taskExtractor: TaskExtractor;
+  private snapshotManager: SnapshotManager;
+  private workingDir: string;
 
   constructor(workingDir: string = process.cwd()) {
+    this.workingDir = workingDir;
     this.gitExtractor = new GitExtractor(workingDir);
     this.taskExtractor = new TaskExtractor();
+    this.snapshotManager = new SnapshotManager(workingDir);
   }
 
   async extract(options: DexOptions): Promise<ExtractedContext> {
     // Get git changes
     let changes: GitChange[];
-    if (options.range) {
+    
+    // Handle snapshot-based diffs
+    if (options.isSnapshot && options.snapshot) {
+      changes = await this.snapshotManager.diff(options.snapshot);
+    } else if (options.range) {
       const [from, to] = options.range.split('..');
       changes = await this.gitExtractor.getChangesInRange(from, to || 'HEAD');
     } else if (options.since) {

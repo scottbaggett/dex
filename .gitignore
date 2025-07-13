@@ -13,3 +13,5 @@ coverage/
 .cache/
 .claude
 .aid
+
+.dex
