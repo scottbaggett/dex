@@ -1,8 +1,9 @@
 import chalk from 'chalk';
-import { writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync, readFileSync } from 'fs';
+import { join, dirname } from 'path';
 import ora from 'ora';
 import * as readline from 'readline';
+import * as yaml from 'js-yaml';
 
 interface DexConfig {
   defaults?: {
@@ -25,17 +26,20 @@ const DEFAULT_CONFIG: DexConfig = {
     depth: 'focused',
   },
   filters: {
-    ignorePaths: ['node_modules', 'dist', 'build', '.git'],
+    ignorePaths: ['node_modules', 'dist', 'build', '.git', '.dex'],
   },
 };
 
 export async function initCommand(): Promise<void> {
   console.log(chalk.cyan.bold('\n🚀 Dex Configuration Setup\n'));
   
-  // Check if config already exists
-  const configPath = join(process.cwd(), '.dexrc');
-  if (existsSync(configPath)) {
-    console.log(chalk.yellow('⚠️  A .dexrc file already exists in this directory.'));
+  const dexDir = join(process.cwd(), '.dex');
+  const configPath = join(dexDir, 'config.yml');
+  const promptsDir = join(dexDir, 'prompts');
+  
+  // Check if .dex directory already exists
+  if (existsSync(dexDir)) {
+    console.log(chalk.yellow('⚠️  A .dex directory already exists in this project.'));
     
     const rl = readline.createInterface({
       input: process.stdin,
@@ -43,7 +47,7 @@ export async function initCommand(): Promise<void> {
     });
     
     const overwrite = await new Promise<boolean>((resolve) => {
-      rl.question(chalk.blue('Do you want to overwrite it? (y/N) '), (answer) => {
+      rl.question(chalk.blue('Do you want to reinitialize it? (y/N) '), (answer) => {
         rl.close();
         resolve(answer.toLowerCase() === 'y');
       });
@@ -55,29 +59,142 @@ export async function initCommand(): Promise<void> {
     }
   }
   
-  const spinner = ora('Creating configuration file...').start();
+  const spinner = ora('Creating .dex directory structure...').start();
   
   try {
-    // Create config file
-    const configContent = JSON.stringify(DEFAULT_CONFIG, null, 2);
-    writeFileSync(configPath, configContent);
+    // Create .dex directory
+    if (!existsSync(dexDir)) {
+      mkdirSync(dexDir, { recursive: true });
+    }
     
-    spinner.succeed(chalk.green('Created .dexrc configuration file'));
+    // Create config.yml
+    const configContent = yaml.dump(DEFAULT_CONFIG, {
+      indent: 2,
+      lineWidth: -1,
+      noRefs: true,
+      sortKeys: false,
+    });
     
-    console.log('\n' + chalk.gray('Default configuration:'));
+    // Add helpful comments to the config
+    const configWithComments = `# Dex Configuration
+# For more information, see: https://github.com/scottbaggett/dex
+
+${configContent}
+# Custom prompt templates can be added in the prompts/ directory
+# Example:
+# prompts:
+#   my-review:
+#     name: My Custom Review
+#     extends: base-review
+#     instructions: |
+#       Custom review instructions here
+`;
+    
+    writeFileSync(configPath, configWithComments);
+    spinner.succeed(chalk.green('Created .dex/config.yml'));
+    
+    // Create prompts directory
+    if (!existsSync(promptsDir)) {
+      mkdirSync(promptsDir, { recursive: true });
+    }
+    spinner.succeed(chalk.green('Created .dex/prompts/ directory'));
+    
+    // Copy built-in prompts as examples
+    const builtinPromptsDir = join(dirname(dirname(__dirname)), 'dist', 'prompts');
+    let promptFiles: string[] = [];
+    
+    if (existsSync(builtinPromptsDir)) {
+      promptFiles = readdirSync(builtinPromptsDir).filter(f => f.endsWith('.yml'));
+      
+      for (const file of promptFiles) {
+        const sourcePath = join(builtinPromptsDir, file);
+        const destPath = join(promptsDir, file);
+        
+        // Read the prompt and add a header comment
+        let content = readFileSync(sourcePath, 'utf-8');
+        content = `# This is a copy of the built-in ${file.replace('.yml', '')} prompt template.\n# Feel free to modify it to suit your needs!\n# To use: dex --prompt-template ${file.replace('.yml', '')}\n\n${content}`;
+        
+        writeFileSync(destPath, content);
+      }
+      
+      spinner.succeed(chalk.green(`Copied ${promptFiles.length} example prompt templates to .dex/prompts/`));
+    } else {
+      spinner.warn(chalk.yellow('Built-in prompts not found. Run "npm run build" first if developing locally.'));
+    }
+    
+    // Create .dexignore file
+    const dexignorePath = join(dexDir, '.dexignore');
+    const dexignoreContent = `# Files and patterns to ignore when extracting context
+# Uses gitignore syntax
+
+# Dependencies
+node_modules/
+vendor/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+
+# IDE and system files
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Environment files with secrets
+.env.local
+.env.*.local
+
+# Large binary files
+*.zip
+*.tar.gz
+*.dmg
+*.iso
+*.exe
+*.dll
+*.so
+*.dylib
+`;
+    
+    writeFileSync(dexignorePath, dexignoreContent);
+    spinner.succeed(chalk.green('Created .dex/.dexignore'));
+    
+    // Display summary
+    console.log('\n' + chalk.gray('Directory structure:'));
     console.log(chalk.gray('─'.repeat(40)));
-    console.log(configContent);
+    console.log(chalk.white('.dex/'));
+    console.log(chalk.white('├── config.yml        ') + chalk.gray('# Main configuration'));
+    console.log(chalk.white('├── .dexignore        ') + chalk.gray('# Ignore patterns'));
+    console.log(chalk.white('└── prompts/          ') + chalk.gray('# Custom prompt templates'));
+    
+    if (promptFiles?.length) {
+      for (let i = 0; i < promptFiles.length; i++) {
+        const isLast = i === promptFiles.length - 1;
+        console.log(chalk.white(`    ${isLast ? '└' : '├'}── ${promptFiles[i]}`));
+      }
+    }
+    
     console.log(chalk.gray('─'.repeat(40)));
     
-    console.log(chalk.cyan('\n✨ You can now customize your dex settings!'));
-    console.log(chalk.gray('\nExample customizations:'));
-    console.log(chalk.gray('  • Set default format: "format": "claude"'));
-    console.log(chalk.gray('  • Set default depth: "depth": "extended"'));
-    console.log(chalk.gray('  • Always copy to clipboard: "clipboard": true'));
-    console.log(chalk.gray('  • Ignore specific paths: "ignorePaths": ["tests", "*.test.ts"]'));
+    console.log(chalk.cyan('\n✨ Dex has been initialized!'));
+    console.log(chalk.gray('\nNext steps:'));
+    console.log(chalk.gray('  1. Review and customize .dex/config.yml'));
+    console.log(chalk.gray('  2. Explore prompt templates in .dex/prompts/'));
+    console.log(chalk.gray('  3. Run "dex" to extract your code changes'));
+    console.log(chalk.gray('\nTip: Add .dex/ to your .gitignore if you want to keep it local'));
     
   } catch (error) {
-    spinner.fail(chalk.red('Failed to create configuration file'));
+    spinner.fail(chalk.red('Failed to initialize Dex'));
     console.error(chalk.red(`Error: ${error instanceof Error ? error.message : error}`));
     process.exit(1);
   }

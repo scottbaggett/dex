@@ -1,4 +1,5 @@
 import { ExtractedContext, DexOptions } from '../types';
+import { PromptLoader } from './prompt-loader';
 
 export interface PromptContext {
   task?: string;
@@ -57,15 +58,52 @@ export class PromptGenerator {
   
   static generate(context: ExtractedContext, options: DexOptions): string {
     const analysis = this.analyzeContext(context);
+    const promptLoader = PromptLoader.getInstance();
     
     // If custom prompt provided, use it
     if (options.prompt) {
       return options.prompt;
     }
     
-    // If preset prompt requested, use it
-    if (options.promptPreset) {
-      return this.getPresetPrompt(options.promptPreset, analysis);
+    // If prompt template requested, use it
+    if (options.promptTemplate) {
+      const template = promptLoader.getPrompt(options.promptTemplate);
+      if (template) {
+        let instructions = template.instructions;
+        
+        // Interpolate variables if provided
+        if (template.variables) {
+          const variables = {
+            ...template.variables,
+            task: analysis.task || '',
+            file_count: String(analysis.filesChanged),
+            primary_language: analysis.primaryLanguage
+          };
+          instructions = promptLoader.interpolateVariables(instructions, variables);
+        }
+        
+        return instructions;
+      }
+      
+      // Fall back to old system if template not found
+      console.warn(`Prompt template '${options.promptTemplate}' not found, using default`);
+      return this.getPromptByName(options.promptTemplate, analysis);
+    }
+    
+    // Auto-suggest prompts if in interactive mode
+    if (options.interactive && !options.noPrompt) {
+      const suggestions = promptLoader.suggestPrompts({
+        format: options.format,
+        task: analysis.task,
+        fileTypes: analysis.fileTypes
+      });
+      
+      if (suggestions.length > 0) {
+        // In a real implementation, this would be shown in interactive UI
+        // For now, we'll just use the top suggestion
+        const topSuggestion = suggestions[0];
+        console.log(`💡 Suggested prompt template: ${topSuggestion.name}`);
+      }
     }
     
     // Generate contextual prompt based on what changed
@@ -197,8 +235,8 @@ export class PromptGenerator {
     return names[ext] || 'Programming language';
   }
   
-  private static getPresetPrompt(preset: string, analysis: PromptContext): string {
-    const presets: Record<string, string> = {
+  private static getPromptByName(promptName: string, analysis: PromptContext): string {
+    const prompts: Record<string, string> = {
       'security': `Perform a security audit of these changes. Focus on:
 - Authentication/authorization vulnerabilities
 - Input validation and sanitization
@@ -271,6 +309,6 @@ Ensure API best practices are followed.`,
 Suggest missing test scenarios.`
     };
     
-    return presets[preset] || this.generateContextualPrompt(analysis, { format: 'markdown' });
+    return prompts[promptName] || this.generateContextualPrompt(analysis, { format: 'markdown' });
   }
 }

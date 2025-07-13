@@ -40,8 +40,8 @@ export interface DexOptions {
   noMetadata?: boolean;
   
   // Prompt options
-  prompt?: string;           // Custom prompt
-  promptPreset?: string;     // Preset prompt (security, performance, etc.)
+  prompt?: string;           // Custom prompt text
+  promptTemplate?: string;   // Prompt template name (security, performance, etc.)
   noPrompt?: boolean;        // Disable prompt generation
 }
 

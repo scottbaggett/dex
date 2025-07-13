@@ -1,0 +1,48 @@
+name: Feature Implementation Review
+description: Validate feature completeness and integration
+tags:
+  - feature
+  - implementation
+  - requirements
+llm:
+  - gpt
+  - claude
+  - gemini
+instructions: |
+  Review this feature implementation for completeness:
+
+  1. **Requirements Coverage**
+     - All acceptance criteria met
+     - Edge cases handled
+     - Error scenarios covered
+
+  2. **User Experience**
+     - Intuitive interactions
+     - Helpful error messages
+     - Loading states and feedback
+     - Accessibility compliance
+
+  3. **Integration Points**
+     - API contract adherence
+     - Event handling completeness
+     - Data flow correctness
+     - Side effects managed
+
+  4. **Testing Coverage**
+     - Unit tests for logic
+     - Integration tests for flows
+     - E2E tests for critical paths
+     - Performance benchmarks
+
+  5. **Documentation**
+     - API documentation
+     - User-facing docs
+     - Code comments
+     - Migration guides
+
+  Assessment:
+  - **Completeness**: % of requirements met
+  - **Missing Pieces**: What's not implemented
+  - **Quality Issues**: Implementation concerns
+  - **Next Steps**: To reach production-ready
+extends: base-review

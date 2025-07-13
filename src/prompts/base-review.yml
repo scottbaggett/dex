@@ -1,0 +1,32 @@
+name: Base Code Review
+description: Standard code review template that others can extend
+tags:
+  - review
+  - base
+instructions: |
+  Review the code changes for:
+
+  1. **Correctness**
+     - Logic errors
+     - Off-by-one errors
+     - Null/undefined handling
+
+  2. **Code Quality**
+     - Readability
+     - Maintainability
+     - DRY principle
+
+  3. **Best Practices**
+     - Language idioms
+     - Framework conventions
+     - Design patterns
+
+  4. **Error Handling**
+     - Graceful degradation
+     - User-friendly messages
+     - Logging
+
+  Provide actionable feedback with examples.
+variables:
+  language: "{{primary_language}}"
+  scope: "{{file_count}} files"

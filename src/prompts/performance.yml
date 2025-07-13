@@ -1,0 +1,45 @@
+name: Performance Review
+description: Analyze performance implications and optimization opportunities
+tags:
+  - performance
+  - optimization
+  - efficiency
+llm:
+  - gpt
+  - claude
+  - gemini
+instructions: |
+  Analyze the performance implications of these changes:
+
+  1. **Algorithm Complexity**
+     - Time complexity (Big O)
+     - Space complexity
+     - Nested loops and recursion depth
+
+  2. **Database Performance**
+     - Query optimization (missing indexes, N+1 queries)
+     - Connection pooling
+     - Caching opportunities
+
+  3. **Memory Management**
+     - Memory leaks
+     - Large object allocations
+     - Garbage collection pressure
+
+  4. **Network Optimization**
+     - API call batching
+     - Payload size reduction
+     - Compression opportunities
+
+  5. **Frontend Performance**
+     - Render blocking resources
+     - Bundle size impact
+     - React re-render optimization
+
+  For each issue found:
+  - **Impact**: Quantify performance impact
+  - **Location**: Specific code location
+  - **Optimization**: Concrete improvement suggestion
+  - **Trade-offs**: Any downsides to consider
+variables:
+  focus_area: general

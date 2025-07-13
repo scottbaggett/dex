@@ -71,7 +71,7 @@ program
   .option('--optimize <types...>', 'Optimizations: aid, symbols')
   .option('--no-metadata', 'Exclude metadata from output')
   .option('--prompt <text>', 'Custom AI analysis prompt')
-  .option('--prompt-preset <preset>', 'Use preset prompt: security, performance, refactor, feature, bugfix, migration, api, testing')
+  .option('--prompt-template <name>', 'Use prompt template: security, performance, refactor, feature, bugfix, migration, api, testing')
   .option('--no-prompt', 'Disable AI prompt generation')
   .action(async (range, options) => {
     await extractCommand(range, options);
@@ -101,7 +101,7 @@ program
   .option('--optimize <types...>', 'Optimizations: aid, symbols')
   .option('--no-metadata', 'Exclude metadata from output')
   .option('--prompt <text>', 'Custom AI analysis prompt')
-  .option('--prompt-preset <preset>', 'Use preset prompt: security, performance, refactor, feature, bugfix, migration, api, testing')
+  .option('--prompt-template <name>', 'Use prompt template: security, performance, refactor, feature, bugfix, migration, api, testing')
   .option('--no-prompt', 'Disable AI prompt generation')
   .action(async (range, options) => {
     await extractCommand(range || '', options);
@@ -114,6 +114,216 @@ program
   .action(async () => {
     const { initCommand } = await import('./commands/init');
     await initCommand();
+  });
+
+// Prompts command with subcommands
+const promptsCmd = program
+  .command('prompts')
+  .description('Manage prompt templates')
+  .action(() => {
+    // Default action shows help
+    promptsCmd.outputHelp();
+  });
+
+// List prompts subcommand
+promptsCmd
+  .command('list')
+  .alias('ls')
+  .description('List all available prompt templates')
+  .option('-t, --tags <tags>', 'Filter by tags (comma-separated)')
+  .option('-v, --verbose', 'Show detailed information')
+  .action(async (options) => {
+    const { PromptLoader } = await import('./core/prompt-loader');
+    const loader = PromptLoader.getInstance();
+    let prompts = loader.getAllPrompts();
+    
+    // Filter by tags if specified
+    if (options.tags) {
+      const filterTags = options.tags.split(',').map((t: string) => t.trim());
+      prompts = prompts.filter(p => 
+        p.tags && p.tags.some(tag => filterTags.includes(tag))
+      );
+    }
+    
+    if (prompts.length === 0) {
+      console.log(chalk.yellow('\nNo prompt templates found matching criteria.\n'));
+      return;
+    }
+    
+    console.log(chalk.cyan.bold('\nAvailable Prompt Templates:\n'));
+    
+    for (const prompt of prompts) {
+      console.log(chalk.green.bold(`${prompt.id}`) + chalk.gray(' - ') + chalk.white(prompt.name));
+      console.log(chalk.gray(`  ${prompt.description}`));
+      
+      if (options.verbose || (prompt.tags && prompt.tags.length > 0)) {
+        if (prompt.tags && prompt.tags.length > 0) {
+          console.log(chalk.gray('  Tags: ') + chalk.blue(prompt.tags.join(', ')));
+        }
+        if (prompt.extends) {
+          console.log(chalk.gray('  Extends: ') + chalk.cyan(prompt.extends));
+        }
+        if (prompt.llm && options.verbose) {
+          console.log(chalk.gray('  Recommended for: ') + chalk.blue(prompt.llm.join(', ')));
+        }
+      }
+      console.log();
+    }
+    
+    console.log(chalk.gray('Use: dex --prompt-template <id>\n'));
+  });
+
+// Show prompt template details
+promptsCmd
+  .command('show <id>')
+  .description('Show detailed prompt template information and preview')
+  .option('-e, --example', 'Show with example context')
+  .action(async (id, options) => {
+    const { PromptLoader } = await import('./core/prompt-loader');
+    const { PromptGenerator } = await import('./core/prompts');
+    const loader = PromptLoader.getInstance();
+    const template = loader.getPrompt(id);
+    
+    if (!template) {
+      console.error(chalk.red(`\nPrompt template '${id}' not found.\n`));
+      console.log(chalk.gray('Run "dex prompts list" to see available templates.\n'));
+      process.exit(1);
+    }
+    
+    console.log(chalk.cyan.bold(`\nPrompt Template: ${template.name}\n`));
+    console.log(chalk.blue('ID:') + ' ' + chalk.green.bold(template.id));
+    console.log(chalk.blue('Description:') + ' ' + template.description);
+    
+    if (template.tags && template.tags.length > 0) {
+      console.log(chalk.blue('Tags:') + ' ' + chalk.gray(template.tags.join(', ')));
+    }
+    
+    if (template.extends) {
+      console.log(chalk.blue('Extends:') + ' ' + chalk.cyan(template.extends));
+    }
+    
+    if (template.llm && template.llm.length > 0) {
+      console.log(chalk.blue('Recommended for:') + ' ' + chalk.gray(template.llm.join(', ')));
+    }
+    
+    console.log(chalk.blue.bold('\nPrompt Instructions:'));
+    console.log(chalk.gray('─'.repeat(60)));
+    console.log(template.instructions);
+    console.log(chalk.gray('─'.repeat(60)));
+    
+    if (template.examples && template.examples.length > 0) {
+      console.log(chalk.yellow('\nExamples:'));
+      for (const example of template.examples) {
+        console.log(chalk.gray('\nInput:'), example.input);
+        console.log(chalk.gray('Output:'), example.output);
+        if (example.explanation) {
+          console.log(chalk.gray('Explanation:'), example.explanation);
+        }
+      }
+    }
+    
+    if (options.example) {
+      console.log(chalk.yellow('\nExample with sample context:'));
+      console.log(chalk.gray('─'.repeat(60)));
+      
+      // Create mock context
+      const mockContext = {
+        changes: [
+          { file: 'auth.js', status: 'modified', additions: 20, deletions: 5, diff: '' }
+        ],
+        scope: { filesChanged: 1, linesAdded: 20, linesDeleted: 5, functionsModified: 2 },
+        metadata: {
+          repository: { name: 'example-app', branch: 'main', commit: 'abc123' },
+          extraction: { depth: 'focused' },
+          tokens: { estimated: 500 },
+          tool: { name: 'dex', version: '0.1.0' },
+          generated: new Date().toISOString()
+        }
+      };
+      
+      const prompt = PromptGenerator.generate(mockContext as any, { 
+        promptTemplate: id,
+        format: 'markdown'
+      } as any);
+      
+      console.log(prompt);
+      console.log(chalk.gray('─'.repeat(60)));
+    }
+    
+    console.log(chalk.gray('\nUse this template: dex --prompt-template ' + id + '\n'));
+  });
+
+// Initialize new prompt template
+promptsCmd
+  .command('init <name>')
+  .description('Create a new prompt template')
+  .option('-e, --extends <base>', 'Extend from existing prompt template')
+  .option('-o, --output <path>', 'Output path (default: show in console)')
+  .action(async (name, options) => {
+    const { PromptLoader } = await import('./core/prompt-loader');
+    const loader = PromptLoader.getInstance();
+    
+    // Validate base prompt if extending
+    if (options.extends) {
+      const basePrompt = loader.getPrompt(options.extends);
+      if (!basePrompt) {
+        console.error(chalk.red(`\nBase prompt template '${options.extends}' not found.\n`));
+        process.exit(1);
+      }
+    }
+    
+    // Convert name to id format (lowercase, hyphenated)
+    const id = name.toLowerCase().replace(/\s+/g, '-');
+    
+    const template = {
+      name: name,
+      description: `Custom ${name} prompt template`,
+      tags: ["custom"],
+      ...(options.extends && { extends: options.extends }),
+      instructions: `# ${name} Review\n\nProvide detailed analysis focusing on:\n\n1. **First Focus Area**\n   - Specific check 1\n   - Specific check 2\n\n2. **Second Focus Area**\n   - Specific check 1\n   - Specific check 2\n\nFormat your response as:\n- **Finding**: Description\n- **Severity**: High/Medium/Low\n- **Suggestion**: How to address`,
+      examples: [
+        {
+          input: "Example issue in code",
+          output: "**Finding**: Description of issue\\n**Severity**: Medium\\n**Suggestion**: How to fix"
+        }
+      ]
+    };
+    
+    const output = JSON.stringify(template, null, 2);
+    
+    if (options.output) {
+      const { writeFileSync } = await import('fs');
+      const outputPath = options.output.endsWith('.json') 
+        ? options.output 
+        : `${options.output}/${id}.json`;
+        
+      try {
+        writeFileSync(outputPath, output);
+        console.log(chalk.green(`\n✓ Created prompt template at: ${outputPath}\n`));
+      } catch (error) {
+        console.error(chalk.red(`\nFailed to write file: ${error}\n`));
+        process.exit(1);
+      }
+    } else {
+      console.log(chalk.cyan.bold(`\nPrompt Template for '${name}':\n`));
+      console.log(chalk.gray('Save this as a .yml file in your prompts/ directory:\n'));
+      console.log(chalk.yellow(`# ${id}.yml`));
+      const yamlOutput = `name: ${name}
+description: ${template.description}
+tags:
+  - custom
+${options.extends ? `extends: ${options.extends}
+` : ''}instructions: |
+  ${template.instructions.replace(/\n/g, '\n  ')}
+examples:
+  - input: "Example issue in code"
+    output: |
+      **Finding**: Description of issue
+      **Severity**: Medium
+      **Suggestion**: How to fix`;
+      console.log(yamlOutput);
+      console.log(chalk.gray('\nOr add to your .dexrc for inline configuration.\n'));
+    }
   });
 
 // Help subcommand with detailed examples
@@ -149,10 +359,13 @@ program
       console.log('  dex -t ts,tsx          Filter to TypeScript files\n');
 
       console.log(chalk.yellow('AI Prompt Options:'));
-      console.log('  dex --prompt-preset security    Security-focused review');
-      console.log('  dex --prompt-preset performance Performance analysis');
+      console.log('  dex --prompt-template security  Security-focused review');
+      console.log('  dex --prompt-template perf      Performance analysis');
       console.log('  dex --prompt "Custom prompt"    Use custom analysis prompt');
-      console.log('  dex --no-prompt                 Disable prompt generation\n');
+      console.log('  dex --no-prompt                 Disable prompt generation');
+      console.log('  dex prompts list                Browse available prompt templates');
+      console.log('  dex prompts show <id>           Preview a specific prompt template');
+      console.log('  dex prompts init <name>         Create custom prompt template\n');
 
       console.log(chalk.yellow('Output Formats:'));
       console.log('  markdown               Human-readable format (default)');
@@ -245,7 +458,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
       symbols,
       noMetadata: !options.metadata,
       prompt: options.prompt,
-      promptPreset: options.promptPreset,
+      promptTemplate: options.promptTemplate,
       noPrompt: options.prompt === false,
     };
 

@@ -1,5 +1,6 @@
 import { cosmiconfigSync } from 'cosmiconfig';
 import { DexOptions } from '../types';
+import { PromptsConfig } from '../types/prompts';
 
 export interface DexConfig {
   defaults?: Partial<DexOptions>;
@@ -10,10 +11,15 @@ export interface DexConfig {
   tasks?: {
     defaultSource?: string;
   };
+  prompts?: PromptsConfig['prompts'];
 }
 
 const explorer = cosmiconfigSync('dex', {
   searchPlaces: [
+    '.dex/config.yml',
+    '.dex/config.yaml',
+    '.dex/config.json',
+    '.dex/config.js',
     '.dexrc',
     '.dexrc.json',
     '.dexrc.yaml',
