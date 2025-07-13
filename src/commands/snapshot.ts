@@ -220,7 +220,7 @@ export function createSnapshotCommand(): Command {
   snapshot
     .command('clean')
     .description('Remove old snapshots')
-    .option('--older-than <time>', 'Remove snapshots older than (e.g., 7d, 2w, 1m)')
+    .option('--older-than <time>', 'Remove snapshots older than (e.g., 30m, 2h, 7d, 2w, 1M)')
     .option('--keep-tags <tags>', 'Keep snapshots with these tags (comma-separated)', (value) =>
       value.split(',').map((t) => t.trim())
     )
@@ -281,23 +281,25 @@ export function createSnapshotCommand(): Command {
 }
 
 function parseRelativeTime(timeStr: string): number {
-  const match = timeStr.match(/^(\d+)([hdwm])$/);
+  const match = timeStr.match(/^(\d+)([mhdwM])$/);
   if (!match) {
-    throw new Error('Invalid time format. Use format like: 7d, 2w, 1m');
+    throw new Error('Invalid time format. Use format like: 5m, 2h, 7d, 2w, 1M');
   }
 
   const value = parseInt(match[1], 10);
   const unit = match[2];
 
   switch (unit) {
-    case 'h':
-      return value * 60 * 60 * 1000;
-    case 'd':
-      return value * 24 * 60 * 60 * 1000;
-    case 'w':
-      return value * 7 * 24 * 60 * 60 * 1000;
     case 'm':
-      return value * 30 * 24 * 60 * 60 * 1000;
+      return value * 60 * 1000;           // minutes
+    case 'h':
+      return value * 60 * 60 * 1000;      // hours
+    case 'd':
+      return value * 24 * 60 * 60 * 1000; // days
+    case 'w':
+      return value * 7 * 24 * 60 * 60 * 1000; // weeks
+    case 'M':
+      return value * 30 * 24 * 60 * 60 * 1000; // months
     default:
       throw new Error('Invalid time unit');
   }

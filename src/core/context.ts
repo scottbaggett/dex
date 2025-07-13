@@ -2,9 +2,11 @@ import { GitExtractor } from './git';
 import { DexOptions, ExtractedContext, GitChange, TaskContext, Metadata } from '../types';
 import { minimatch } from 'minimatch';
 import { readFileSync } from 'fs';
+import { promises as fs } from 'fs';
 import { join } from 'path';
 import { TaskExtractor, TaskSource } from './task-extractor';
 import { SnapshotManager } from './snapshot';
+import * as diff from 'diff';
 
 export class ContextEngine {
   private gitExtractor: GitExtractor;
@@ -23,8 +25,11 @@ export class ContextEngine {
     // Get git changes
     let changes: GitChange[];
     
-    // Handle snapshot-based diffs
-    if (options.isSnapshot && options.snapshot) {
+    // Handle time-based file changes
+    if (options.isTimeRange && options.timeRange) {
+      changes = await this.getTimeBasedChanges(options.timeRange);
+    } else if (options.isSnapshot && options.snapshot) {
+      // Handle snapshot-based diffs
       changes = await this.snapshotManager.diff(options.snapshot);
     } else if (options.range) {
       const [from, to] = options.range.split('..');
@@ -315,5 +320,117 @@ export class ContextEngine {
 
     // Rough estimate: 1 token ≈ 4 characters
     return Math.ceil(charCount / 4);
+  }
+
+  private async getTimeBasedChanges(timeRange: string): Promise<GitChange[]> {
+    // Parse time range to get cutoff timestamp
+    const cutoffTime = this.parseTimeRange(timeRange);
+    if (!cutoffTime) {
+      throw new Error(`Invalid time range format: ${timeRange}`);
+    }
+
+    // Get all tracked files from git
+    const trackedFiles = await this.gitExtractor.getTrackedFiles();
+    const changes: GitChange[] = [];
+
+    // Check each file's modification time
+    for (const filePath of trackedFiles) {
+      try {
+        const fullPath = join(this.workingDir, filePath);
+        const stats = await fs.stat(fullPath);
+        
+        // Check if file was modified within the time range
+        if (stats.mtime.getTime() >= cutoffTime) {
+          // Get the file's last committed version
+          const lastCommittedContent = await this.gitExtractor.getFileContentFromHead(filePath);
+          const currentContent = await fs.readFile(fullPath, 'utf8');
+          
+          // Generate diff between last committed and current
+          if (lastCommittedContent !== currentContent) {
+            const patch = diff.createPatch(filePath, lastCommittedContent, currentContent);
+            const diffStats = this.calculateDiffStats(patch);
+            
+            changes.push({
+              file: filePath,
+              status: 'modified',
+              additions: diffStats.additions,
+              deletions: diffStats.deletions,
+              diff: patch
+            });
+          }
+        }
+      } catch {
+        // File might have been deleted or is inaccessible
+        continue;
+      }
+    }
+
+    // Also check for new untracked files
+    const untrackedFiles = await this.gitExtractor.getUntrackedFiles();
+    for (const filePath of untrackedFiles) {
+      try {
+        const fullPath = join(this.workingDir, filePath);
+        const stats = await fs.stat(fullPath);
+        
+        if (stats.mtime.getTime() >= cutoffTime) {
+          const content = await fs.readFile(fullPath, 'utf8');
+          const lines = content.split('\n').length;
+          
+          changes.push({
+            file: filePath,
+            status: 'added',
+            additions: lines,
+            deletions: 0,
+            diff: this.createAddedDiff(content)
+          });
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return changes;
+  }
+
+  private parseTimeRange(timeRange: string): number | null {
+    const match = timeRange.match(/^(\d+)([mhdwM])$/);
+    if (!match) return null;
+    
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+    
+    let milliseconds = 0;
+    switch (unit) {
+      case 'm': milliseconds = value * 60 * 1000; break;           // minutes
+      case 'h': milliseconds = value * 60 * 60 * 1000; break;      // hours
+      case 'd': milliseconds = value * 24 * 60 * 60 * 1000; break; // days
+      case 'w': milliseconds = value * 7 * 24 * 60 * 60 * 1000; break; // weeks
+      case 'M': milliseconds = value * 30 * 24 * 60 * 60 * 1000; break; // months
+      default: return null;
+    }
+    
+    // Return cutoff timestamp (now - duration)
+    return Date.now() - milliseconds;
+  }
+
+  private calculateDiffStats(patch: string): { additions: number; deletions: number } {
+    const lines = patch.split('\n');
+    let additions = 0;
+    let deletions = 0;
+    
+    for (const line of lines) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        additions++;
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        deletions++;
+      }
+    }
+    
+    return { additions, deletions };
+  }
+
+  private createAddedDiff(content: string): string {
+    const lines = content.split('\n');
+    return lines.map(line => `+${line}`).join('\n');
   }
 }

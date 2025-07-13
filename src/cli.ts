@@ -402,11 +402,22 @@ async function extractCommand(range: string, options: Record<string, any>) {
       process.exit(1);
     }
 
-    // Check if range is a snapshot reference
+    // Check if range is a time-based or snapshot reference
     let isSnapshot = false;
+    let isTimeRange = false;
+    
     if (range) {
-      // Check for snapshot patterns: @-1, @2h, or snapshot names/IDs
-      if (range.startsWith('@') || !range.includes('..')) {
+      // Check for time-based pattern: @2h, @30m, @1d
+      const isTimePattern = range.match(/^@\d+[mhdwM]$/);
+      
+      // Check for snapshot position pattern: @-1, @-2
+      const isSnapshotPosition = range.match(/^@-\d+$/);
+      
+      if (isTimePattern) {
+        // Time-based file changes
+        isTimeRange = true;
+      } else if (isSnapshotPosition || !range.includes('..')) {
+        // Try to resolve as snapshot
         const { SnapshotManager } = await import('./core/snapshot');
         const snapshotManager = new SnapshotManager(process.cwd());
         try {
@@ -460,9 +471,11 @@ async function extractCommand(range: string, options: Record<string, any>) {
 
     // Parse options
     let dexOptions: DexOptions = {
-      range: isSnapshot ? undefined : range,
+      range: isSnapshot || isTimeRange ? undefined : range,
       snapshot: isSnapshot ? range : undefined,
       isSnapshot,
+      timeRange: isTimeRange ? range.substring(1) : undefined, // Remove @ prefix
+      isTimeRange,
       staged: options.staged,
       all: options.all,
       since: options.since,

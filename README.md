@@ -201,10 +201,11 @@ dex snapshot create -p src/auth -m "Auth module baseline"
 dex snapshot create --include-untracked
 ```
 
-### Using Snapshots in Diffs
+### Reference Types
 
-The real power comes from using snapshots as reference points:
+Dex supports multiple ways to reference changes:
 
+**Snapshot References**:
 ```bash
 # Changes since last snapshot
 dex @-1
@@ -212,14 +213,35 @@ dex @-1
 # Changes since 2nd most recent snapshot
 dex @-2
 
-# Changes since 2 hours ago
+# Changes since a specific snapshot
+dex snapshot-id
+```
+
+**Time-Based File Changes**:
+```bash
+# All files modified in the last 30 minutes
+dex @30m
+
+# All files modified in the last 2 hours
 dex @2h
 
-# Changes since 1 day ago
+# All files modified in the last day
 dex @1d
 
-# Changes since a week ago
+# All files modified in the last week
 dex @1w
+```
+
+**Git References** (standard git syntax):
+```bash
+# Changes in last 3 commits
+dex HEAD~3
+
+# Changes between branches
+dex main..feature
+
+# Changes since a specific commit
+dex abc123
 ```
 
 ### Managing Snapshots
@@ -246,12 +268,12 @@ dex snapshot clean --older-than 7d --keep-tags important
 
 ### Smart Resolution
 
-Dex intelligently resolves snapshot references:
+Dex intelligently resolves references:
 - **Exact ID**: `abc123` - Direct snapshot ID
 - **Relative Position**: `@-1`, `@-2` - Nth most recent snapshot
-- **Relative Time**: `@2h`, `@1d`, `@1w` - Most recent before time
-- **Name Match**: `auth-refactor` - Partial match on description
-- **Fallback**: If no snapshot matches, falls back to git refs
+- **Time-Based Changes**: `@5m`, `@2h`, `@1d` - Files modified within that time
+- **Name Match**: `auth-refactor` - Partial match on snapshot description
+- **Git Refs**: Standard git references (HEAD~3, main..feature, etc.)
 
 ### Example Workflow
 
@@ -393,10 +415,12 @@ dex snapshot create -m "Start feature"
 # ... work on code ...
 dex @-1 -f claude --prompt-template feature
 
-# Time-based references
-dex @2h   # Changes in last 2 hours
-dex @1d   # Changes since yesterday
-dex @1w   # Changes in past week
+# Time-based file changes (based on modification time)
+dex @15m  # All files changed in last 15 minutes
+dex @2h   # All files changed in last 2 hours
+dex @1d   # All files changed since yesterday
+dex @1w   # All files changed in past week
+dex @1M   # All files changed in past month
 
 # Compare snapshots
 dex snapshot diff @-3 @-1  # What changed between snapshots

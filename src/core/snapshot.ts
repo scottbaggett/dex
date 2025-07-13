@@ -428,34 +428,27 @@ export class SnapshotManager {
       if (index >= 0 && index < snapshots.length) {
         return snapshots[index].id;
       }
-    } else if (reference.match(/^@\d+[hdwm]$/)) {
-      // Handle @2h, @1d, @1w, @1m
-      const age = this.parseRelativeTime(reference.substring(1));
-      const cutoff = Date.now() - age;
-      
-      // Find the most recent snapshot before the cutoff
-      for (const meta of snapshots) {
-        if (new Date(meta.time).getTime() >= cutoff) {
-          return meta.id;
-        }
-      }
     }
+    
+    // Note: Time-based references (@2h, @30m) are now handled differently
+    // They show all files changed in that time period, not snapshots
     
     return null;
   }
 
   private parseRelativeTime(timeStr: string): number {
-    const match = timeStr.match(/^(\d+)([hdwm])$/);
+    const match = timeStr.match(/^(\d+)([mhdwM])$/);
     if (!match) return 0;
     
     const value = parseInt(match[1], 10);
     const unit = match[2];
     
     switch (unit) {
-      case 'h': return value * 60 * 60 * 1000;
-      case 'd': return value * 24 * 60 * 60 * 1000;
-      case 'w': return value * 7 * 24 * 60 * 60 * 1000;
-      case 'm': return value * 30 * 24 * 60 * 60 * 1000;
+      case 'm': return value * 60 * 1000;           // minutes
+      case 'h': return value * 60 * 60 * 1000;      // hours
+      case 'd': return value * 24 * 60 * 60 * 1000; // days
+      case 'w': return value * 7 * 24 * 60 * 60 * 1000; // weeks
+      case 'M': return value * 30 * 24 * 60 * 60 * 1000; // months
       default: return 0;
     }
   }

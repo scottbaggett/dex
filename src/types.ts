@@ -12,6 +12,10 @@ export interface DexOptions {
   snapshot?: string;
   isSnapshot?: boolean;
   
+  // Time-based options
+  timeRange?: string;  // e.g., "2h", "30m", "1d"
+  isTimeRange?: boolean;
+  
   // Depth options
   depth?: DepthLevel;
   fullFiles?: string[];

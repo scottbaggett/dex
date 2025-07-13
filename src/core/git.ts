@@ -129,4 +129,18 @@ export class GitExtractor {
     const path = await import('path');
     return path.basename(process.cwd());
   }
+
+  async getTrackedFiles(): Promise<string[]> {
+    const result = await this.git.raw(['ls-files']);
+    return result.trim().split('\n').filter(Boolean);
+  }
+
+  async getFileContentFromHead(path: string): Promise<string> {
+    try {
+      return await this.git.show([`HEAD:${path}`]);
+    } catch {
+      // File might not exist in HEAD (new file)
+      return '';
+    }
+  }
 }
