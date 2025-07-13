@@ -11,10 +11,12 @@ export interface InteractiveState {
   totalAdditions: number;
   totalDeletions: number;
   estimatedTokens: number;
+  previewFile: FileItem | null;
+  scrollOffset: number;
 }
 
 export interface InteractiveModeProps {
   changes: GitChange[];
-  onComplete: (selectedFiles: GitChange[]) => void;
+  onComplete: (selectedFiles: GitChange[], copyToClipboard?: boolean) => void;
   onCancel: () => void;
 }

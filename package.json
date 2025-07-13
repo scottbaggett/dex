@@ -30,6 +30,7 @@
   "scripts": {
     "build": "tsc && node scripts/copy-prompts.js",
     "dev": "tsc --watch",
+    "dev:interactive": "node dist/cli.js --select",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:ui": "vitest --ui",

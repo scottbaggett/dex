@@ -198,12 +198,24 @@ export class ContextEngine {
       const content = await this.gitExtractor.getFileContent(file);
       const lines = content.split('\n').length;
       
+      // Get file modification time
+      let lastModified: Date | undefined;
+      try {
+        // Get the git root directory for proper path resolution
+        const gitRoot = await this.gitExtractor.getRepositoryRoot();
+        const stats = await fs.stat(join(gitRoot, file));
+        lastModified = stats.mtime;
+      } catch {
+        // File might not be accessible
+      }
+      
       changes.push({
         file,
         status: 'added',
         additions: lines,
         deletions: 0,
         diff: '', // We'll include as full file
+        lastModified,
       });
     }
     
@@ -329,6 +341,9 @@ export class ContextEngine {
       throw new Error(`Invalid time range format: ${timeRange}`);
     }
 
+    // Get the git root directory for proper path resolution
+    const gitRoot = await this.gitExtractor.getRepositoryRoot();
+    
     // Get all tracked files from git
     const trackedFiles = await this.gitExtractor.getTrackedFiles();
     const changes: GitChange[] = [];
@@ -336,7 +351,7 @@ export class ContextEngine {
     // Check each file's modification time
     for (const filePath of trackedFiles) {
       try {
-        const fullPath = join(this.workingDir, filePath);
+        const fullPath = join(gitRoot, filePath);
         const stats = await fs.stat(fullPath);
         
         // Check if file was modified within the time range
@@ -355,7 +370,8 @@ export class ContextEngine {
               status: 'modified',
               additions: diffStats.additions,
               deletions: diffStats.deletions,
-              diff: patch
+              diff: patch,
+              lastModified: stats.mtime
             });
           }
         }
@@ -369,7 +385,7 @@ export class ContextEngine {
     const untrackedFiles = await this.gitExtractor.getUntrackedFiles();
     for (const filePath of untrackedFiles) {
       try {
-        const fullPath = join(this.workingDir, filePath);
+        const fullPath = join(gitRoot, filePath);
         const stats = await fs.stat(fullPath);
         
         if (stats.mtime.getTime() >= cutoffTime) {
@@ -381,7 +397,8 @@ export class ContextEngine {
             status: 'added',
             additions: lines,
             deletions: 0,
-            diff: this.createAddedDiff(content)
+            diff: this.createAddedDiff(content),
+            lastModified: stats.mtime
           });
         }
       } catch {

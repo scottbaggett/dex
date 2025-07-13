@@ -1,27 +1,49 @@
 import simpleGit, { SimpleGit } from 'simple-git';
 import { GitChange } from '../types';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 export class GitExtractor {
   private git: SimpleGit;
+  private workingDir: string;
+  private gitRoot: string | null = null;
 
   constructor(workingDir: string = process.cwd()) {
+    this.workingDir = workingDir;
     this.git = simpleGit(workingDir);
+  }
+
+  private async getGitRoot(): Promise<string> {
+    if (this.gitRoot) return this.gitRoot;
+    
+    try {
+      const root = await this.git.revparse(['--show-toplevel']);
+      this.gitRoot = root.trim();
+      return this.gitRoot;
+    } catch {
+      // Not in a git repository
+      this.gitRoot = this.workingDir;
+      return this.gitRoot;
+    }
   }
 
   async getCurrentChanges(staged: boolean = false): Promise<GitChange[]> {
     const args = staged ? ['--cached'] : [];
     const diff = await this.git.diff(args);
-    return this.parseDiff(diff);
+    const changes = await this.parseDiff(diff);
+    return this.addFileModificationTimes(changes);
   }
 
   async getChangesSince(base: string): Promise<GitChange[]> {
     const diff = await this.git.diff([`${base}...HEAD`]);
-    return this.parseDiff(diff);
+    const changes = await this.parseDiff(diff);
+    return this.addFileModificationTimes(changes);
   }
 
   async getChangesInRange(from: string, to: string): Promise<GitChange[]> {
     const diff = await this.git.diff([`${from}..${to}`]);
-    return this.parseDiff(diff);
+    const changes = await this.parseDiff(diff);
+    return this.addFileModificationTimes(changes);
   }
 
   async getFileContent(path: string): Promise<string> {
@@ -111,6 +133,10 @@ export class GitExtractor {
     return log.latest?.hash.substring(0, 7) || 'unknown';
   }
 
+  async getRepositoryRoot(): Promise<string> {
+    return this.getGitRoot();
+  }
+
   async getRepositoryName(): Promise<string> {
     try {
       const remotes = await this.git.getRemotes(true);
@@ -142,5 +168,29 @@ export class GitExtractor {
       // File might not exist in HEAD (new file)
       return '';
     }
+  }
+
+  private async addFileModificationTimes(changes: GitChange[]): Promise<GitChange[]> {
+    const gitRoot = await this.getGitRoot();
+    const changesWithTimes = await Promise.all(
+      changes.map(async (change) => {
+        try {
+          // Git paths are relative to the repository root
+          const filePath = join(gitRoot, change.file);
+          const stats = await fs.stat(filePath);
+          return {
+            ...change,
+            lastModified: stats.mtime
+          };
+        } catch (error) {
+          // File might have been deleted or doesn't exist
+          if (process.env.DEBUG) {
+            console.warn(`Failed to get stats for ${change.file}:`, error);
+          }
+          return change;
+        }
+      })
+    );
+    return changesWithTimes;
   }
 }

@@ -480,12 +480,12 @@ async function extractCommand(range: string, options: Record<string, any>) {
       timeRange: isTimeRange ? range.substring(1) : undefined, // Remove @ prefix
       isTimeRange,
       staged: options.staged,
-      all: options.all,
+      all: options.all || options.select, // Include all changes when using --select
       since: options.since,
       depth: options.depth,
       fullFiles,
       bootstrap,
-      includeUntracked: options.includeUntracked,
+      includeUntracked: options.includeUntracked || options.select, // Include untracked files when using --select
       untrackedPattern: options.untrackedPattern,
       path: options.path,
       type: options.type ? options.type.split(',') : undefined,
@@ -588,7 +588,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
 
     // Extract context
     spinner.text = chalk.gray('Extracting context...');
-    const contextEngine = new ContextEngine();
+    const contextEngine = new ContextEngine(process.cwd());
     let context = await contextEngine.extract(dexOptions);
 
     if (context.changes.length === 0) {
@@ -604,25 +604,30 @@ async function extractCommand(range: string, options: Record<string, any>) {
       
       try {
         const { launchInteractiveMode } = await import('./interactive/index.js');
-        const selectedChanges = await launchInteractiveMode({
+        const result = await launchInteractiveMode({
           changes: context.changes
         });
         
         // Update context with selected files
         context = {
           ...context,
-          changes: selectedChanges,
+          changes: result.files,
           scope: {
-            filesChanged: selectedChanges.length,
+            filesChanged: result.files.length,
             functionsModified: 0,
-            linesAdded: selectedChanges.reduce((sum, c) => sum + c.additions, 0),
-            linesDeleted: selectedChanges.reduce((sum, c) => sum + c.deletions, 0),
+            linesAdded: result.files.reduce((sum, c) => sum + c.additions, 0),
+            linesDeleted: result.files.reduce((sum, c) => sum + c.deletions, 0),
           }
         };
         
         // Re-estimate tokens after selection
-        const charCount = selectedChanges.reduce((sum, change) => sum + change.diff.length, 0);
+        const charCount = result.files.reduce((sum, change) => sum + change.diff.length, 0);
         context.metadata.tokens.estimated = Math.ceil(charCount / 4);
+        
+        // Override clipboard option if user pressed 'c'
+        if (result.copyToClipboard) {
+          dexOptions.clipboard = true;
+        }
         
         spinner.start('Processing selection...');
       } catch (error) {

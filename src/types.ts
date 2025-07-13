@@ -63,6 +63,7 @@ export interface GitChange {
   deletions: number;
   diff: string;
   oldFile?: string; // for renames
+  lastModified?: Date; // file modification time
 }
 
 export interface Metadata {
