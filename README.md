@@ -4,8 +4,17 @@
 ██   ██  █████      ███
 ██   ██  ██        ██ ██
 ██████   ███████  ██   ██
-
 ```
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Token_Savings-70--90%25-green?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/AI_Agents-Claude_|_Gemini_|_GPT_|_Grok-blue?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Context-Perfectly_Preserved-orange?style=for-the-badge" />
+</p>
+<p align="center">
+  <strong>Generate perfect context once. Share it everywhere.</strong>
+</p>
+
 
 ## Installation
 
