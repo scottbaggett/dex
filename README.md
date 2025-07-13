@@ -23,25 +23,28 @@ npm install -g dex
 dex
 
 # Extract staged changes
-dex --staged
+dex -s
+
+# Extract all changes (staged + unstaged)
+dex -a
 
 # Extract changes since main branch
-dex --since=main
+dex --since main
 
-# Extract with full file context
-dex --depth=extended
-
-# Copy to clipboard for AI tools
+# Copy to clipboard
 dex -c
 
 # Format for Claude
-dex --format=claude
+dex -f claude
 
-# Bootstrap mode for new AI sessions
-dex --bootstrap --task="Implement user authentication"
+# Include full files
+dex --full "*.ts"
 
-# Interactive task input
-dex -i --staged
+# Add task context
+dex --task "Fix auth bug"
+
+# Interactive mode
+dex -i
 ```
 
 ## Features
@@ -53,38 +56,37 @@ dex -i --staged
 - **Smart Filtering**: Filter by paths, file types, or specific symbols
 - **LLM Optimization**: Reduce token usage while maintaining context quality
 
-## CLI Options
+## CLI Usage
 
 ```
 Usage: dex [options] [range]
 
 Arguments:
-  range                    Git commit range (e.g., HEAD~5..HEAD)
+  range                       Git commit range (e.g., HEAD~5..HEAD)
 
 Options:
-  -V, --version            output the version number
-  -s, --staged             Include only staged changes
-  --since <commit>         Show changes since a specific commit
-  -d, --depth <level>      Extraction depth: minimal, focused, full, extended (default: "focused")
-  --full-files <pattern>   Include full files matching pattern
-  --bootstrap              Bootstrap mode for new AI sessions
-  -p, --path <pattern>     Filter by file path pattern
-  -t, --type <types>       Filter by file types (comma-separated)
-  --extract <mode>         Extraction mode: changes, functions, symbols
-  --symbols                Include symbol references
-  -f, --format <format>    Output format: markdown, json, claude, gpt (default: "markdown")
-  --json                   Output as JSON (alias for --format json)
-  -c, --clipboard          Copy output to clipboard
-  --github-pr              Format for GitHub PR description
-  --task <description>     Task description for context
-  --task-file <path>       Read task from file (markdown, text, or JSON)
-  --task-url <url>         Fetch task from URL (not yet implemented)
-  --issue <url>            GitHub issue URL or number (deprecated, use --task-url)
-  -i, --interactive        Interactive mode for task input
-  --compress <type>        Compression type: aid
-  --map <type>             Mapping type: symbols
-  --aid                    Enable AI Distiller integration
-  -h, --help               display help for command
+  -V, --version               Output version
+  -h, --help                  Display help
+  -s, --staged                Include only staged changes
+  -a, --all                   Include both staged and unstaged changes
+  --since <commit>            Show changes since a specific commit
+  -d, --depth <level>         Extraction depth: minimal, focused, full, extended (default: "focused")
+  --full <pattern>            Include full files matching pattern (use * for all)
+  -p, --path <pattern>        Filter by file path pattern
+  -t, --type <types>          Filter by file types (comma-separated)
+  -f, --format <format>       Output format: markdown, json, claude, gpt, pr (default: "markdown")
+  -c, --clipboard             Copy output to clipboard
+  --task <source>             Task context (description, file path, URL, or - for stdin)
+  -i, --interactive           Interactive mode for task input
+  --include-untracked         Include untracked files
+  --untracked-pattern <pat>   Pattern for untracked files to include
+  --optimize <types...>       Optimizations: aid, symbols
+  --no-metadata               Exclude metadata from output
+
+Subcommands:
+  extract [range]             Extract and format code changes (default)
+  init                        Initialize dex configuration
+  help [command]              Display detailed help
 ```
 
 ## Extraction Depth Levels
@@ -105,32 +107,53 @@ Options:
 
 ### Basic Usage
 ```bash
-# Get current changes in markdown
+# Current changes
 dex
 
-# Get staged changes as JSON
-dex --staged --json
+# Staged changes
+dex -s
+
+# All changes (staged + unstaged)
+dex -a
+
+# Changes from last 3 commits
+dex HEAD~3
+
+# Copy to clipboard
+dex -c
 ```
 
-### Advanced Filtering
+### Filtering & Context
 ```bash
-# Only TypeScript files in src/
-dex --path="src/**/*.ts" --type=ts,tsx
+# Filter by path
+dex -p "src/**"
 
-# Changes since main branch, full depth
-dex --since=main --depth=full
+# Filter by file type
+dex -t ts,tsx
+
+# Include full files
+dex --full "*.config.*"
+
+# Add task context
+dex --task "Fix authentication bug"
+
+# Interactive task input
+dex -i
 ```
 
-### AI Workflow Integration
+### AI Workflows
 ```bash
-# Bootstrap a new AI session with task context
-dex --bootstrap --task="Refactor authentication system" --format=claude
+# Format for Claude
+dex -f claude -c
 
-# Quick copy for chat
-dex -c --depth=minimal
+# Format for GPT
+dex -f gpt --task "Review this code"
 
-# PR review context
-dex HEAD~3..HEAD --github-pr
+# Maximum context
+dex -d extended --full "*"
+
+# Include untracked files
+dex --include-untracked
 ```
 
 ## API Usage

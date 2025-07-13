@@ -11,7 +11,6 @@ export type {
   DexOptions,
   DepthLevel,
   OutputFormat,
-  ExtractMode,
   GitChange,
   ExtractedContext,
   TaskContext,

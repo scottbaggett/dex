@@ -1,6 +1,5 @@
 export type DepthLevel = 'minimal' | 'focused' | 'full' | 'extended';
-export type OutputFormat = 'markdown' | 'json' | 'claude' | 'gpt' | 'github-pr';
-export type ExtractMode = 'changes' | 'functions' | 'symbols';
+export type OutputFormat = 'markdown' | 'json' | 'claude' | 'gpt' | 'github-pr' | 'pr';
 
 export interface DexOptions {
   // Git options
@@ -22,27 +21,19 @@ export interface DexOptions {
   path?: string;
   type?: string[];
   
-  // Extraction options
-  extract?: ExtractMode;
-  symbols?: boolean;
-  
   // Output options
   format?: OutputFormat;
-  json?: boolean;
   clipboard?: boolean;
-  githubPr?: boolean;
   
   // Task integration
   task?: string;          // Direct task description
   taskFile?: string;      // Path to task file
   taskUrl?: string;       // URL to fetch task from
   taskStdin?: boolean;    // Read task from stdin (--task=-)
-  issue?: string;         // GitHub issue (legacy, will be replaced by taskUrl)
   interactive?: boolean;
   
-  // Optimization
-  compress?: 'aid' | false;
-  map?: 'symbols' | false;
+  // Optimization (from --optimize flag)
+  symbols?: boolean;
   aid?: boolean;
   
   // Display options

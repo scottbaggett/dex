@@ -210,7 +210,7 @@ export class ContextEngine {
 
   private async buildTaskContext(options: DexOptions): Promise<TaskContext | undefined> {
     // Check if any task source is provided
-    if (!options.task && !options.taskFile && !options.taskUrl && !options.taskStdin && !options.issue) {
+    if (!options.task && !options.taskFile && !options.taskUrl && !options.taskStdin) {
       return undefined;
     }
 
@@ -240,16 +240,6 @@ export class ContextEngine {
       } catch (error) {
         throw new Error(`Failed to extract task: ${error instanceof Error ? error.message : error}`);
       }
-    }
-
-    // Legacy issue support (will be deprecated)
-    if (options.issue && context) {
-      context.issueUrl = options.issue;
-    } else if (options.issue) {
-      context = {
-        description: `Task from issue ${options.issue}`,
-        issueUrl: options.issue,
-      };
     }
 
     return context;
