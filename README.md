@@ -75,10 +75,17 @@ dex --prompt-template perf       # Performance-oriented context
 dex prompts create "team-style"  # Your team's context standards
 ```
 
-### 5. **Coming Soon: Visual Context Selection**
+### 5. **Visual Context Selection**
 ```bash
-dex -i  # Interactive mode to visually craft perfect context
+dex --select  # Interactive mode to visually select files
 ```
+
+Visually select which files to include with:
+- Arrow keys to navigate
+- Space to toggle selection
+- `a` to select all, `n` to select none
+- Enter to confirm, ESC to cancel
+- Real-time token estimation
 
 ## Quick Start
 
@@ -155,11 +162,14 @@ dex -t ts,tsx
 # Just the API layer
 dex -p "src/api/**"
 
-# Exclude tests
-dex -x "**/*.test.ts"
+# Interactive file selection
+dex --select
 
 # Combine filters
-dex @-1 -t ts -p "src/api" -x "*.test.ts" --format claude
+dex @-1 -t ts -p "src/api" --format claude
+
+# Interactive selection with snapshots
+dex @-1 --select
 ```
 </details>
 
@@ -223,4 +233,5 @@ DEX is open source and we'd love your help:
 
 <p align="center">
   The context generation engine for multi-agent development
+</p>
 </p>

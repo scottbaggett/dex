@@ -40,6 +40,9 @@ export interface DexOptions {
   taskStdin?: boolean;    // Read task from stdin (--task=-)
   interactive?: boolean;
   
+  // File selection
+  select?: boolean;       // Interactive file selection mode
+  
   // Optimization (from --optimize flag)
   symbols?: boolean;
   aid?: boolean;

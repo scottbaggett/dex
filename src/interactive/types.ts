@@ -1,0 +1,20 @@
+import { GitChange } from '../types';
+
+export interface FileItem extends GitChange {
+  selected: boolean;
+}
+
+export interface InteractiveState {
+  files: FileItem[];
+  cursor: number;
+  selectedCount: number;
+  totalAdditions: number;
+  totalDeletions: number;
+  estimatedTokens: number;
+}
+
+export interface InteractiveModeProps {
+  changes: GitChange[];
+  onComplete: (selectedFiles: GitChange[]) => void;
+  onCancel: () => void;
+}

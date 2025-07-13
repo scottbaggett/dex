@@ -66,6 +66,7 @@ program
   .option('-c, --clipboard', 'Copy output to clipboard')
   .option('--task <source>', 'Task context (description, file path, URL, or - for stdin)')
   .option('-i, --interactive', 'Interactive mode for task input')
+  .option('--select', 'Interactive file selection mode')
   .option('-u, --include-untracked', 'Include untracked files')
   .option('--untracked-pattern <pattern>', 'Pattern for untracked files to include')
   .option('--optimize <types...>', 'Optimizations: aid, symbols')
@@ -96,6 +97,7 @@ program
   .option('-c, --clipboard', 'Copy output to clipboard')
   .option('--task <source>', 'Task context (description, file path, URL, or - for stdin)')
   .option('-i, --interactive', 'Interactive mode for task input')
+  .option('--select', 'Interactive file selection mode')
   .option('-u, --include-untracked', 'Include untracked files')
   .option('--untracked-pattern <pattern>', 'Pattern for untracked files to include')
   .option('--optimize <types...>', 'Optimizations: aid, symbols')
@@ -362,7 +364,8 @@ program
       console.log('  dex -d extended        Maximum context extraction');
       console.log('  dex -u                 Include new uncommitted files');
       console.log('  dex -p "src/**"        Filter to src directory');
-      console.log('  dex -t ts,tsx          Filter to TypeScript files\n');
+      console.log('  dex -t ts,tsx          Filter to TypeScript files');
+      console.log('  dex --select           Interactive file selection\n');
 
       console.log(chalk.yellow('AI Prompt Options:'));
       console.log('  dex --prompt-template security  Security-focused review');
@@ -493,6 +496,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
       taskUrl,
       taskStdin,
       interactive: options.interactive,
+      select: options.select,
       aid,
       symbols,
       noMetadata: !options.metadata,
@@ -585,13 +589,49 @@ async function extractCommand(range: string, options: Record<string, any>) {
     // Extract context
     spinner.text = chalk.gray('Extracting context...');
     const contextEngine = new ContextEngine();
-    const context = await contextEngine.extract(dexOptions);
+    let context = await contextEngine.extract(dexOptions);
 
     if (context.changes.length === 0) {
       spinner.warn(
         chalk.yellow('No changes found') + chalk.gray(' - try --staged or --since=<branch>')
       );
       process.exit(0);
+    }
+
+    // Launch interactive file selection mode if requested
+    if (dexOptions.select && !dexOptions.path && !dexOptions.type) {
+      spinner.stop();
+      
+      try {
+        const { launchInteractiveMode } = await import('./interactive/index.js');
+        const selectedChanges = await launchInteractiveMode({
+          changes: context.changes
+        });
+        
+        // Update context with selected files
+        context = {
+          ...context,
+          changes: selectedChanges,
+          scope: {
+            filesChanged: selectedChanges.length,
+            functionsModified: 0,
+            linesAdded: selectedChanges.reduce((sum, c) => sum + c.additions, 0),
+            linesDeleted: selectedChanges.reduce((sum, c) => sum + c.deletions, 0),
+          }
+        };
+        
+        // Re-estimate tokens after selection
+        const charCount = selectedChanges.reduce((sum, change) => sum + change.diff.length, 0);
+        context.metadata.tokens.estimated = Math.ceil(charCount / 4);
+        
+        spinner.start('Processing selection...');
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Interactive mode cancelled') {
+          console.log(chalk.yellow('\nInteractive mode cancelled.'));
+          process.exit(0);
+        }
+        throw error;
+      }
     }
 
     // Update spinner with extraction info
