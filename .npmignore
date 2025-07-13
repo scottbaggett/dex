@@ -1,0 +1,16 @@
+src/
+test/
+examples/
+.eslintrc.js
+.prettierrc
+tsconfig.json
+jest.config.js
+*.log
+.DS_Store
+.env
+.env.local
+coverage/
+.vscode/
+.idea/
+*.swp
+*.swo
