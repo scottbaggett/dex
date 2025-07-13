@@ -58,7 +58,7 @@ program
   .option('-c, --clipboard', 'Copy output to clipboard')
   .option('--task <source>', 'Task context (description, file path, URL, or - for stdin)')
   .option('-i, --interactive', 'Interactive mode for task input')
-  .option('--include-untracked', 'Include untracked files')
+  .option('-u, --include-untracked', 'Include untracked files')
   .option('--untracked-pattern <pattern>', 'Pattern for untracked files to include')
   .option('--optimize <types...>', 'Optimizations: aid, symbols')
   .option('--no-metadata', 'Exclude metadata from output')
@@ -81,7 +81,7 @@ program
   .option('-c, --clipboard', 'Copy output to clipboard')
   .option('--task <source>', 'Task context (description, file path, URL, or - for stdin)')
   .option('-i, --interactive', 'Interactive mode for task input')
-  .option('--include-untracked', 'Include untracked files')
+  .option('-u, --include-untracked', 'Include untracked files')
   .option('--untracked-pattern <pattern>', 'Pattern for untracked files to include')
   .option('--optimize <types...>', 'Optimizations: aid, symbols')
   .option('--no-metadata', 'Exclude metadata from output')
@@ -126,7 +126,7 @@ program
       console.log(chalk.yellow('Advanced Usage:'));
       console.log('  dex --full "*.ts"      Include full TypeScript files');
       console.log('  dex -d extended        Maximum context extraction');
-      console.log('  dex --include-untracked Include new uncommitted files');
+      console.log('  dex -u                 Include new uncommitted files');
       console.log('  dex -p "src/**"        Filter to src directory');
       console.log('  dex -t ts,tsx          Filter to TypeScript files\n');
 
@@ -135,7 +135,7 @@ program
   });
 
 // Main extract function
-async function extractCommand(range: string, options: any) {
+async function extractCommand(range: string, options: Record<string, any>) {
   const spinner = ora('Analyzing changes...').start();
 
   try {
