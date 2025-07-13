@@ -1,0 +1,16 @@
+{
+  "defaults": {
+    "format": "claude",
+    "depth": "focused",
+    "clipboard": true
+  },
+  "filters": {
+    "ignorePaths": [
+        ".claude",
+        "node_modules",
+        "dist",
+        "build",
+        ".git"
+    ]
+  }
+}

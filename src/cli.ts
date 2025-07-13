@@ -13,6 +13,7 @@ import { DexOptions, OutputFormat } from './types';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import * as readline from 'readline';
+import { mergeWithConfig } from './core/config';
 
 const packageJson = JSON.parse(
   readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')
@@ -86,8 +87,8 @@ program
   .command('init')
   .description('Initialize dex configuration')
   .action(async () => {
-    console.log(chalk.yellow('Config initialization not yet implemented'));
-    console.log(chalk.gray('This will create a .dexrc file with your preferences'));
+    const { initCommand } = await import('./commands/init');
+    await initCommand();
   });
 
 // Help subcommand with detailed examples
@@ -179,7 +180,7 @@ async function extractCommand(range: string, options: any) {
     const symbols = options.optimize?.includes('symbols');
 
     // Parse options
-    const dexOptions: DexOptions = {
+    let dexOptions: DexOptions = {
       range,
       staged: options.staged,
       all: options.all,
@@ -202,6 +203,9 @@ async function extractCommand(range: string, options: any) {
       symbols,
       noMetadata: !options.metadata,
     };
+
+    // Merge with config file defaults
+    dexOptions = mergeWithConfig(dexOptions);
 
     // Interactive mode for task input
     if (dexOptions.interactive && !task && !taskFile && !taskStdin) {
