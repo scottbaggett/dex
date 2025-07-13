@@ -1,6 +1,9 @@
 {
   "name": "dex",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Context engineering for code changes - Extract and format code changes with surgical precision for LLM consumption",
   "keywords": [
     "git",
