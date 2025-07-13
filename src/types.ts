@@ -1,5 +1,5 @@
 export type DepthLevel = 'minimal' | 'focused' | 'full' | 'extended';
-export type OutputFormat = 'markdown' | 'json' | 'claude' | 'gpt' | 'github-pr' | 'pr';
+export type OutputFormat = 'markdown' | 'json' | 'claude' | 'gpt' | 'gemini' | 'grok' | 'llama' | 'mistral' | 'github-pr' | 'pr';
 
 export interface DexOptions {
   // Git options
@@ -107,4 +107,8 @@ export interface SymbolMap {
 export interface FormatterOptions {
   context: ExtractedContext;
   options: DexOptions;
+}
+
+export interface Formatter {
+  format(options: FormatterOptions): string;
 }

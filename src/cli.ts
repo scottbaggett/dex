@@ -9,6 +9,10 @@ import { MarkdownFormatter } from './templates/markdown';
 import { JsonFormatter } from './templates/json';
 import { ClaudeFormatter } from './templates/claude';
 import { GptFormatter } from './templates/gpt';
+import { GeminiFormatter } from './templates/gemini';
+import { GrokFormatter } from './templates/grok';
+import { LlamaFormatter } from './templates/llama';
+import { MistralFormatter } from './templates/mistral';
 import { DexOptions, OutputFormat } from './types';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -57,7 +61,7 @@ program
   .addOption(
     new Option('-f, --format <format>', 'Output format')
       .default('markdown')
-      .choices(['markdown', 'json', 'claude', 'gpt', 'pr'])
+      .choices(['markdown', 'json', 'claude', 'gpt', 'gemini', 'grok', 'llama', 'mistral', 'pr'])
   )
   .option('-c, --clipboard', 'Copy output to clipboard')
   .option('--task <source>', 'Task context (description, file path, URL, or - for stdin)')
@@ -84,7 +88,7 @@ program
   .addOption(
     new Option('-f, --format <format>', 'Output format')
       .default('markdown')
-      .choices(['markdown', 'json', 'claude', 'gpt', 'pr'])
+      .choices(['markdown', 'json', 'claude', 'gpt', 'gemini', 'grok', 'llama', 'mistral', 'pr'])
   )
   .option('-c, --clipboard', 'Copy output to clipboard')
   .option('--task <source>', 'Task context (description, file path, URL, or - for stdin)')
@@ -127,7 +131,7 @@ program
       console.log('  dex -a                 Extract all changes (staged + unstaged)');
       console.log('  dex HEAD~3             Extract changes from last 3 commits');
       console.log('  dex -c                 Copy output to clipboard');
-      console.log('  dex -f claude          Format for Claude AI');
+      console.log('  dex -f claude          Format for Claude AI (XML-structured)');
       console.log('  dex --task "Bug fix"   Add task context');
       console.log('  dex -i                 Interactive task input\n');
 
@@ -137,6 +141,17 @@ program
       console.log('  dex -u                 Include new uncommitted files');
       console.log('  dex -p "src/**"        Filter to src directory');
       console.log('  dex -t ts,tsx          Filter to TypeScript files\n');
+
+      console.log(chalk.yellow('Output Formats:'));
+      console.log('  markdown               Human-readable format (default)');
+      console.log('  json                   Structured data for tools/agents');
+      console.log('  claude                 XML-structured for Claude AI');
+      console.log('  gpt                    Optimized for GPT with CoT prompts');
+      console.log('  gemini                 End-loaded context with few-shot examples');
+      console.log('  grok                   JSON schemas for structured output');
+      console.log('  llama                  Uses [INST] tags for instruction separation');
+      console.log('  mistral                Concise format with [INST] delimiters');
+      console.log('  pr                     GitHub pull request format\n');
 
       console.log(chalk.gray('Run "dex --help" for all options'));
     }
@@ -223,9 +238,9 @@ async function extractCommand(range: string, options: Record<string, any>) {
     dexOptions = mergeWithConfig(dexOptions);
 
     // Validate format after config merge
-    const validFormats = ['markdown', 'json', 'claude', 'gpt', 'github-pr'];
+    const validFormats = ['markdown', 'json', 'claude', 'gpt', 'gemini', 'grok', 'llama', 'mistral', 'github-pr'];
     if (dexOptions.format && !validFormats.includes(dexOptions.format)) {
-      spinner.fail(chalk.red(`Error: Invalid format '${dexOptions.format}'. Valid formats are: markdown, json, claude, gpt, pr`));
+      spinner.fail(chalk.red(`Error: Invalid format '${dexOptions.format}'. Valid formats are: markdown, json, claude, gpt, gemini, grok, llama, mistral, pr`));
       process.exit(1);
     }
 
@@ -327,6 +342,18 @@ async function extractCommand(range: string, options: Record<string, any>) {
         break;
       case 'gpt':
         formatter = new GptFormatter();
+        break;
+      case 'gemini':
+        formatter = new GeminiFormatter();
+        break;
+      case 'grok':
+        formatter = new GrokFormatter();
+        break;
+      case 'llama':
+        formatter = new LlamaFormatter();
+        break;
+      case 'mistral':
+        formatter = new MistralFormatter();
         break;
       case 'markdown':
         formatter = new MarkdownFormatter();
