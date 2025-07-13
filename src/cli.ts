@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import clipboardy from 'clipboardy';
@@ -54,7 +54,11 @@ program
   .option('--full <pattern>', 'Include full files matching pattern (use * for all)')
   .option('-p, --path <pattern>', 'Filter by file path pattern')
   .option('-t, --type <types>', 'Filter by file types (comma-separated)')
-  .option('-f, --format <format>', 'Output format: markdown, json, claude, gpt, pr', 'markdown')
+  .addOption(
+    new Option('-f, --format <format>', 'Output format')
+      .default('markdown')
+      .choices(['markdown', 'json', 'claude', 'gpt', 'pr'])
+  )
   .option('-c, --clipboard', 'Copy output to clipboard')
   .option('--task <source>', 'Task context (description, file path, URL, or - for stdin)')
   .option('-i, --interactive', 'Interactive mode for task input')
@@ -77,7 +81,11 @@ program
   .option('--full <pattern>', 'Include full files matching pattern (use * for all)')
   .option('-p, --path <pattern>', 'Filter by file path pattern')
   .option('-t, --type <types>', 'Filter by file types (comma-separated)')
-  .option('-f, --format <format>', 'Output format: markdown, json, claude, gpt, pr', 'markdown')
+  .addOption(
+    new Option('-f, --format <format>', 'Output format')
+      .default('markdown')
+      .choices(['markdown', 'json', 'claude', 'gpt', 'pr'])
+  )
   .option('-c, --clipboard', 'Copy output to clipboard')
   .option('--task <source>', 'Task context (description, file path, URL, or - for stdin)')
   .option('-i, --interactive', 'Interactive mode for task input')
@@ -214,6 +222,13 @@ async function extractCommand(range: string, options: Record<string, any>) {
     // Merge with config file defaults
     dexOptions = mergeWithConfig(dexOptions);
 
+    // Validate format after config merge
+    const validFormats = ['markdown', 'json', 'claude', 'gpt', 'github-pr'];
+    if (dexOptions.format && !validFormats.includes(dexOptions.format)) {
+      spinner.fail(chalk.red(`Error: Invalid format '${dexOptions.format}'. Valid formats are: markdown, json, claude, gpt, pr`));
+      process.exit(1);
+    }
+
     // Interactive mode for task input
     if (dexOptions.interactive && !task && !taskFile && !taskStdin) {
       spinner.stop();
@@ -303,7 +318,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
     // Format output
     spinner.text = chalk.gray(`Formatting as ${chalk.cyan(dexOptions.format || 'markdown')}...`);
     let formatter;
-    switch (dexOptions.format) {
+    switch (dexOptions.format || 'markdown') {
       case 'json':
         formatter = new JsonFormatter();
         break;
@@ -314,8 +329,11 @@ async function extractCommand(range: string, options: Record<string, any>) {
         formatter = new GptFormatter();
         break;
       case 'markdown':
-      default:
         formatter = new MarkdownFormatter();
+        break;
+      default:
+        // This should never happen due to validation above
+        throw new Error(`Invalid format: ${dexOptions.format}`);
     }
 
     const output = formatter.format({ context, options: dexOptions });
