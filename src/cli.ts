@@ -15,9 +15,7 @@ import { join } from 'path';
 import * as readline from 'readline';
 import { mergeWithConfig } from './core/config';
 
-const packageJson = JSON.parse(
-  readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')
-);
+const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
 
 const program = new Command();
 
@@ -25,7 +23,15 @@ program
   .name('dex')
   .description(packageJson.description)
   .version(packageJson.version)
-  .addHelpText('after', `
+  .addHelpText(
+    'after',
+    `
+██████   ███████  ██   ██
+██   ██  ██        ██ ██
+██   ██  █████      ███
+██   ██  ██        ██ ██
+██████   ███████  ██   ██
+
 Examples:
   $ dex                          # Extract current changes
   $ dex HEAD~3                   # Changes from last 3 commits
@@ -35,7 +41,8 @@ Examples:
   $ dex --task "Fix auth bug"   # Add task context
   $ dex -i                      # Interactive mode
 
-For more help, run 'dex help'`);
+For more help, run 'dex help'`
+  );
 
 // Default command (extract)
 program
@@ -97,7 +104,7 @@ program
   .description('Display detailed help')
   .action((command) => {
     if (command) {
-      const cmd = program.commands.find(c => c.name() === command);
+      const cmd = program.commands.find((c) => c.name() === command);
       if (cmd) {
         cmd.outputHelp();
       } else {
@@ -105,7 +112,7 @@ program
       }
     } else {
       console.log(chalk.cyan.bold('DEX - Context Engineering for Code Changes\n'));
-      
+
       console.log(chalk.yellow('Common Usage:'));
       console.log('  dex                    Extract current unstaged changes');
       console.log('  dex -s                 Extract staged changes');
@@ -115,14 +122,14 @@ program
       console.log('  dex -f claude          Format for Claude AI');
       console.log('  dex --task "Bug fix"   Add task context');
       console.log('  dex -i                 Interactive task input\n');
-      
+
       console.log(chalk.yellow('Advanced Usage:'));
       console.log('  dex --full "*.ts"      Include full TypeScript files');
       console.log('  dex -d extended        Maximum context extraction');
       console.log('  dex --include-untracked Include new uncommitted files');
       console.log('  dex -p "src/**"        Filter to src directory');
       console.log('  dex -t ts,tsx          Filter to TypeScript files\n');
-      
+
       console.log(chalk.gray('Run "dex --help" for all options'));
     }
   });
@@ -135,7 +142,7 @@ async function extractCommand(range: string, options: any) {
     // Check if we're in a git repository
     const gitExtractor = new GitExtractor();
     const isGitRepo = await gitExtractor.isGitRepository();
-    
+
     if (!isGitRepo) {
       spinner.fail(chalk.red('Error: Not in a git repository'));
       process.exit(1);
@@ -210,7 +217,7 @@ async function extractCommand(range: string, options: any) {
     // Interactive mode for task input
     if (dexOptions.interactive && !task && !taskFile && !taskStdin) {
       spinner.stop();
-      
+
       // Check if we're in a TTY (some environments may have undefined instead of false)
       if (process.stdin.isTTY === false) {
         console.error(chalk.red('Error: Interactive mode requires a TTY'));
@@ -220,15 +227,15 @@ async function extractCommand(range: string, options: any) {
       const headerSpinner = ora({
         text: chalk.cyan('Interactive Task Input Mode'),
         spinner: 'dots',
-        color: 'cyan'
+        color: 'cyan',
       }).start();
-      
-      await new Promise(resolve => setTimeout(resolve, 800));
+
+      await new Promise((resolve) => setTimeout(resolve, 800));
       headerSpinner.succeed(chalk.cyan('Interactive Task Input Mode'));
-      
+
       const rl = readline.createInterface({
         input: process.stdin,
-        output: process.stdout
+        output: process.stdout,
       });
 
       console.log(chalk.gray('\nEnter your task description (press Enter twice to finish):'));
@@ -253,7 +260,7 @@ async function extractCommand(range: string, options: any) {
             } else {
               consecutiveEmptyLines = 0;
             }
-            
+
             lines.push(answer);
             askForLine();
           });
@@ -267,7 +274,7 @@ async function extractCommand(range: string, options: any) {
           process.exit(0);
         });
       });
-      
+
       if (taskInput) {
         dexOptions.task = taskInput;
         console.log(chalk.green('\n✓ Task description captured\n'));
@@ -284,7 +291,9 @@ async function extractCommand(range: string, options: any) {
     const context = await contextEngine.extract(dexOptions);
 
     if (context.changes.length === 0) {
-      spinner.warn(chalk.yellow('No changes found') + chalk.gray(' - try --staged or --since=<branch>'));
+      spinner.warn(
+        chalk.yellow('No changes found') + chalk.gray(' - try --staged or --since=<branch>')
+      );
       process.exit(0);
     }
 
@@ -314,25 +323,33 @@ async function extractCommand(range: string, options: any) {
     // Handle output
     if (dexOptions.clipboard) {
       await clipboardy.write(output);
-      
+
       // Show enhanced success message with metadata
       const tokenStr = chalk.cyan(`~${context.metadata.tokens.estimated.toLocaleString()} tokens`);
       const filesStr = chalk.yellow(`${context.scope.filesChanged} files`);
-      const linesStr = chalk.green(`+${context.scope.linesAdded}`) + chalk.gray('/') + chalk.red(`-${context.scope.linesDeleted}`);
+      const linesStr =
+        chalk.green(`+${context.scope.linesAdded}`) +
+        chalk.gray('/') +
+        chalk.red(`-${context.scope.linesDeleted}`);
       const depthStr = chalk.magenta(context.metadata.extraction.depth);
-      
+
       // Add format if not default markdown
       let formatStr = '';
       if (dexOptions.format && dexOptions.format !== 'markdown') {
         formatStr = chalk.gray(' • ') + chalk.blue(dexOptions.format);
       }
-      
+
       spinner.succeed(
-        chalk.green('Context copied to clipboard') + chalk.gray(' • ') +
-        tokenStr + chalk.gray(' • ') +
-        filesStr + chalk.gray(' • ') +
-        linesStr + chalk.gray(' • ') +
-        depthStr + formatStr
+        chalk.green('Context copied to clipboard') +
+          chalk.gray(' • ') +
+          tokenStr +
+          chalk.gray(' • ') +
+          filesStr +
+          chalk.gray(' • ') +
+          linesStr +
+          chalk.gray(' • ') +
+          depthStr +
+          formatStr
       );
     } else {
       spinner.stop();
@@ -343,16 +360,20 @@ async function extractCommand(range: string, options: any) {
     if (!dexOptions.format?.includes('json') && !dexOptions.clipboard) {
       const width = process.stdout.columns || 50;
       console.log('\n' + chalk.dim('─'.repeat(Math.min(width, 50))));
-      
+
       console.log(
         chalk.cyan.bold('Summary: ') +
-        chalk.yellow(`${context.scope.filesChanged} files`) + chalk.gray(' • ') +
-        chalk.green(`+${context.scope.linesAdded}`) + chalk.gray('/') + chalk.red(`-${context.scope.linesDeleted}`) + chalk.gray(' • ') +
-        chalk.cyan(`~${context.metadata.tokens.estimated.toLocaleString()} tokens`) + chalk.gray(' • ') +
-        chalk.magenta(context.metadata.extraction.depth)
+          chalk.yellow(`${context.scope.filesChanged} files`) +
+          chalk.gray(' • ') +
+          chalk.green(`+${context.scope.linesAdded}`) +
+          chalk.gray('/') +
+          chalk.red(`-${context.scope.linesDeleted}`) +
+          chalk.gray(' • ') +
+          chalk.cyan(`~${context.metadata.tokens.estimated.toLocaleString()} tokens`) +
+          chalk.gray(' • ') +
+          chalk.magenta(context.metadata.extraction.depth)
       );
     }
-
   } catch (error) {
     spinner.fail(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
     process.exit(1);
