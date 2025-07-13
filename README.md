@@ -201,10 +201,10 @@ dex --prompt-template architecture
 
 DEX is open source and we'd love your help:
 
-- ⭐ [Star us on GitHub](https://github.com/yourusername/dex)
-- 🐛 [Report bugs](https://github.com/yourusername/dex/issues)
-- 💡 [Request features](https://github.com/yourusername/dex/discussions)
-- 🤲 [Contribute code](https://github.com/yourusername/dex/blob/main/CONTRIBUTING.md)
+- ⭐ [Star us on GitHub](https://github.com/scottbaggett/dex)
+- 🐛 [Report bugs](https://github.com/scottbaggett/dex/issues)
+- 💡 [Request features](https://github.com/scottbaggett/dex/discussions)
+- 🤲 [Contribute code](https://github.com/scottbaggett/dex/blob/main/CONTRIBUTING.md)
 
 ## Who Needs DEX?
 
