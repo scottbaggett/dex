@@ -208,7 +208,7 @@ The magic of dex is that these all work the same way:
 dex                    # Current changes
 dex HEAD~3             # Git: 3 commits ago
 dex @-1                # Snapshot: Most recent
-dex @2h                # Snapshot: 2 hours ago
+dex @2h                # Time: Files changed in last 2 hours
 dex baseline           # Snapshot: Named
 dex main..feature      # Git: Branch comparison
 ```
@@ -278,7 +278,7 @@ dex HEAD~5 -i
 - `dex -a` - All (staged + unstaged)
 - `dex HEAD~N` - Last N commits
 - `dex @-N` - Nth most recent snapshot
-- `dex @Xt` - Snapshot from X time ago (m/h/d/w/M)
+- `dex @Xt` - Files changed in last X time (m/h/d/w/M)
 - `dex <name>` - Snapshot by name/description
 - `dex A..B` - Git range
 
