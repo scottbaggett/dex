@@ -1,4 +1,3 @@
-# Dex - Context optimization for agentic decs.  Extract and format code changes with surgical precision for LLM consumption.
 ```
 ██████   ███████  ██   ██
 ██   ██  ██        ██ ██
