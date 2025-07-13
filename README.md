@@ -173,6 +173,150 @@ dex prompts show security
 dex prompts init "Migration Guide"
 ```
 
+## Core Philosophy: One Command, Many Sources
+
+At its heart, dex has one job: **extract code changes**. The beauty is in its simplicity:
+
+```bash
+dex [source]
+```
+
+That's it. The `source` can be:
+- Nothing (current changes)
+- A git reference (HEAD~3, main..feature)
+- A time-based reference (@2h - files changed in last 2 hours)
+- A snapshot reference (@-1, snapshot-id)
+- A snapshot name ("baseline", "before-refactor")
+
+## Reference Types
+
+Dex uses the `@` symbol for special references that aren't git commits:
+
+**Time-Based File Changes**: `@<number><unit>`
+```bash
+dex @30m   # All files modified in the last 30 minutes
+dex @2h    # All files modified in the last 2 hours
+dex @1d    # All files modified in the last day
+dex @1w    # All files modified in the last week
+```
+
+**Snapshot References**: `@-N` or snapshot ID
+```bash
+dex @-1              # Changes since last snapshot
+dex @-2              # Changes since 2nd most recent snapshot
+dex baseline         # Named snapshot
+dex md26jujdhvdoj    # Specific snapshot ID
+```
+
+**Git References** (standard git syntax):
+```bash
+dex HEAD~3           # Changes in last 3 commits
+dex main..feature    # Changes between branches
+dex abc123           # Changes since a specific commit
+```
+
+## Real-World Workflows
+
+### 1. Active Development Flow
+
+```bash
+# What have I changed?
+dex
+
+# What did I stage?
+dex -s
+
+# Everything (staged + unstaged)
+dex -a
+```
+
+### 2. Time-Based Review Flow
+
+"What have I been working on?"
+
+```bash
+# All files changed in the last 30 minutes
+dex @30m
+
+# All files changed in the last 2 hours  
+dex @2h
+
+# All files changed since yesterday
+dex @1d
+```
+
+**Why it's powerful**: Natural time expressions show actual file changes based on modification times. Perfect for "what did I just change?" without needing commits or snapshots.
+
+### 3. AI Pair Programming Flow
+
+```bash
+# Initial context for AI
+dex --full "*.ts" -f claude -c
+
+# Quick iteration - only send changes since last AI interaction
+dex @-1 -f claude -c
+
+# Time-boxed context - "Here's what I've done in the last hour"
+dex @1h -f claude -c
+```
+
+### 4. Checkpoint Flow with Snapshots
+
+```bash
+# Start feature
+dex snapshot create -m "Feature: Auth - Starting point" -t auth,baseline
+
+# After implementing login
+dex snapshot create -m "Feature: Auth - Login complete" -t auth,checkpoint
+
+# Review progress since baseline
+dex baseline
+
+# Compare checkpoints
+dex snapshot diff "Login complete" "OAuth complete"
+```
+
+**Why it's elegant**: Named snapshots work like lightweight branches without the git complexity.
+
+### 5. Debug Investigation Flow
+
+```bash
+# Create snapshots as you debug
+dex snapshot create -m "Reproduction state" -t bug
+
+# Make investigative changes...
+dex @-1  # What did I change while investigating?
+
+# Compare working vs broken states
+dex snapshot diff "last-working" "Reproduction state"
+```
+
+### 6. Code Review Flow
+
+```bash
+# Review your branch
+dex main..HEAD
+
+# Review since morning standup
+dex @8h
+
+# Review a specific problematic commit
+dex abc123^..abc123
+
+# Review between snapshots
+dex snapshot diff "pre-review" "post-review"
+```
+
+## Why This Design Matters
+
+1. **Cognitive Simplicity**: One command to remember: `dex`
+2. **Flexible Workflows**: Snapshots for quick saves, git for permanent history
+3. **Time Awareness**: Natural time-based references (@30m, @2h, @1d)
+4. **No Mode Switching**: Don't think about "am I in git mode or snapshot mode?"
+5. **Compositional**: Options compose naturally regardless of source
+
+The beauty of dex is that it gets out of your way. You don't need to think about "Should I commit this?" or "Which command extracts from snapshots vs git?" Instead, you just think about what changes you want to see and from when.
+
 ## Snapshot System
 
 Dex includes a powerful snapshot system that allows you to track changes without creating git commits. This is perfect for AI-assisted coding workflows where you want to reference previous states without polluting your git history.
@@ -182,7 +326,7 @@ Dex includes a powerful snapshot system that allows you to track changes without
 - **Token Efficiency**: Avoid repeatedly sending full context to AI
 - **Clean Git History**: No temporary commits cluttering your repository
 - **Fast Comparisons**: Quickly see what changed since any snapshot
-- **Flexible References**: Use relative times (@2h) or positions (@-1)
+- **Flexible References**: Use relative positions (@-1) or names
 - **Persistent Context**: Maintain conversation continuity across sessions
 
 ### Creating Snapshots
@@ -199,49 +343,6 @@ dex snapshot create -p src/auth -m "Auth module baseline"
 
 # Include untracked files
 dex snapshot create --include-untracked
-```
-
-### Reference Types
-
-Dex supports multiple ways to reference changes:
-
-**Snapshot References**:
-```bash
-# Changes since last snapshot
-dex @-1
-
-# Changes since 2nd most recent snapshot
-dex @-2
-
-# Changes since a specific snapshot
-dex snapshot-id
-```
-
-**Time-Based File Changes**:
-```bash
-# All files modified in the last 30 minutes
-dex @30m
-
-# All files modified in the last 2 hours
-dex @2h
-
-# All files modified in the last day
-dex @1d
-
-# All files modified in the last week
-dex @1w
-```
-
-**Git References** (standard git syntax):
-```bash
-# Changes in last 3 commits
-dex HEAD~3
-
-# Changes between branches
-dex main..feature
-
-# Changes since a specific commit
-dex abc123
 ```
 
 ### Managing Snapshots
@@ -349,45 +450,46 @@ Subcommands:
 - **mistral**: Concise format optimized for Mistral
 - **pr**: GitHub pull request format
 
-## Examples
+## Advanced Patterns
 
-### Basic Usage
+### Filtering Across Any Source
+
+These options work regardless of your change source:
+
 ```bash
-# Current changes
-dex
+# Only TypeScript files from 2 hours ago
+dex @2h -t ts,tsx
 
-# Staged changes
-dex -s
+# Full file context for config files changed in last 3 commits  
+dex HEAD~3 --full "*.config.*"
 
-# All changes (staged + unstaged)
-dex -a
+# Only changes in src/ since last snapshot
+dex @-1 -p "src/**"
 
-# Changes from last 3 commits
-dex HEAD~3
+# Maximum context extraction with all files
+dex -d extended --full "*"
 
-# Copy to clipboard
-dex -c
+# Include new untracked files matching pattern
+dex -u --untracked-pattern "*.test.ts"
 ```
 
-### Filtering & Context
+### Universal Task Context
+
+Add task context to any extraction:
+
 ```bash
-# Filter by path
-dex -p "src/**"
+# Current changes with task context
+dex --task "Implementing user authentication"
 
-# Filter by file type
-dex -t ts,tsx
+# Snapshot with issue URL
+dex @-1 --task https://github.com/org/repo/issues/123
 
-# Include full files
-dex --full "*.config.*"
-
-# Add task context
-dex --task "Fix authentication bug"
-
-# Interactive task input
-dex -i
+# Git range with interactive task input
+dex HEAD~5 -i
 ```
 
-### AI Workflows
+### AI-Optimized Workflows
+
 ```bash
 # Security review with Claude
 dex -f claude --prompt-template security -c
@@ -395,61 +497,46 @@ dex -f claude --prompt-template security -c
 # Performance analysis with GPT
 dex -f gpt --prompt-template performance
 
-# Custom team review
-dex --prompt-template team-review
-
-# Quick one-off analysis
-dex --prompt "Check for SQL injection vulnerabilities"
-
-# Maximum context extraction
-dex -d extended --full "*"
-
-# Include new untracked files
-dex -u
-```
-
-### Snapshot Examples
-```bash
-# Track progress without commits
-dex snapshot create -m "Start feature"
-# ... work on code ...
-dex @-1 -f claude --prompt-template feature
-
-# Time-based file changes (based on modification time)
-dex @15m  # All files changed in last 15 minutes
-dex @2h   # All files changed in last 2 hours
-dex @1d   # All files changed since yesterday
-dex @1w   # All files changed in past week
-dex @1M   # All files changed in past month
-
-# Compare snapshots
-dex snapshot diff @-3 @-1  # What changed between snapshots
-
-# Clean up workspace
-dex snapshot clean --older-than 7d --keep-tags baseline,milestone
-```
-
-### Advanced Examples
-```bash
 # Review changes since main with security focus
 dex --since main --prompt-template security
 
 # Extract specific commit range with custom prompt
 dex HEAD~5..HEAD~2 --prompt "Migration safety check"
 
-# Full TypeScript files with refactoring focus
-dex --full "*.ts" --prompt-template refactor
-
 # Interactive mode with performance template
 dex -i --prompt-template performance
 
 # Combine snapshots with templates
 dex @baseline --prompt-template security -f claude
-
-# Track incremental progress
-dex snapshot create -m "Added auth middleware"
-dex @-1 --prompt "Review auth implementation for security"
 ```
+
+## Quick Reference
+
+### Change Sources
+- `dex` - Current changes
+- `dex -s` - Staged only
+- `dex -a` - All (staged + unstaged)
+- `dex HEAD~N` - Last N commits
+- `dex @-N` - Nth most recent snapshot
+- `dex @Xt` - Files changed in last X time (m/h/d/w/M)
+- `dex <name>` - Snapshot by name/description
+- `dex A..B` - Git range
+
+### Universal Options
+- `-f <format>` - Output format (claude, gpt, etc.)
+- `-c` - Copy to clipboard
+- `-p <pattern>` - Filter paths
+- `-t <types>` - Filter file types
+- `-d <depth>` - Context depth
+- `--full <pattern>` - Include full files
+- `--task <context>` - Add task context
+- `-i` - Interactive mode
+
+### Snapshot Management
+- `dex snapshot create -m "message"` - Create snapshot
+- `dex snapshot list` - List snapshots
+- `dex snapshot diff A B` - Compare snapshots
+- `dex snapshot clean --older-than 7d` - Cleanup
 
 ## Prompt Template System
 
