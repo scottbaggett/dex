@@ -13,14 +13,15 @@ dex [source]
 That's it. The `source` can be:
 - Nothing (current changes)
 - A git reference (HEAD~3, main..feature)
-- A snapshot reference (@-1, @2h, snapshot-id)
+- A time-based reference (@2h - files changed in last 2 hours)
+- A snapshot reference (@-1, snapshot-id)
 - A snapshot name ("baseline", "before-refactor")
 
-## Understanding Snapshot References
+## Understanding References
 
-Before we dive into workflows, let's understand snapshot references. Dex uses the `@` symbol to denote snapshot-based references (as opposed to git references):
+Dex uses the `@` symbol for special references that aren't git commits:
 
-### Why @ for Snapshots?
+### Why @ Symbol?
 
 The `@` symbol was chosen to:
 1. **Distinguish from git** - Git uses `~` and `^` for relative commits (HEAD~1, HEAD^)
@@ -54,9 +55,12 @@ dex HEAD~1            # 1 commit ago
 dex main..feature     # Changes between branches
 dex abc123            # Specific commit
 
+# Time-based references
+dex @2h               # Files changed in last 2 hours
+dex @30m              # Files changed in last 30 minutes
+
 # Snapshot references  
 dex @-1               # Last snapshot
-dex @2h               # Snapshot from 2 hours ago
 dex baseline          # Named snapshot
 ```
 
