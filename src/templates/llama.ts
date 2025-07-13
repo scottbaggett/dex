@@ -1,6 +1,7 @@
-import { Formatter } from '../types';
+import { Formatter as FormatterInterface } from '../types';
+import { Formatter } from '../core/formatter';
 
-export class LlamaFormatter implements Formatter {
+export class LlamaFormatter extends Formatter implements FormatterInterface {
   format({ context, options }: { context: any; options: any }): string {
     const sections: string[] = [];
 
@@ -28,11 +29,13 @@ Tokens: ~${context.metadata.tokens.estimated}`);
     
     // Add the actual changes
     for (const change of context.changes) {
-      sections.push(`\n<s>File: ${change.path}</s>`);
+      sections.push(`\n<s>File: ${change.file}</s>`);
       
-      if (change.type === 'full') {
-        sections.push('```' + change.language);
-        sections.push(change.content);
+      if (context.fullFiles?.has(change.file)) {
+        const ext = this.getFileExtension(change.file);
+        const lang = this.getLanguageFromExtension(ext);
+        sections.push('```' + lang);
+        sections.push(context.fullFiles.get(change.file)!);
         sections.push('```');
       } else {
         sections.push('```diff');

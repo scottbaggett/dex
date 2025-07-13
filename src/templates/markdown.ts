@@ -1,5 +1,6 @@
 import { Formatter } from '../core/formatter';
 import { FormatterOptions, ExtractedContext, TaskContext, Metadata } from '../types';
+import { PromptGenerator } from '../core/prompts';
 
 export class MarkdownFormatter extends Formatter {
   format({ context, options }: FormatterOptions): string {
@@ -29,6 +30,12 @@ export class MarkdownFormatter extends Formatter {
     // Impact analysis (placeholder for future AST analysis)
     if (options.bootstrap || options.depth === 'extended') {
       sections.push(this.formatImpactAnalysis());
+    }
+
+    // Add AI prompt unless disabled
+    if (!options.noPrompt) {
+      sections.push('## AI Analysis Request');
+      sections.push(PromptGenerator.generate(context, options));
     }
 
     return sections.join('\n\n');

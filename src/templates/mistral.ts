@@ -1,6 +1,7 @@
-import { Formatter } from '../types';
+import { Formatter as FormatterInterface } from '../types';
+import { Formatter } from '../core/formatter';
 
-export class MistralFormatter implements Formatter {
+export class MistralFormatter extends Formatter implements FormatterInterface {
   format({ context, options }: { context: any; options: any }): string {
     const sections: string[] = [];
 
@@ -22,11 +23,13 @@ export class MistralFormatter implements Formatter {
     
     // Add changes with minimal formatting
     for (const change of context.changes) {
-      sections.push(`[FILE] ${change.path}`);
+      sections.push(`[FILE] ${change.file}`);
       
-      if (change.type === 'full') {
-        sections.push('```' + change.language);
-        sections.push(change.content);
+      if (context.fullFiles?.has(change.file)) {
+        const ext = this.getFileExtension(change.file);
+        const lang = this.getLanguageFromExtension(ext);
+        sections.push('```' + lang);
+        sections.push(context.fullFiles.get(change.file)!);
         sections.push('```');
       } else {
         sections.push('```diff');

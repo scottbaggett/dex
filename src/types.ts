@@ -38,6 +38,11 @@ export interface DexOptions {
   
   // Display options
   noMetadata?: boolean;
+  
+  // Prompt options
+  prompt?: string;           // Custom prompt
+  promptPreset?: string;     // Preset prompt (security, performance, etc.)
+  noPrompt?: boolean;        // Disable prompt generation
 }
 
 export interface GitChange {

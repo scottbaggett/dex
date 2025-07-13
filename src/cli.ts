@@ -70,6 +70,9 @@ program
   .option('--untracked-pattern <pattern>', 'Pattern for untracked files to include')
   .option('--optimize <types...>', 'Optimizations: aid, symbols')
   .option('--no-metadata', 'Exclude metadata from output')
+  .option('--prompt <text>', 'Custom AI analysis prompt')
+  .option('--prompt-preset <preset>', 'Use preset prompt: security, performance, refactor, feature, bugfix, migration, api, testing')
+  .option('--no-prompt', 'Disable AI prompt generation')
   .action(async (range, options) => {
     await extractCommand(range, options);
   });
@@ -97,6 +100,9 @@ program
   .option('--untracked-pattern <pattern>', 'Pattern for untracked files to include')
   .option('--optimize <types...>', 'Optimizations: aid, symbols')
   .option('--no-metadata', 'Exclude metadata from output')
+  .option('--prompt <text>', 'Custom AI analysis prompt')
+  .option('--prompt-preset <preset>', 'Use preset prompt: security, performance, refactor, feature, bugfix, migration, api, testing')
+  .option('--no-prompt', 'Disable AI prompt generation')
   .action(async (range, options) => {
     await extractCommand(range || '', options);
   });
@@ -141,6 +147,12 @@ program
       console.log('  dex -u                 Include new uncommitted files');
       console.log('  dex -p "src/**"        Filter to src directory');
       console.log('  dex -t ts,tsx          Filter to TypeScript files\n');
+
+      console.log(chalk.yellow('AI Prompt Options:'));
+      console.log('  dex --prompt-preset security    Security-focused review');
+      console.log('  dex --prompt-preset performance Performance analysis');
+      console.log('  dex --prompt "Custom prompt"    Use custom analysis prompt');
+      console.log('  dex --no-prompt                 Disable prompt generation\n');
 
       console.log(chalk.yellow('Output Formats:'));
       console.log('  markdown               Human-readable format (default)');
@@ -232,6 +244,9 @@ async function extractCommand(range: string, options: Record<string, any>) {
       aid,
       symbols,
       noMetadata: !options.metadata,
+      prompt: options.prompt,
+      promptPreset: options.promptPreset,
+      noPrompt: options.prompt === false,
     };
 
     // Merge with config file defaults

@@ -1,5 +1,6 @@
 import { Formatter } from '../core/formatter';
 import { FormatterOptions } from '../types';
+import { PromptGenerator } from '../core/prompts';
 
 export class ClaudeFormatter extends Formatter {
   format({ context, options }: FormatterOptions): string {
@@ -70,17 +71,16 @@ export class ClaudeFormatter extends Formatter {
     sections.push('</changes>');
 
     // AI instructions
-    sections.push('<instructions>');
-    sections.push('Please analyze these code changes considering:');
-    sections.push('1. Correctness and functionality');
-    sections.push('2. Best practices and code quality');
-    sections.push('3. Potential bugs or edge cases');
-    sections.push('4. Performance implications');
-    sections.push('5. Security considerations');
-    if (context.task) {
-      sections.push(`6. Alignment with the task: "${this.escapeXml(context.task.description)}"`);
+    if (!options.noPrompt) {
+      sections.push('<instructions>');
+      const prompt = PromptGenerator.generate(context, options);
+      // Convert newlines to proper XML format
+      const promptLines = prompt.split('\n');
+      promptLines.forEach(line => {
+        sections.push(this.escapeXml(line));
+      });
+      sections.push('</instructions>');
     }
-    sections.push('</instructions>');
 
     sections.push('</context>');
 

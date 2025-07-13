@@ -1,6 +1,8 @@
-import { Formatter } from '../types';
+import { Formatter as FormatterInterface, FormatterOptions } from '../types';
+import { Formatter } from '../core/formatter';
+import { PromptGenerator } from '../core/prompts';
 
-export class GeminiFormatter implements Formatter {
+export class GeminiFormatter extends Formatter implements FormatterInterface {
   format({ context, options }: { context: any; options: any }): string {
     const sections: string[] = [];
 
@@ -32,11 +34,13 @@ ${options.task}
     sections.push('## Changes\n');
     
     for (const change of context.changes) {
-      sections.push(`### ${change.path}`);
+      sections.push(`### ${change.file}`);
       
-      if (change.type === 'full') {
-        sections.push('```' + change.language);
-        sections.push(change.content);
+      if (context.fullFiles?.has(change.file)) {
+        const ext = change.file.split('.').pop() || '';
+        const lang = this.getLanguageFromExtension(ext);
+        sections.push('```' + lang);
+        sections.push(context.fullFiles.get(change.file)!);
         sections.push('```\n');
       } else {
         sections.push('```diff');
@@ -50,22 +54,18 @@ ${options.task}
       sections.push(taskSection);
     }
 
-    // Add few-shot example prompt for better Gemini performance
-    sections.push(`## Analysis Request
-
-Please analyze the above code changes. Consider:
-1. Code quality and best practices
-2. Potential bugs or issues
-3. Performance implications
-4. Security considerations
-5. Suggestions for improvement
-
-Example response format:
-- **Summary:** Brief overview of changes
-- **Issues Found:** List of potential problems
-- **Suggestions:** Recommendations for improvement
-- **Security Notes:** Any security considerations
-`);
+    // Add contextual prompt unless disabled
+    if (!options.noPrompt) {
+      sections.push('## Analysis Request\n');
+      sections.push(PromptGenerator.generate(context, options));
+      
+      // Add few-shot example for Gemini
+      sections.push('\nExample response format:');
+      sections.push('- **Summary:** Brief overview of changes');
+      sections.push('- **Issues Found:** List of potential problems');
+      sections.push('- **Suggestions:** Recommendations for improvement');
+      sections.push('- **Security Notes:** Any security considerations');
+    }
 
     return sections.join('\n');
   }

@@ -1,6 +1,7 @@
-import { Formatter } from '../types';
+import { Formatter as FormatterInterface } from '../types';
+import { Formatter } from '../core/formatter';
 
-export class GrokFormatter implements Formatter {
+export class GrokFormatter extends Formatter implements FormatterInterface {
   format({ context, options }: { context: any; options: any }): string {
     // Grok prefers JSON schemas for structured output
     const output = {
@@ -25,10 +26,10 @@ export class GrokFormatter implements Formatter {
       },
       
       changes: context.changes.map((change: any) => ({
-        path: change.path,
-        type: change.type,
-        language: change.language,
-        content: change.type === 'full' ? change.content : change.diff
+        path: change.file,
+        type: change.status,
+        language: this.getLanguageFromExtension(this.getFileExtension(change.file)),
+        content: context.fullFiles?.has(change.file) ? context.fullFiles.get(change.file) : change.diff
       })),
       
       expected_output_schema: {
