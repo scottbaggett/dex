@@ -1,6 +1,8 @@
 # DEX
 A powerful context generator that creates the perfect extraction from your codebase for any AI agent. One source of truth, multiple destinations.
 
+> **Note:** This is the very first version of this tool. We would be very grateful for any feedback in the form of a discussion or by creating an issue on [GitHub](https://github.com/scottbaggett/dex/issues). Thank you\!
+
 <p align="">
   <img src="https://img.shields.io/badge/Token_Savings-70--90%25-cyan?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Agents-Claude_|_Gemini_|_GPT_|_Grok_|_THE_REST_-cyan?style=for-the-badge" />
