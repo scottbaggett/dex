@@ -63,6 +63,7 @@
     "@types/react": "17.0.2",
     "@vitest/ui": "^2.0.5",
     "eslint": "^9.9.0",
+    "ink-testing-library": "^4.0.0",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
     "typescript-eslint": "^8.0.0",

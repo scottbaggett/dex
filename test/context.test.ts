@@ -33,6 +33,8 @@ describe('ContextEngine', () => {
       getCurrentBranch: vi.fn().mockResolvedValue('main'),
       getLatestCommit: vi.fn().mockResolvedValue('abc123'),
       getRepositoryName: vi.fn().mockResolvedValue('test-repo'),
+      getRepositoryRoot: vi.fn().mockResolvedValue(mockWorkingDir),
+      addFileModificationTimes: vi.fn().mockImplementation((changes) => Promise.resolve(changes)),
     };
     
     (GitExtractor as any).mockImplementation(() => mockGitExtractor);
