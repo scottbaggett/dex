@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import { FileItem, InteractiveState } from './types';
+import { InteractiveState } from './types';
 import { GitChange } from '../types';
 import DiffPreview from './DiffPreview';
 
@@ -176,7 +176,11 @@ const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCanc
     if (input === 'c' || input === 'C') {
       const selectedFiles = state.files
         .filter(f => f.selected)
-        .map(({ selected, ...change }) => change);
+        .map((file) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { selected, ...change } = file;
+          return change;
+        });
       onComplete(selectedFiles, true);
       exit();
       return;
@@ -306,3 +310,4 @@ const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCanc
 };
 
 export default FileSelector;
+export { truncatePath, formatRelativeTime };
