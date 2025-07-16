@@ -1,0 +1,50 @@
+# Example DEX configuration file
+# Copy this to .dexrc.yml and customize as needed
+
+# Default options for all dex commands
+defaults:
+  depth: focused
+  format: markdown
+
+# File filters
+filters:
+  ignorePaths:
+    - node_modules
+    - dist
+    - build
+  includeTypes:
+    - ts
+    - tsx
+    - js
+    - jsx
+
+# Task extraction settings
+tasks:
+  defaultSource: stdin
+
+# Distiller configuration
+distiller:
+  # Default output mode: 'save' (default), 'clipboard', or 'stdout'
+  defaultOutput: save
+  
+  # Directory to save distilled files (default: .dex)
+  saveDirectory: .dex
+  
+  # Additional patterns to exclude during distillation
+  excludePatterns:
+    - "*.test.ts"
+    - "*.spec.ts"
+    - "__tests__/**"
+    - "*.min.js"
+    - "*.min.css"
+
+# Custom prompt templates
+prompts:
+  custom-review:
+    name: "Custom Code Review"
+    description: "My team's specific review guidelines"
+    instructions: |
+      Review the code changes with focus on:
+      1. Performance implications
+      2. Security best practices
+      3. Code maintainability

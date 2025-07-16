@@ -1,5 +1,5 @@
 export type DepthLevel = 'minimal' | 'focused' | 'full' | 'extended';
-export type OutputFormat = 'markdown' | 'json' | 'claude' | 'gpt' | 'gemini' | 'grok' | 'llama' | 'mistral' | 'github-pr' | 'pr';
+export type OutputFormat = 'markdown' | 'json' | 'claude' | 'gpt' | 'gemini' | 'grok' | 'llama' | 'mistral' | 'github-pr' | 'pr' | 'xml';
 
 export interface DexOptions {
   // Git options
@@ -40,8 +40,6 @@ export interface DexOptions {
   taskStdin?: boolean;    // Read task from stdin (--task=-)
   interactive?: boolean;
   
-  // File selection
-  select?: boolean;       // Interactive file selection mode
   
   // Optimization (from --optimize flag)
   symbols?: boolean;
@@ -169,4 +167,88 @@ export interface SnapshotOptions {
   path?: string;
   ignorePatterns?: string[];
   onProgress?: (progress: { current: number; total: number; file: string }) => void;
+}
+
+// Distiller types
+export type DistillDepth = 'minimal' | 'public' | 'extended' | 'full';
+
+export interface DistillerOptions {
+  path?: string;
+  depth?: DistillDepth;
+  compressFirst?: boolean;
+  excludePatterns?: string[];
+  includeComments?: boolean;
+  includeDocstrings?: boolean;
+  format?: 'compressed' | 'distilled' | 'both';
+  output?: string;
+  aiAction?: 'audit' | 'refactor' | 'document' | 'analyze';
+  promptTemplate?: string;
+  since?: string;
+  staged?: boolean;
+  parallel?: boolean;
+  cacheDir?: string;
+  useAidStyle?: boolean;
+}
+
+export interface CompressionResult {
+  files: CompressedFile[];
+  metadata: {
+    totalFiles: number;
+    totalSize: number;
+    excludedCount: number;
+    timestamp: string;
+  };
+}
+
+export interface CompressedFile {
+  path: string;
+  size: number;
+  hash: string;
+  content: string;
+  language?: string;
+}
+
+export interface DistillationResult {
+  apis: ExtractedAPI[];
+  structure: ProjectStructure;
+  dependencies: DependencyMap;
+  metadata: {
+    originalTokens: number;
+    distilledTokens: number;
+    compressionRatio: number;
+  };
+}
+
+export interface ExtractedAPI {
+  file: string;
+  imports?: string[];
+  exports: Array<{
+    name: string;
+    type: 'function' | 'class' | 'interface' | 'const' | 'type' | 'enum';
+    signature: string;
+    docstring?: string;
+    visibility: 'public' | 'private';
+    location: {
+      startLine: number;
+      endLine: number;
+    };
+    members?: Array<{
+      name: string;
+      signature: string;
+      type: 'property' | 'method';
+    }>;
+  }>;
+}
+
+export interface ProjectStructure {
+  directories: string[];
+  fileCount: number;
+  languages: Record<string, number>;
+}
+
+export interface DependencyMap {
+  [file: string]: {
+    imports: string[];
+    exports: string[];
+  };
 }

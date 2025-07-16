@@ -12,6 +12,11 @@ export interface DexConfig {
     defaultSource?: string;
   };
   prompts?: PromptsConfig['prompts'];
+  distiller?: {
+    defaultOutput?: 'save' | 'clipboard' | 'stdout';
+    saveDirectory?: string;
+    excludePatterns?: string[];
+  };
 }
 
 const explorer = cosmiconfigSync('dex', {
