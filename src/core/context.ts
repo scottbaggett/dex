@@ -11,11 +11,16 @@ export class ContextEngine {
 
   async extract(options: DexOptions): Promise<ExtractedContext> {
     let changes: GitChange[] = [];
-    let detectionMethod = 'none';
-    let additionalContext: { totalChanges?: number; notIncluded?: number } = {};
+    let detectionMethod = '';
+    let additionalContext: any = {};
 
-    // Handle git range/reference if provided
-    if (options.range) {
+    // Selected files (from --select flag)
+    if (options.selectedFiles && options.selectedFiles.length > 0) {
+      changes = await this.createChangesFromSelectedFiles(options.selectedFiles);
+      detectionMethod = 'selected files';
+    }
+    // Range-based extraction
+    else if (options.range) {
       // Check if it's a range (contains ..) or a single reference
       if (options.range.includes('..')) {
         // It's a range like HEAD~3..HEAD
@@ -491,5 +496,37 @@ export class ContextEngine {
     }
 
     return Array.from(changeMap.values());
+  }
+
+  /**
+   * Create GitChange objects from selected file paths
+   */
+  private async createChangesFromSelectedFiles(selectedFiles: string[]): Promise<GitChange[]> {
+    const { readFileSync, statSync } = await import('fs');
+    const { resolve } = await import('path');
+    const changes: GitChange[] = [];
+
+    for (const filePath of selectedFiles) {
+      try {
+        const fullPath = resolve(filePath);
+        const content = readFileSync(fullPath, 'utf-8');
+        const stats = statSync(fullPath);
+        const lines = content.split('\n').length;
+
+        changes.push({
+          file: filePath,
+          status: 'added', // Treat selected files as "added" for context
+          additions: lines,
+          deletions: 0,
+          diff: this.createAddedDiff(content),
+          lastModified: stats.mtime
+        });
+      } catch (error) {
+        // Skip files that can't be read, but warn
+        console.warn(`Warning: Could not read selected file ${filePath}:`, error instanceof Error ? error.message : 'Unknown error');
+      }
+    }
+
+    return changes;
   }
 }

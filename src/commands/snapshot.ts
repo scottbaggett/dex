@@ -4,6 +4,8 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { SnapshotManager } from '../core/snapshot';
 import { formatRelativeTime, formatFileSize } from '../utils/format';
+import { FileSelector } from '../utils/file-selector';
+import { SnapshotOptions } from '../types';
 
 export function createSnapshotCommand(): Command {
   const snapshot = new Command('snapshot').description(
@@ -20,15 +22,103 @@ export function createSnapshotCommand(): Command {
     )
     .option('-p, --path <path>', 'Specific path to snapshot')
     .option('--include-untracked', 'Include untracked files')
-    .action(async (name, options) => {
+    .action(async (name, options, command) => {
+      // Merge parent options (including --select)
+      // For nested commands, we need to go up two levels: create -> snapshot -> main
+      const snapshotCommand = command.parent;
+      const mainCommand = snapshotCommand?.parent;
+      const parentOptions = mainCommand?.opts() || {};
+      const mergedOptions = { ...parentOptions, ...options };
+      
       const manager = new SnapshotManager(process.cwd());
 
-      const snapshotOptions = {
-        message: options.message || name,
-        tags: options.tags,
-        path: options.path,
-        includeUntracked: options.includeUntracked,
+      let snapshotOptions: SnapshotOptions = {
+        message: mergedOptions.message || name,
+        tags: mergedOptions.tags,
+        path: mergedOptions.path,
+        includeUntracked: mergedOptions.includeUntracked,
       };
+
+      // Handle file selection if requested
+      if (mergedOptions.select) {
+        // Check if interactive mode is possible
+        if (!process.stdin.isTTY || !process.stdin.setRawMode) {
+          console.error(chalk.red('Interactive mode requires a TTY terminal'));
+          const fileSelector = new FileSelector();
+          fileSelector.showTTYError();
+          process.exit(1);
+        }
+        
+        const spinner = ora('Collecting files...').start();
+        
+        try {
+          // Use FileSelector to collect and select files
+          const fileSelector = new FileSelector();
+          const { files: allFiles, errors } = await fileSelector.collectFiles([process.cwd()], {
+            excludePatterns: [
+              '.git/**',
+              '.dex/**',
+              'node_modules/**',
+              'dist/**',
+              'build/**',
+              '.next/**',
+              '.nuxt/**',
+              '.cache/**',
+              '.DS_Store',
+              '*.log',
+              'coverage/**',
+              '.env.local',
+              '.env.*.local',
+              'vendor/**',
+              '__pycache__/**',
+              '*.pyc',
+              '.pytest_cache/**',
+              'target/**',
+              'Cargo.lock',
+              'package-lock.json',
+              'yarn.lock',
+              'pnpm-lock.yaml'
+            ],
+            maxFiles: 10000,
+            maxDepth: 20,
+            respectGitignore: true
+          });
+
+          if (errors.length > 0) {
+            spinner.warn(chalk.yellow('Some paths had issues:'));
+            for (const error of errors) {
+              console.warn(chalk.yellow(`  ${error}`));
+            }
+          }
+
+          if (allFiles.length === 0) {
+            spinner.fail(chalk.red('No valid files found'));
+            process.exit(1);
+          }
+
+          spinner.stop();
+
+          // Convert to GitChange objects for selection
+          const fileChanges = fileSelector.filesToGitChanges(allFiles);
+          const result = await fileSelector.selectFiles(fileChanges);
+
+          // Convert back to file paths and add to snapshot options
+          const selectedFiles = result.files.map(change => change.file);
+          snapshotOptions = {
+            message: snapshotOptions.message,
+            tags: snapshotOptions.tags,
+            path: snapshotOptions.path,
+            includeUntracked: snapshotOptions.includeUntracked,
+            selectedFiles // Add selected files to options
+          };
+        } catch (error) {
+          if (error instanceof Error && error.message === 'File selection cancelled') {
+            console.log(chalk.yellow('\nFile selection cancelled.'));
+            process.exit(0);
+          }
+          throw error;
+        }
+      }
 
       // Get file count first for warning
       const spinner = ora('Analyzing files...').start();

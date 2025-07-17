@@ -2,29 +2,15 @@ import { Command, Option } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import clipboardy from 'clipboardy';
-import { readFileSync, existsSync, statSync } from 'fs';
+import { readFileSync, statSync } from 'fs';
 import { resolve, relative } from 'path';
 import { XmlFormatter } from '../templates/xml';
 import { MarkdownFormatter } from '../templates/markdown';
 import { JsonFormatter } from '../templates/json';
 import { ExtractedContext, GitChange, DexOptions, OutputFormat, Formatter } from '../types';
-import { FileScanner, formatFileSize } from '../utils/file-scanner';
-
-interface CombineOptions {
-  outputFormat?: OutputFormat;
-  clipboard?: boolean;
-  prompt?: string;
-  promptTemplate?: string;
-  noPrompt?: boolean;
-  noMetadata?: boolean;
-  output?: string;
-  include?: string;
-  exclude?: string;
-  maxFiles?: number;
-  maxDepth?: number;
-  noGitignore?: boolean;
-  select?: boolean;
-}
+import { formatFileSize } from '../utils/file-scanner';
+import { FileSelector } from '../utils/file-selector';
+import { OutputManager } from '../utils/output-manager';
 
 export function createCombineCommand(): Command {
   const combine = new Command('combine')
@@ -46,9 +32,11 @@ export function createCombineCommand(): Command {
     .option('--max-files <number>', 'Maximum number of files to process', '1000')
     .option('--max-depth <number>', 'Maximum directory depth to scan', '10')
     .option('--no-gitignore', 'Do not respect .gitignore patterns')
-    .option('--select', 'Interactive file selection mode')
-    .action(async (files: string[], options: any) => {
-      await combineCommand(files, options);
+    .action(async (files: string[], options: any, command: any) => {
+      // Merge parent options (including --select)
+      const parentOptions = command.parent?.opts() || {};
+      const mergedOptions = { ...parentOptions, ...options };
+      await combineCommand(files, mergedOptions);
     });
 
   return combine;
@@ -78,44 +66,14 @@ async function combineCommand(filePaths: string[], options: any) {
     const respectGitignore = !options.noGitignore;
 
     // Collect all files from inputs (files and directories)
-    const allFiles: string[] = [];
-    const errors: string[] = [];
-    const scanner = new FileScanner();
-
-    for (const inputPath of filePaths) {
-      const resolvedPath = resolve(inputPath);
-      
-      if (!existsSync(resolvedPath)) {
-        errors.push(`Path not found: ${inputPath}`);
-        continue;
-      }
-
-      const stat = statSync(resolvedPath);
-      
-      if (stat.isFile()) {
-        // Single file
-        allFiles.push(resolvedPath);
-      } else if (stat.isDirectory()) {
-        // Directory - scan for files
-        spinner.text = chalk.gray(`Scanning directory: ${inputPath}`);
-        
-        try {
-          const scannedFiles = await scanner.scan(resolvedPath, {
-            includePatterns,
-            excludePatterns,
-            maxFiles: maxFiles - allFiles.length, // Remaining file limit
-            maxDepth,
-            respectGitignore
-          });
-          
-          allFiles.push(...scannedFiles.map(f => f.path));
-        } catch (error) {
-          errors.push(`Failed to scan directory ${inputPath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      } else {
-        errors.push(`Not a file or directory: ${inputPath}`);
-      }
-    }
+    const fileSelector = new FileSelector();
+    const { files: allFiles, errors } = await fileSelector.collectFiles(filePaths, {
+      includePatterns,
+      excludePatterns,
+      maxFiles,
+      maxDepth,
+      respectGitignore
+    });
 
     if (errors.length > 0) {
       spinner.warn(chalk.yellow('Some paths had issues:'));
@@ -130,9 +88,8 @@ async function combineCommand(filePaths: string[], options: any) {
     }
 
     // Safety check for too many files
-    if (allFiles.length > maxFiles) {
-      spinner.warn(chalk.yellow(`Found ${allFiles.length} files, limiting to ${maxFiles}`));
-      allFiles.splice(maxFiles);
+    if (allFiles.length >= maxFiles) {
+      spinner.warn(chalk.yellow(`Found ${allFiles.length} files, limited to ${maxFiles}`));
     }
 
     // Show file count and size info
@@ -152,28 +109,19 @@ async function combineCommand(filePaths: string[], options: any) {
     let finalFiles = allFiles;
     
     if (options.select) {
+      // Check if interactive mode is possible
+      if (!process.stdin.isTTY || !process.stdin.setRawMode) {
+        spinner.fail(chalk.red('Interactive mode requires a TTY terminal'));
+        fileSelector.showTTYError();
+        process.exit(1);
+      }
+      
       spinner.stop();
       
       try {
-        // Convert file paths to GitChange-like objects for the selector
-        const fileChanges: GitChange[] = allFiles.map(filePath => {
-          const relativePath = relative(process.cwd(), filePath);
-          const stats = statSync(filePath);
-          
-          return {
-            file: relativePath,
-            status: 'added' as const,
-            additions: 0, // Will be calculated after reading
-            deletions: 0,
-            diff: '',
-            lastModified: stats.mtime
-          };
-        });
-
-        const { launchInteractiveMode } = await import('../interactive/index.js');
-        const result = await launchInteractiveMode({
-          changes: fileChanges,
-        });
+        // Convert file paths to GitChange objects for the selector
+        const fileChanges = fileSelector.filesToGitChanges(allFiles);
+        const result = await fileSelector.selectFiles(fileChanges);
 
         // Convert back to file paths
         finalFiles = result.files.map(change => resolve(change.file));
@@ -185,7 +133,7 @@ async function combineCommand(filePaths: string[], options: any) {
 
         spinner.start('Processing selected files...');
       } catch (error) {
-        if (error instanceof Error && error.message === 'Interactive mode cancelled') {
+        if (error instanceof Error && error.message === 'File selection cancelled') {
           console.log(chalk.yellow('\nFile selection cancelled.'));
           process.exit(0);
         }
@@ -326,25 +274,35 @@ async function combineCommand(filePaths: string[], options: any) {
         console.log(output);
       }
     } else {
-      spinner.stop();
-      console.log(output);
-    }
+      // Save to .dex/ directory using OutputManager
+      const outputManager = new OutputManager();
+      
+      // Generate context string for filename
+      const contextParts = filePaths.map(p => p.replace(/[^a-zA-Z0-9]/g, '-')).join('-');
+      const contextString = contextParts.length > 20 ? contextParts.substring(0, 20) : contextParts;
+      
+      await outputManager.saveOutput(output, {
+        command: 'combine',
+        context: contextString,
+        format: options.outputFormat || 'xml'
+      });
+      
+      const relativePath = outputManager.getRelativePath({
+        command: 'combine',
+        context: contextString,
+        format: options.outputFormat || 'xml'
+      });
 
-    // Show summary for non-clipboard output
-    if (!options.copy && !options.output) {
-      const width = process.stdout.columns || 50;
-      console.log('\n' + chalk.dim('─'.repeat(Math.min(width, 50))));
+      // Format token display
+      const tokenCount = context.metadata.tokens.estimated;
+      const tokenStr = tokenCount >= 1000 ? `${Math.round(tokenCount / 1000)}k tokens` : `${tokenCount} tokens`;
 
-      console.log(
-        chalk.cyan.bold('Summary: ') +
-          chalk.yellow(`${context.scope.filesChanged} files`) +
-          chalk.gray(' • ') +
-          chalk.green(`${context.scope.linesAdded} lines`) +
-          chalk.gray(' • ') +
-          chalk.cyan(`~${context.metadata.tokens.estimated.toLocaleString()} tokens`) +
-          chalk.gray(' • ') +
-          chalk.blue(options.outputFormat || 'xml')
+      spinner.succeed(
+        chalk.green('Saved to ') + chalk.white(relativePath) + chalk.dim(' • ') + chalk.white(tokenStr)
       );
+
+      // Show agent instruction
+      console.log(chalk.dim(`\nFor agents: cat ${relativePath}`));
     }
   } catch (error) {
     spinner.fail(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));

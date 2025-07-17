@@ -11,8 +11,6 @@ export interface InteractiveState {
   totalAdditions: number;
   totalDeletions: number;
   estimatedTokens: number;
-  previewFile: FileItem | null;
-  scrollOffset: number;
 }
 
 export interface InteractiveModeProps {

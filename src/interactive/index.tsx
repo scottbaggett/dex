@@ -15,19 +15,28 @@ export interface InteractiveModeResult {
 export async function launchInteractiveMode(
   options: InteractiveModeOptions
 ): Promise<InteractiveModeResult> {
-  return new Promise((resolve, reject) => {
-    const app = render(
-      <FileSelector
-        changes={options.changes}
-        onComplete={(selectedFiles, copyToClipboard = false) => {
-          resolve({ files: selectedFiles, copyToClipboard });
-        }}
-        onCancel={() => {
-          reject(new Error('Interactive mode cancelled'));
-        }}
-      />
-    );
+  // Check if raw mode is supported
+  if (!process.stdin.isTTY || !process.stdin.setRawMode) {
+    throw new Error('Interactive mode requires a TTY terminal. Try running without --select or use a different terminal.');
+  }
 
-    app.waitUntilExit().catch(reject);
+  return new Promise((resolve, reject) => {
+    try {
+      const app = render(
+        <FileSelector
+          changes={options.changes}
+          onComplete={(selectedFiles, copyToClipboard = false) => {
+            resolve({ files: selectedFiles, copyToClipboard });
+          }}
+          onCancel={() => {
+            reject(new Error('Interactive mode cancelled'));
+          }}
+        />
+      );
+
+      app.waitUntilExit().catch(reject);
+    } catch (error) {
+      reject(new Error(`Interactive mode failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
   });
 }

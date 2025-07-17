@@ -62,6 +62,7 @@ program
     'Use prompt template: security, performance, refactor, feature, bugfix, migration, api, testing'
   )
   .option('--no-prompt', 'Disable AI prompt generation')
+  .option('--select', 'Interactive file selection mode')
   .action(async (range, options) => {
     await extractCommand(range, options);
   });
@@ -487,7 +488,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
           if (snapshot) {
             isSnapshot = true;
           }
-        } catch (err) {
+        } catch {
           // Not a snapshot, continue as git ref
         }
       }
@@ -520,7 +521,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
     }
 
     // Use format directly
-    let format = options.format;
+    const format = options.format;
 
     // Map optimize flags
     const aid = options.optimize?.includes('aid');
@@ -638,7 +639,91 @@ async function extractCommand(range: string, options: Record<string, any>) {
       }
     }
 
-    // Extract context
+    // Handle interactive selection if requested - do this BEFORE context extraction
+    if (options.select) {
+      // Check if interactive mode is possible
+      if (!process.stdin.isTTY || !process.stdin.setRawMode) {
+        spinner.fail(chalk.red('Interactive mode requires a TTY terminal'));
+        const { FileSelector } = await import('./utils/file-selector');
+        const fileSelector = new FileSelector();
+        fileSelector.showTTYError();
+        process.exit(1);
+      }
+      
+      spinner.text = chalk.gray('Scanning files for selection...');
+      
+      try {
+        const { FileSelector } = await import('./utils/file-selector');
+        const fileSelector = new FileSelector();
+        
+        // Collect all files in the repository (similar to combine command)
+        const { files: allFiles, errors } = await fileSelector.collectFiles([process.cwd()], {
+          excludePatterns: [
+            '.git/**',
+            '.dex/**',
+            'node_modules/**',
+            'dist/**',
+            'build/**',
+            '.next/**',
+            '.nuxt/**',
+            '.cache/**',
+            '.DS_Store',
+            '*.log',
+            'coverage/**',
+            '.env.local',
+            '.env.*.local',
+            'vendor/**',
+            '__pycache__/**',
+            '*.pyc',
+            '.pytest_cache/**',
+            'target/**',
+            'Cargo.lock',
+            'package-lock.json',
+            'yarn.lock',
+            'pnpm-lock.yaml'
+          ],
+          maxFiles: 10000,
+          maxDepth: 20,
+          respectGitignore: true
+        });
+
+        if (errors.length > 0) {
+          spinner.warn(chalk.yellow('Some paths had issues:'));
+          for (const error of errors) {
+            console.warn(chalk.yellow(`  ${error}`));
+          }
+        }
+
+        if (allFiles.length === 0) {
+          spinner.fail(chalk.red('No valid files found'));
+          process.exit(1);
+        }
+
+        spinner.stop();
+
+        // Convert to GitChange objects for selection
+        const fileChanges = fileSelector.filesToGitChanges(allFiles);
+        const result = await fileSelector.selectFiles(fileChanges);
+
+        // Override clipboard option if user pressed 'c'
+        if (result.copyToClipboard) {
+          dexOptions.clipboard = true;
+        }
+
+        // Update dexOptions to include selected files for context extraction
+        dexOptions.selectedFiles = result.files.map(change => change.file);
+
+        spinner.start('Extracting context from selected files...');
+      } catch (error) {
+        if (error instanceof Error && error.message === 'File selection cancelled') {
+          console.log(chalk.yellow('\nFile selection cancelled.'));
+          process.exit(0);
+        }
+        throw error;
+      }
+    }
+
+    // Extract context (either from git changes or selected files)
     spinner.text = chalk.gray('Extracting context...');
     const startTime = Date.now();
     const { SessionManager } = await import('./core/session');

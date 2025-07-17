@@ -33,7 +33,8 @@ export class DexHelpFormatter extends Help {
     lines.push('  dex -s            Extract staged changes → .dex/dex.extract.staged.xml');
     lines.push('  dex HEAD~3        Extract last 3 commits → .dex/dex.extract.head~3.xml');
     lines.push('  dex --task "Bug"  Add task context');
-    lines.push('  dex distill .     Distill entire repo → .dex/dex.distill.*.md\n');
+    lines.push('  dex distill .     Distill entire repo → .dex/dex.distill.{path}.md');
+    lines.push('  dex combine a/ b/ Combine files → .dex/dex.combine.{context}.xml\n');
 
     // Core Options (hand-picked)
     lines.push(chalk.yellow('CORE FLAGS'));
@@ -48,6 +49,7 @@ export class DexHelpFormatter extends Help {
 
     // Sub commands
     lines.push(chalk.yellow('COMMANDS'));
+    lines.push('  combine     Combine multiple files into one document');
     lines.push('  distill     Compress entire codebase');
     lines.push('  snapshot    Manage code snapshots');
     lines.push('  session     Track work sessions');
@@ -56,8 +58,8 @@ export class DexHelpFormatter extends Help {
     // Output info
     lines.push(chalk.yellow('OUTPUT'));
     lines.push('  All commands save to .dex/ with pattern: dex.command.context.ext');
-    lines.push('  Use -c to copy to clipboard instead of saving to file');
-    lines.push('  For agents: cat .dex/dex.extract.{context}.xml\n');
+    lines.push('  Use -c/--clipboard to copy to clipboard instead of saving to file');
+    lines.push('  For agents: cat .dex/dex.{command}.{context}.{ext}\n');
 
     // Help routing
     lines.push(chalk.yellow('MORE'));

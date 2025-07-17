@@ -453,6 +453,11 @@ export class SnapshotManager {
   }
 
   private async getFilesToSnapshot(options: SnapshotOptions): Promise<string[]> {
+    // If selectedFiles are provided, use them directly
+    if (options.selectedFiles && options.selectedFiles.length > 0) {
+      return options.selectedFiles;
+    }
+    
     const files: string[] = [];
     const ignorePatterns: string[] = [...(options.ignorePatterns || [])];
     

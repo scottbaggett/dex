@@ -98,8 +98,56 @@ export class Distiller {
     }
   }
 
+  async distillSelectedFiles(selectedFiles: string[], basePath: string, progress?: DistillerProgress): Promise<CompressionResult | DistillationResult | { compression: CompressionResult; distillation: DistillationResult }> {
+    this.progress = progress;
+    
+    // Initialize parser
+    await this.parser.initialize();
+
+    // Phase 1: Compression (if enabled)
+    let compressionResult: CompressionResult | undefined;
+    if (this.options.compressFirst !== false || this.options.format === 'compressed' || this.options.format === 'both') {
+      compressionResult = await this.compressSelectedFiles(selectedFiles, basePath);
+    }
+
+    // Phase 2: Distillation (if not full depth)
+    let distillationResult: DistillationResult | undefined;
+    if (this.options.depth !== 'full' && (this.options.format === 'distilled' || this.options.format === 'both')) {
+      const filesToDistill = compressionResult 
+        ? compressionResult.files.filter(f => this.parser.isLanguageSupported(Parser.detectLanguage(f.path) || ''))
+        : selectedFiles;
+      
+      // Don't restart progress if already running from compression phase
+      if (!compressionResult && this.progress) {
+        this.progress.start(filesToDistill.length);
+      }
+        
+      distillationResult = await this.distillFiles(filesToDistill, basePath);
+    }
+
+    // Return based on format option
+    if (this.options.format === 'compressed') {
+      return compressionResult!;
+    } else if (this.options.format === 'distilled') {
+      return distillationResult!;
+    } else {
+      return {
+        compression: compressionResult!,
+        distillation: distillationResult!,
+      };
+    }
+  }
+
   private async compress(targetPath: string): Promise<CompressionResult> {
     const files = await this.getFilesToProcess(targetPath);
+    return this.compressFiles(files, targetPath);
+  }
+
+  private async compressSelectedFiles(selectedFiles: string[], basePath: string): Promise<CompressionResult> {
+    return this.compressFiles(selectedFiles, basePath);
+  }
+
+  private async compressFiles(files: string[], _basePath: string): Promise<CompressionResult> {
     const compressedFiles: CompressedFile[] = [];
     let totalSize = 0;
     const excludedCount = 0;

@@ -3,11 +3,12 @@ import chalk from 'chalk';
 import { Distiller } from '../core/distiller';
 import { DistillerOptions } from '../types';
 import { promises as fs } from 'fs';
-import { resolve, basename, join } from 'path';
+import { resolve, basename } from 'path';
 import clipboardy from 'clipboardy';
-import { existsSync, mkdirSync } from 'fs';
 import { DistillerProgress } from '../core/distiller/progress';
 import { loadConfig } from '../core/config';
+import { OutputManager } from '../utils/output-manager';
+import { FileSelector } from '../utils/file-selector';
 
 export function createDistillCommand(): Command {
   const command = new Command('distill');
@@ -94,11 +95,67 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
       promptTemplate: options.promptTemplate,
     };
 
+    // Handle file selection if requested
+    let filesToProcess: string[] | undefined;
+    if (options.select) {
+      // Check if interactive mode is possible
+      if (!process.stdin.isTTY || !process.stdin.setRawMode) {
+        console.error(chalk.red('Interactive mode requires a TTY terminal'));
+        const fileSelector = new FileSelector();
+        fileSelector.showTTYError();
+        process.exit(1);
+      }
+      
+      try {
+        // Collect files first
+        const fileSelector = new FileSelector();
+        const { files: allFiles, errors } = await fileSelector.collectFiles([resolvedPath], {
+          excludePatterns: [...configExcludes, ...cliExcludes],
+          maxFiles: 10000, // Higher limit for distill
+          maxDepth: 20,
+          respectGitignore: true
+        });
+
+        if (errors.length > 0) {
+          console.warn(chalk.yellow('Some paths had issues:'));
+          for (const error of errors) {
+            console.warn(chalk.yellow(`  ${error}`));
+          }
+        }
+
+        if (allFiles.length === 0) {
+          console.error(chalk.red('No valid files found'));
+          process.exit(1);
+        }
+
+        // Convert to GitChange objects for selection
+        const fileChanges = fileSelector.filesToGitChanges(allFiles);
+        const result = await fileSelector.selectFiles(fileChanges);
+
+        // Convert back to file paths
+        filesToProcess = result.files.map(change => resolve(change.file));
+        
+        // Override clipboard option if user pressed 'c'
+        if (result.copyToClipboard) {
+          options.clipboard = true;
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === 'File selection cancelled') {
+          console.log(chalk.yellow('\nFile selection cancelled.'));
+          process.exit(0);
+        }
+        throw error;
+      }
+    }
+
     // Create distiller instance
     const distiller = new Distiller(distillerOptions);
     
     // Run distillation with progress (unless outputting to stdout)
-    const result = await distiller.distill(resolvedPath, isStdout ? undefined : progress);
+    // If we have selected files, we need to modify the distiller to use them
+    const result = filesToProcess 
+      ? await distiller.distillSelectedFiles(filesToProcess, resolvedPath, isStdout ? undefined : progress)
+      : await distiller.distill(resolvedPath, isStdout ? undefined : progress);
     
     // Format result
     const formatted = distiller.formatResult(result, resolvedPath);
@@ -154,18 +211,21 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
       
       console.log(chalk.cyan('📋 Distilled output copied to clipboard'));
     } else {
-      // Default: save to .dex directory (or configured directory)
-      const saveDir = config.distiller?.saveDirectory || '.dex';
-      const dexDir = join(process.cwd(), saveDir);
-      if (!existsSync(dexDir)) {
-        mkdirSync(dexDir, { recursive: true });
-      }
-      
-      // Extract folder name from path
+      // Default: save using OutputManager
+      const outputManager = new OutputManager();
       const folderName = basename(resolvedPath);
-      const outputFile = join(dexDir, `dex.distilled.${folderName}.txt`);
       
-      await fs.writeFile(outputFile, output, 'utf-8');
+      await outputManager.saveOutput(output, {
+        command: 'distill',
+        context: folderName,
+        format: 'markdown' // distill outputs markdown format
+      });
+      
+      const relativePath = outputManager.getRelativePath({
+        command: 'distill',
+        context: folderName,
+        format: 'markdown'
+      });
       
       // Complete progress with cool output
       if ('apis' in result && result.metadata) {
@@ -176,8 +236,8 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
         });
       }
       
-      console.log(chalk.cyan('💾 Distilled output saved to: ') + chalk.green(outputFile));
-      console.log(chalk.gray('🤖 If you\'re an AI agent, load this ENTIRE file into your context (don\'t use grep/tail/head) for a comprehensive code overview.'));
+      console.log(chalk.cyan('💾 Distilled output saved to: ') + chalk.green(relativePath));
+      console.log(chalk.dim(`\nFor agents: cat ${relativePath}`));
     }
 
   } catch (error) {

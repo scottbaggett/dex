@@ -26,6 +26,9 @@ export interface DexOptions {
   path?: string;
   type?: string[];
   
+  // File selection options
+  selectedFiles?: string[];
+  
   // Output options
   format?: OutputFormat;
   clipboard?: boolean;
@@ -172,6 +175,7 @@ export interface SnapshotOptions {
   includeUntracked?: boolean;
   path?: string;
   ignorePatterns?: string[];
+  selectedFiles?: string[];
   onProgress?: (progress: { current: number; total: number; file: string }) => void;
 }
 
