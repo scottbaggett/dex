@@ -81,11 +81,12 @@ dex --select  # Interactive mode to visually select files
 ```
 
 Visually select which files to include with:
-- Arrow keys to navigate
-- Space to toggle selection
+- Arrow keys (↑↓) or `j`/`k` to navigate
+- **Tab** to jump to next directory, **Shift+Tab** to jump to previous directory
+- Space to toggle file/directory selection
 - `a` to select all, `n` to select none
-- Enter to confirm, ESC to cancel
-- Real-time token estimation
+- `c` to copy to clipboard, Enter to confirm, ESC to cancel
+- Real-time token estimation and directory grouping
 
 ## Quick Start
 
@@ -170,6 +171,9 @@ dex @-1 -t ts -p "src/api" --format claude
 
 # Interactive selection with snapshots
 dex @-1 --select
+
+# Quick directory navigation in interactive mode
+# Use Tab/Shift+Tab to jump between directories
 ```
 </details>
 
