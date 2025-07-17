@@ -124,7 +124,8 @@ sessionCmd
       if (description) {
         console.log(chalk.dim(`  Description: ${description}`));
       }
-      console.log(chalk.dim(`\nUse 'dex' to package all changes since session start`));
+      console.log(chalk.dim(`\nSession now tracking ALL changes (committed and uncommitted)`));
+      console.log(chalk.dim(`Use 'dex' to package everything you've worked on`));
     } catch (error) {
       spinner.fail(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
       process.exit(1);
@@ -196,11 +197,21 @@ sessionCmd
       }
       
       // Show what would be included
-      const gitExtractor = new GitExtractor();
-      const changes = await gitExtractor.getChangesSince(session.startCommit);
-      if (changes.length > 0) {
-        console.log(chalk.dim(`\n  Changes since start: ${changes.length} files`));
-        console.log(chalk.dim(`  Run 'dex' to package these changes`));
+      const sessionChanges = await sessionManager.getSessionChanges();
+      const totalChanges = sessionChanges.added.length + sessionChanges.modified.length + sessionChanges.deleted.length;
+      
+      if (totalChanges > 0) {
+        console.log(chalk.dim(`\n  Changes since session start:`));
+        if (sessionChanges.added.length > 0) {
+          console.log(chalk.dim(`    Added: ${sessionChanges.added.length} files`));
+        }
+        if (sessionChanges.modified.length > 0) {
+          console.log(chalk.dim(`    Modified: ${sessionChanges.modified.length} files`));
+        }
+        if (sessionChanges.deleted.length > 0) {
+          console.log(chalk.dim(`    Deleted: ${sessionChanges.deleted.length} files`));
+        }
+        console.log(chalk.dim(`\n  Run 'dex' to package ALL changes (including uncommitted)`));
       } else {
         console.log(chalk.dim(`\n  No changes since session start`));
       }

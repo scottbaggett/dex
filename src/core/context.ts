@@ -330,8 +330,79 @@ export class ContextEngine {
     // 1. Check for active session
     const session = await this.sessionManager.getCurrentSession();
     if (session) {
-      // Get all changes since session start
-      const changes = await this.gitExtractor.getChangesSince(session.startCommit);
+      // Get all changes since session start (including uncommitted)
+      const sessionChanges = await this.sessionManager.getSessionChanges();
+      
+      // Convert session changes to GitChange format
+      const changes: GitChange[] = [];
+      
+      // Get git changes for comparison
+      const [stagedChanges, unstagedChanges] = await Promise.all([
+        this.gitExtractor.getCurrentChanges(true),
+        this.gitExtractor.getCurrentChanges(false),
+      ]);
+      
+      // Create a map of current git changes
+      const gitChangeMap = new Map<string, GitChange>();
+      for (const change of [...stagedChanges, ...unstagedChanges]) {
+        gitChangeMap.set(change.file, change);
+      }
+      
+      // Process each changed file
+      for (const file of sessionChanges.added) {
+        const gitChange = gitChangeMap.get(file);
+        if (gitChange) {
+          changes.push(gitChange);
+        } else {
+          // Untracked file - create a synthetic change
+          try {
+            const content = await this.gitExtractor.getFileContent(file);
+            const lines = content.split('\n').length;
+            changes.push({
+              file,
+              status: 'added',
+              additions: lines,
+              deletions: 0,
+              diff: this.createAddedDiff(content),
+            });
+          } catch {
+            // Skip if can't read file
+          }
+        }
+      }
+      
+      for (const file of sessionChanges.modified) {
+        const gitChange = gitChangeMap.get(file);
+        if (gitChange) {
+          changes.push(gitChange);
+        } else {
+          // File modified but not in git status - might need to generate diff
+          try {
+            const content = await this.gitExtractor.getFileContent(file);
+            const lines = content.split('\n').length;
+            changes.push({
+              file,
+              status: 'modified',
+              additions: lines,
+              deletions: 0,
+              diff: this.createAddedDiff(content), // Simplified for now
+            });
+          } catch {
+            // Skip if can't read file
+          }
+        }
+      }
+      
+      for (const file of sessionChanges.deleted) {
+        changes.push({
+          file,
+          status: 'deleted',
+          additions: 0,
+          deletions: 1, // We don't know the actual line count
+          diff: `--- a/${file}\n+++ /dev/null`,
+        });
+      }
+      
       return {
         changes,
         method: `session (started ${new Date(session.startTime).toLocaleTimeString()})`,
