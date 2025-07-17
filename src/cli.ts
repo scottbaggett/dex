@@ -10,6 +10,7 @@ import { MarkdownFormatter } from './templates/markdown';
 import { JsonFormatter } from './templates/json';
 import { XmlFormatter } from './templates/xml';
 import { DexOptions, OutputFormat } from './types';
+import { OutputManager } from './utils/output-manager';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import * as readline from 'readline';
@@ -435,6 +436,27 @@ examples:
     }
   });
 
+// Helper function to generate context string for filename
+function generateContextString(dexOptions: DexOptions, method: string): string {
+  if (dexOptions.range) {
+    return dexOptions.range;
+  }
+  if (dexOptions.staged) {
+    return 'staged';
+  }
+  if (dexOptions.all) {
+    return 'all';
+  }
+  // Parse method string to extract meaningful context
+  if (method.includes('session')) {
+    return 'session';
+  }
+  if (method.includes('feature branch')) {
+    return 'feature-branch';
+  }
+  return 'current';
+}
+
 // Main extract function
 async function extractCommand(range: string, options: Record<string, any>) {
   const spinner = ora('Analyzing changes...').start();
@@ -701,6 +723,9 @@ async function extractCommand(range: string, options: Record<string, any>) {
 
     const output = formatter.format({ context, options: dexOptions });
 
+    // Generate context string for filename
+    const contextString = generateContextString(dexOptions, context.metadata.extraction.method || 'default');
+
     // Handle output
     if (dexOptions.clipboard) {
       await clipboardy.write(output);
@@ -714,44 +739,31 @@ async function extractCommand(range: string, options: Record<string, any>) {
         chalk.green('Copied to clipboard') + chalk.dim(' • ') + chalk.white(tokenStr)
       );
     } else {
-      spinner.stop();
-      console.log(output);
-    }
+      // Save to file instead of printing to console
+      const outputManager = new OutputManager();
+      await outputManager.saveOutput(output, {
+        command: 'extract',
+        context: contextString,
+        format: dexOptions.format || 'xml'
+      });
+      
+      const relativePath = outputManager.getRelativePath({
+        command: 'extract',
+        context: contextString,
+        format: dexOptions.format || 'xml'
+      });
 
-    // Show summary for non-clipboard output
-    if (!dexOptions.format?.includes('json') && !dexOptions.clipboard) {
-      const width = process.stdout.columns || 50;
-      console.log('\n' + chalk.dim('─'.repeat(Math.min(width, 50))));
+      // Format token display
+      const tokenCount = context.metadata.tokens.estimated;
+      const tokenStr =
+        tokenCount >= 1000 ? `${Math.round(tokenCount / 1000)}k tokens` : `${tokenCount} tokens`;
 
-      let summaryMsg =
-        chalk.cyan.bold('Summary: ') +
-        chalk.yellow(`${context.scope.filesChanged} files`) +
-        chalk.gray(' • ') +
-        chalk.green(`+${context.scope.linesAdded}`) +
-        chalk.gray('/') +
-        chalk.red(`-${context.scope.linesDeleted}`) +
-        chalk.gray(' • ') +
-        chalk.cyan(`~${context.metadata.tokens.estimated.toLocaleString()} tokens`);
+      spinner.succeed(
+        chalk.green('Saved to ') + chalk.white(relativePath) + chalk.dim(' • ') + chalk.white(tokenStr)
+      );
 
-      // Add token savings info if available
-      if (context.tokenSavings && context.tokenSavings.saved > 0) {
-        summaryMsg +=
-          chalk.gray(' • ') +
-          chalk.green(`~${(context.tokenSavings.saved / 1000).toFixed(1)}k saved`);
-      }
-
-      console.log(summaryMsg);
-
-      // Show additional context about excluded files
-      if (context.additionalContext?.notIncluded) {
-        console.log(
-          chalk.dim('\n') +
-            chalk.white(`${context.additionalContext.notIncluded} unstaged changes not included`) +
-            chalk.dim(' • Use ') +
-            chalk.white('--all') +
-            chalk.dim(' to include both staged and unstaged')
-        );
-      }
+      // Show agent instruction
+      console.log(chalk.dim(`\nFor agents: cat ${relativePath}`));
     }
   } catch (error) {
     spinner.fail(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));

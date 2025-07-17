@@ -27,7 +27,7 @@ export class SessionManager {
   constructor(workingDir: string = process.cwd()) {
     this.workingDir = workingDir;
     this.sessionDir = join(workingDir, '.dex');
-    this.sessionFile = join(this.sessionDir, 'session.json');
+    this.sessionFile = join(this.sessionDir, 'dex.session.json');
     this.gitExtractor = new GitExtractor(workingDir);
   }
 

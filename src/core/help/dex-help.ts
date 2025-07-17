@@ -12,7 +12,7 @@ export class DexHelpFormatter extends Help {
    * @param helper The Help instance (unused)
    * @returns {string} The formatted help string
    */
-  formatHelp(cmd: Command, helper: Help): string {
+  formatHelp(cmd: Command, _helper: Help): string {
         const v = cmd.version() || '-';
     const lines: string[] = [];
 
@@ -29,11 +29,11 @@ export class DexHelpFormatter extends Help {
 
     // Quick Start
     lines.push(chalk.yellow('QUICK START'));
-    lines.push('  dex               Extract current unstaged changes');
-    lines.push('  dex -s            Extract staged changes');
-    lines.push('  dex HEAD~3        Extract last 3 commits');
+    lines.push('  dex               Extract current changes → .dex/dex.extract.current.xml');
+    lines.push('  dex -s            Extract staged changes → .dex/dex.extract.staged.xml');
+    lines.push('  dex HEAD~3        Extract last 3 commits → .dex/dex.extract.head~3.xml');
     lines.push('  dex --task "Bug"  Add task context');
-    lines.push('  dex distill .     Distill entire repo\n');
+    lines.push('  dex distill .     Distill entire repo → .dex/dex.distill.*.md\n');
 
     // Core Options (hand-picked)
     lines.push(chalk.yellow('CORE FLAGS'));
@@ -50,7 +50,14 @@ export class DexHelpFormatter extends Help {
     lines.push(chalk.yellow('COMMANDS'));
     lines.push('  distill     Compress entire codebase');
     lines.push('  snapshot    Manage code snapshots');
+    lines.push('  session     Track work sessions');
     lines.push('  prompts     Prompt-template utilities\n');
+
+    // Output info
+    lines.push(chalk.yellow('OUTPUT'));
+    lines.push('  All commands save to .dex/ with pattern: dex.command.context.ext');
+    lines.push('  Use -c to copy to clipboard instead of saving to file');
+    lines.push('  For agents: cat .dex/dex.extract.{context}.xml\n');
 
     // Help routing
     lines.push(chalk.yellow('MORE'));

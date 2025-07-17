@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync, readFileSync } from 'fs';
+import { writeFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import ora from 'ora';
 import * as readline from 'readline';
@@ -54,7 +54,7 @@ export async function initCommand(): Promise<void> {
     });
     
     if (!overwrite) {
-      console.log(chalk.gray('\nConfiguration setup cancelled.'));
+      console.log(chalk.white('\nConfiguration setup cancelled.'));
       return;
     }
   }
@@ -170,12 +170,12 @@ coverage/
     spinner.succeed(chalk.green('Created .dex/.dexignore'));
     
     // Display summary
-    console.log('\n' + chalk.gray('Directory structure:'));
-    console.log(chalk.gray('─'.repeat(40)));
+    console.log('\n' + chalk.white('Directory structure:'));
+    console.log(chalk.white('─'.repeat(40)));
     console.log(chalk.white('.dex/'));
-    console.log(chalk.white('├── config.yml        ') + chalk.gray('# Main configuration'));
-    console.log(chalk.white('├── .dexignore        ') + chalk.gray('# Ignore patterns'));
-    console.log(chalk.white('└── prompts/          ') + chalk.gray('# Custom prompt templates'));
+    console.log(chalk.white('├── config.yml        ') + chalk.white('# Main configuration'));
+    console.log(chalk.white('├── .dexignore        ') + chalk.white('# Ignore patterns'));
+    console.log(chalk.white('└── prompts/          ') + chalk.white('# Custom prompt templates'));
     
     if (promptFiles?.length) {
       for (let i = 0; i < promptFiles.length; i++) {
@@ -184,14 +184,14 @@ coverage/
       }
     }
     
-    console.log(chalk.gray('─'.repeat(40)));
+    console.log(chalk.white('─'.repeat(40)));
     
     console.log(chalk.cyan('\n✨ Dex has been initialized!'));
-    console.log(chalk.gray('\nNext steps:'));
-    console.log(chalk.gray('  1. Review and customize .dex/config.yml'));
-    console.log(chalk.gray('  2. Explore prompt templates in .dex/prompts/'));
-    console.log(chalk.gray('  3. Run "dex" to extract your code changes'));
-    console.log(chalk.gray('\nTip: Add .dex/ to your .gitignore if you want to keep it local'));
+    console.log(chalk.white('\nNext steps:'));
+    console.log(chalk.white('  1. Review and customize .dex/config.yml'));
+    console.log(chalk.white('  2. Explore prompt templates in .dex/prompts/'));
+    console.log(chalk.white('  3. Run "dex" to extract your code changes'));
+    console.log(chalk.white('\nTip: Add .dex/ to your .gitignore if you want to keep it local'));
     
   } catch (error) {
     spinner.fail(chalk.red('Failed to initialize Dex'));

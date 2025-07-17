@@ -14,8 +14,22 @@ export class ContextEngine {
     let detectionMethod = 'none';
     let additionalContext: { totalChanges?: number; notIncluded?: number } = {};
 
+    // Handle git range/reference if provided
+    if (options.range) {
+      // Check if it's a range (contains ..) or a single reference
+      if (options.range.includes('..')) {
+        // It's a range like HEAD~3..HEAD
+        const [from, to] = options.range.split('..');
+        changes = await this.gitExtractor.getChangesInRange(from, to || 'HEAD');
+        detectionMethod = `range (${options.range})`;
+      } else {
+        // It's a single reference like HEAD~3
+        changes = await this.gitExtractor.getChangesSince(options.range);
+        detectionMethod = `since ${options.range}`;
+      }
+    }
     // Staged changes
-    if (options.staged) {
+    else if (options.staged) {
       changes = await this.gitExtractor.getCurrentChanges(true);
       detectionMethod = 'staged';
       // Check for unstaged changes to inform user
