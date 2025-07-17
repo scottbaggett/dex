@@ -14,7 +14,6 @@ try {
   Python = require('tree-sitter-python');
 } catch (error) {
   // Tree-sitter native bindings not available
-  console.warn('Tree-sitter native bindings not available, falling back to regex parsing');
 }
 
 interface TreeSitterExport {
@@ -54,7 +53,7 @@ export class TreeSitterParser extends BaseParser {
     super(options);
     this.options = options;
     this.isTreeSitterAvailable = Parser !== null;
-    
+
     if (this.isTreeSitterAvailable) {
       this.parser = new Parser();
       this.languageMap = new Map([
@@ -100,13 +99,13 @@ export class TreeSitterParser extends BaseParser {
 
   extract(parsedFile: ParsedFile, depth: DistillDepth): ExtractedAPI {
     const { content, path, language, ast } = parsedFile;
-    
+
     if (!ast) {
       throw new Error('No AST available for extraction');
     }
 
     const extracted = this.extractFromAST(ast, content, language);
-    
+
     return {
       file: path,
       imports: extracted.imports,
@@ -143,7 +142,7 @@ export class TreeSitterParser extends BaseParser {
 
   private walkAST(node: any, callback: (node: any) => void): void {
     callback(node);
-    
+
     for (let i = 0; i < node.childCount; i++) {
       this.walkAST(node.child(i), callback);
     }
@@ -449,7 +448,6 @@ export class TreeSitterParser extends BaseParser {
     });
   }
 
-
   private extractGoImport(node: any, content: string, imports: string[]): void {
     // Extract Go import paths
     const importSpec = node.childForFieldName('import_spec');
@@ -505,7 +503,6 @@ export class TreeSitterParser extends BaseParser {
       location: { startLine, endLine },
     });
   }
-
 
   private extractRustUse(node: any, content: string, imports: string[]): void {
     // Extract Rust use statements
@@ -632,7 +629,7 @@ export class TreeSitterParser extends BaseParser {
 
   private extractDocstring(node: any, lines: string[]): string | undefined {
     if (!this.options.includeDocstrings) return undefined;
-    
+
     const startLine = node.startPosition.row;
     if (startLine > 0) {
       const prevLine = lines[startLine - 1];
@@ -645,7 +642,7 @@ export class TreeSitterParser extends BaseParser {
 
   private extractPythonDocstring(node: any, content: string): string | undefined {
     if (!this.options.includeDocstrings) return undefined;
-    
+
     // Look for string literal as first statement in function/class body
     const body = node.childForFieldName('body');
     if (body && body.childCount > 0) {
@@ -660,9 +657,12 @@ export class TreeSitterParser extends BaseParser {
     return undefined;
   }
 
-  private extractClassMembers(node: any, content: string): Array<{name: string; signature: string; type: 'property' | 'method'}> {
-    const members: Array<{name: string; signature: string; type: 'property' | 'method'}> = [];
-    
+  private extractClassMembers(
+    node: any,
+    content: string
+  ): Array<{ name: string; signature: string; type: 'property' | 'method' }> {
+    const members: Array<{ name: string; signature: string; type: 'property' | 'method' }> = [];
+
     // Find class body
     const body = node.childForFieldName('body');
     if (!body) return members;
@@ -692,9 +692,12 @@ export class TreeSitterParser extends BaseParser {
     return members;
   }
 
-  private extractInterfaceMembers(node: any, content: string): Array<{name: string; signature: string; type: 'property' | 'method'}> {
-    const members: Array<{name: string; signature: string; type: 'property' | 'method'}> = [];
-    
+  private extractInterfaceMembers(
+    node: any,
+    content: string
+  ): Array<{ name: string; signature: string; type: 'property' | 'method' }> {
+    const members: Array<{ name: string; signature: string; type: 'property' | 'method' }> = [];
+
     // Find interface body
     const body = node.childForFieldName('body');
     if (!body) return members;
@@ -724,9 +727,12 @@ export class TreeSitterParser extends BaseParser {
     return members;
   }
 
-  private extractPythonClassMembers(node: any, content: string): Array<{name: string; signature: string; type: 'property' | 'method'}> {
-    const members: Array<{name: string; signature: string; type: 'property' | 'method'}> = [];
-    
+  private extractPythonClassMembers(
+    node: any,
+    content: string
+  ): Array<{ name: string; signature: string; type: 'property' | 'method' }> {
+    const members: Array<{ name: string; signature: string; type: 'property' | 'method' }> = [];
+
     // Find class body
     const body = node.childForFieldName('body');
     if (!body) return members;
@@ -751,7 +757,7 @@ export class TreeSitterParser extends BaseParser {
   private getClassSignature(node: any, content: string): string {
     const nameNode = node.childForFieldName('name');
     const name = nameNode ? this.getNodeText(nameNode, content) : '';
-    
+
     // Extract class declaration up to opening brace
     const fullText = this.getNodeText(node, content);
     const braceIndex = fullText.indexOf('{');
@@ -761,7 +767,7 @@ export class TreeSitterParser extends BaseParser {
   private getInterfaceSignature(node: any, content: string): string {
     const nameNode = node.childForFieldName('name');
     const name = nameNode ? this.getNodeText(nameNode, content) : '';
-    
+
     // Extract interface declaration up to opening brace
     const fullText = this.getNodeText(node, content);
     const braceIndex = fullText.indexOf('{');
@@ -771,7 +777,7 @@ export class TreeSitterParser extends BaseParser {
   private getEnumSignature(node: any, content: string): string {
     const nameNode = node.childForFieldName('name');
     const name = nameNode ? this.getNodeText(nameNode, content) : '';
-    
+
     // Extract enum declaration up to opening brace
     const fullText = this.getNodeText(node, content);
     const braceIndex = fullText.indexOf('{');
@@ -830,32 +836,26 @@ export class TreeSitterParser extends BaseParser {
   private filterByDepth(exports: TreeSitterExport[], depth: DistillDepth): TreeSitterExport[] {
     switch (depth) {
       case 'minimal':
-        return exports.filter(e => e.visibility === 'public');
+        return exports.filter((e) => e.visibility === 'public');
       case 'public':
-        return exports.filter(e => e.visibility === 'public');
+        return exports.filter((e) => e.visibility === 'public');
       case 'extended':
-        return exports.filter(e => 
-          e.visibility === 'public' || 
-          (e.visibility === 'private' && this.isKeyPrivateMethod(e.name))
+        return exports.filter(
+          (e) =>
+            e.visibility === 'public' ||
+            (e.visibility === 'private' && this.isKeyPrivateMethod(e.name))
         );
       case 'full':
         return exports;
       default:
-        return exports.filter(e => e.visibility === 'public');
+        return exports.filter((e) => e.visibility === 'public');
     }
   }
 
   private isKeyPrivateMethod(name: string): boolean {
-    const keyPatterns = [
-      /^_init/,
-      /^_validate/,
-      /^_process/,
-      /^_handle/,
-      /^_parse/,
-      /^_transform/,
-    ];
-    
-    return keyPatterns.some(pattern => pattern.test(name));
+    const keyPatterns = [/^_init/, /^_validate/, /^_process/, /^_handle/, /^_parse/, /^_transform/];
+
+    return keyPatterns.some((pattern) => pattern.test(name));
   }
 
   isLanguageSupported(language: string): boolean {
@@ -868,7 +868,7 @@ export class TreeSitterParser extends BaseParser {
 
   static getAutoDepth(fileSize: number, tokenBudget: number = 100000): DistillDepth {
     const estimatedTokens = fileSize / 4;
-    
+
     if (estimatedTokens < tokenBudget * 0.1) {
       return 'extended';
     } else if (estimatedTokens < tokenBudget * 0.3) {

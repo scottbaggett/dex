@@ -31,8 +31,8 @@ export class XmlFormatter extends Formatter {
       sections.push(this.formatChanges(context, options));
     }
 
-    // Add AI prompt unless disabled
-    if (!options.noPrompt) {
+    // Add AI prompt only if explicitly requested
+    if (options.prompt || options.promptTemplate) {
       sections.push('  <ai_analysis_request>');
       sections.push(this.escapeXml(PromptGenerator.generate(context, options)));
       sections.push('  </ai_analysis_request>');
@@ -60,7 +60,6 @@ export class XmlFormatter extends Formatter {
     lines.push(`      <commit>${this.escapeXml(metadata.repository.commit)}</commit>`);
     lines.push(`    </repository>`);
     lines.push(`    <extraction>`);
-    lines.push(`      <depth>${this.escapeXml(metadata.extraction.depth)}</depth>`);
     
     if (metadata.extraction.filters?.path || metadata.extraction.filters?.type) {
       lines.push(`      <filters>`);

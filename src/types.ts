@@ -1,5 +1,4 @@
-export type DepthLevel = 'minimal' | 'focused' | 'full' | 'extended';
-export type OutputFormat = 'markdown' | 'json' | 'claude' | 'gpt' | 'gemini' | 'grok' | 'llama' | 'mistral' | 'github-pr' | 'pr' | 'xml';
+export type OutputFormat = 'markdown' | 'json' | 'xml';
 
 export interface DexOptions {
   // Git options
@@ -16,10 +15,8 @@ export interface DexOptions {
   timeRange?: string;  // e.g., "2h", "30m", "1d"
   isTimeRange?: boolean;
   
-  // Depth options
-  depth?: DepthLevel;
-  fullFiles?: string[];
-  bootstrap?: boolean;
+  // Full file options
+  full?: string;  // Pattern for files to show in full
   
   // Untracked files
   includeUntracked?: boolean;
@@ -72,7 +69,7 @@ export interface Metadata {
     commit: string;
   };
   extraction: {
-    depth: DepthLevel;
+    method?: string; // How changes were detected (e.g., "feature branch", "staged changes")
     filters?: {
       path?: string;
       type?: string[];
@@ -97,8 +94,17 @@ export interface ExtractedContext {
   };
   task?: TaskContext;
   fullFiles?: Map<string, string>;
-  symbols?: SymbolMap;
   metadata: Metadata;
+  tokenSavings?: {
+    fullFileTokens: number;
+    actualTokens: number;
+    saved: number;
+    percentSaved: number;
+  };
+  additionalContext?: {
+    totalChanges?: number;
+    notIncluded?: number;
+  };
 }
 
 export interface TaskContext {

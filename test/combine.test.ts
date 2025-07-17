@@ -89,7 +89,7 @@ function add(a, b) {
             commit: 'abc123',
           },
           extraction: {
-            depth: 'full',
+            method: 'combine',
           },
           tokens: {
             estimated: 100,
@@ -158,7 +158,7 @@ function add(a, b) {
             commit: 'abc123',
           },
           extraction: {
-            depth: 'full',
+            method: 'combine',
           },
           tokens: {
             estimated: 50,
@@ -217,7 +217,7 @@ function add(a, b) {
             commit: 'abc123',
           },
           extraction: {
-            depth: 'full',
+            method: 'combine',
           },
           tokens: {
             estimated: 50,
@@ -275,7 +275,7 @@ function add(a, b) {
             commit: 'abc123',
           },
           extraction: {
-            depth: 'full',
+            method: 'combine',
           },
           tokens: {
             estimated: 50,

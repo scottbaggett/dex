@@ -7,12 +7,6 @@ import { ContextEngine } from './core/context';
 import { GitExtractor } from './core/git';
 import { MarkdownFormatter } from './templates/markdown';
 import { JsonFormatter } from './templates/json';
-import { ClaudeFormatter } from './templates/claude';
-import { GptFormatter } from './templates/gpt';
-import { GeminiFormatter } from './templates/gemini';
-import { GrokFormatter } from './templates/grok';
-import { LlamaFormatter } from './templates/llama';
-import { MistralFormatter } from './templates/mistral';
 import { XmlFormatter } from './templates/xml';
 import { DexOptions, OutputFormat } from './types';
 import { readFileSync } from 'fs';
@@ -27,7 +21,7 @@ const program = new Command();
 
 if (process.argv.includes('--help-extended')) {
   // Remove the custom flag then fall back to Commander's default help
-  process.argv = process.argv.filter(a => a !== '--help-extended');
+  process.argv = process.argv.filter((a) => a !== '--help-extended');
   program.parse(process.argv);
   program.outputHelp(); // the default
   process.exit(0);
@@ -37,10 +31,7 @@ program.configureHelp({
   formatHelp: (cmd, helper) => new DexHelpFormatter().formatHelp(cmd, helper),
 });
 
-program
-  .name('dex')
-  .description(packageJson.description)
-  .version(packageJson.version);
+program.name('dex').description(packageJson.description).version(packageJson.version);
 
 // Default command (extract)
 program
@@ -48,14 +39,13 @@ program
   .option('-s, --staged', 'Include only staged changes')
   .option('-a, --all', 'Include both staged and unstaged changes')
   .option('--since <commit>', 'Show changes since a specific commit')
-  .option('-d, --depth <level>', 'Extraction depth: minimal, focused, full, extended', 'focused')
-  .option('--full <pattern>', 'Include full files matching pattern (use * for all)')
+  .option('--full <pattern>', 'Include full files matching pattern')
   .option('-p, --path <pattern>', 'Filter by file path pattern')
   .option('-t, --type <types>', 'Filter by file types (comma-separated)')
   .addOption(
     new Option('-f, --format <format>', 'Output format')
-      .default('markdown')
-      .choices(['markdown', 'json', 'claude', 'gpt', 'gemini', 'grok', 'llama', 'mistral', 'xml', 'pr'])
+      .default('xml')
+      .choices(['markdown', 'json', 'xml'])
   )
   .option('-c, --clipboard', 'Copy output to clipboard')
   .option('--task <source>', 'Task context (description, file path, URL, or - for stdin)')
@@ -73,8 +63,6 @@ program
   .action(async (range, options) => {
     await extractCommand(range, options);
   });
-
-
 
 // Init subcommand
 program
@@ -313,7 +301,6 @@ examples:
     }
   });
 
-
 // Main extract function
 async function extractCommand(range: string, options: Record<string, any>) {
   const spinner = ora('Analyzing changes...').start();
@@ -383,13 +370,8 @@ async function extractCommand(range: string, options: Record<string, any>) {
       }
     }
 
-    // Handle bootstrap mode (--full *)
-    const bootstrap = options.full === '*';
-    const fullFiles = bootstrap ? undefined : options.full ? [options.full] : undefined;
-
-    // Map format aliases
+    // Use format directly
     let format = options.format;
-    if (format === 'pr') format = 'github-pr';
 
     // Map optimize flags
     const aid = options.optimize?.includes('aid');
@@ -405,9 +387,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
       staged: options.staged,
       all: options.all,
       since: options.since,
-      depth: options.depth,
-      fullFiles,
-      bootstrap,
+      full: options.full,
       includeUntracked: options.includeUntracked,
       untrackedPattern: options.untrackedPattern,
       path: options.path,
@@ -431,22 +411,11 @@ async function extractCommand(range: string, options: Record<string, any>) {
     dexOptions = mergeWithConfig(dexOptions);
 
     // Validate format after config merge
-    const validFormats = [
-      'markdown',
-      'json',
-      'claude',
-      'gpt',
-      'gemini',
-      'grok',
-      'llama',
-      'mistral',
-      'xml',
-      'github-pr',
-    ];
+    const validFormats = ['markdown', 'json', 'xml'];
     if (dexOptions.format && !validFormats.includes(dexOptions.format)) {
       spinner.fail(
         chalk.red(
-          `Error: Invalid format '${dexOptions.format}'. Valid formats are: markdown, json, claude, gpt, gemini, grok, llama, mistral, xml, pr`
+          `Error: Invalid format '${dexOptions.format}'. Valid formats are: markdown, json, xml`
         )
       );
       process.exit(1);
@@ -525,8 +494,12 @@ async function extractCommand(range: string, options: Record<string, any>) {
 
     // Extract context
     spinner.text = chalk.gray('Extracting context...');
-    const contextEngine = new ContextEngine(process.cwd());
+    const startTime = Date.now();
+    const { SessionManager } = await import('./core/session');
+    const sessionManager = new SessionManager();
+    const contextEngine = new ContextEngine(gitExtractor, sessionManager);
     let context = await contextEngine.extract(dexOptions);
+    const extractionTime = Date.now() - startTime;
 
     if (context.changes.length === 0) {
       spinner.warn(
@@ -535,35 +508,61 @@ async function extractCommand(range: string, options: Record<string, any>) {
       process.exit(0);
     }
 
+    // Show detection feedback message with progress bar
+    if (context.metadata.extraction.method) {
+      // Calculate progress bar
+      let progressBar = '';
+      let compressionPercent = 0;
+      if (context.tokenSavings && context.tokenSavings.percentSaved > 0) {
+        compressionPercent = context.tokenSavings.percentSaved;
+        const filled = Math.round(compressionPercent / 10);
+        const empty = 10 - filled;
+        progressBar = chalk.green('█'.repeat(filled)) + chalk.dim('░'.repeat(empty));
+      }
 
+      // Format the main message
+      let message =
+        chalk.white('Packaged ') +
+        chalk.white(`${context.scope.filesChanged} ${context.metadata.extraction.method}`);
+
+      if (progressBar) {
+        message +=
+          ' ' +
+          chalk.dim('[') +
+          progressBar +
+          chalk.dim(']') +
+          ' ' +
+          chalk.white(`${compressionPercent}% compression`);
+      }
+
+      // Add timing
+      message += chalk.dim(` in ${extractionTime}ms`);
+
+      spinner.succeed(message);
+
+      // Show skipped files if any
+      if (context.additionalContext?.notIncluded && context.additionalContext.notIncluded > 0) {
+        console.log(
+          chalk.yellow('Skipped ') +
+            chalk.white(`${context.additionalContext.notIncluded} unstaged files`) +
+            chalk.dim(' (use ') +
+            chalk.white('--all') +
+            chalk.dim(' to include)')
+        );
+      }
+
+      spinner.start(); // Restart spinner for formatting
+    }
 
     // Update spinner with extraction info
     spinner.text = chalk.gray(`Processing ${chalk.yellow(context.scope.filesChanged)} files...`);
 
     // Format output
-    spinner.text = chalk.gray(`Formatting as ${chalk.cyan(dexOptions.format || 'markdown')}...`);
+    spinner.text = chalk.gray(`Formatting as ${chalk.cyan(dexOptions.format || 'xml')}...`);
     let formatter;
-    switch (dexOptions.format || 'markdown') {
+    switch (dexOptions.format || 'xml') {
       case 'json':
         formatter = new JsonFormatter();
-        break;
-      case 'claude':
-        formatter = new ClaudeFormatter();
-        break;
-      case 'gpt':
-        formatter = new GptFormatter();
-        break;
-      case 'gemini':
-        formatter = new GeminiFormatter();
-        break;
-      case 'grok':
-        formatter = new GrokFormatter();
-        break;
-      case 'llama':
-        formatter = new LlamaFormatter();
-        break;
-      case 'mistral':
-        formatter = new MistralFormatter();
         break;
       case 'xml':
         formatter = new XmlFormatter();
@@ -582,32 +581,13 @@ async function extractCommand(range: string, options: Record<string, any>) {
     if (dexOptions.clipboard) {
       await clipboardy.write(output);
 
-      // Show enhanced success message with metadata
-      const tokenStr = chalk.cyan(`~${context.metadata.tokens.estimated.toLocaleString()} tokens`);
-      const filesStr = chalk.yellow(`${context.scope.filesChanged} files`);
-      const linesStr =
-        chalk.green(`+${context.scope.linesAdded}`) +
-        chalk.gray('/') +
-        chalk.red(`-${context.scope.linesDeleted}`);
-      const depthStr = chalk.magenta(context.metadata.extraction.depth);
-
-      // Add format if not default markdown
-      let formatStr = '';
-      if (dexOptions.format && dexOptions.format !== 'markdown') {
-        formatStr = chalk.gray(' • ') + chalk.blue(dexOptions.format);
-      }
+      // Format token display
+      const tokenCount = context.metadata.tokens.estimated;
+      const tokenStr =
+        tokenCount >= 1000 ? `${Math.round(tokenCount / 1000)}k tokens` : `${tokenCount} tokens`;
 
       spinner.succeed(
-        chalk.green('Context copied to clipboard') +
-          chalk.gray(' • ') +
-          tokenStr +
-          chalk.gray(' • ') +
-          filesStr +
-          chalk.gray(' • ') +
-          linesStr +
-          chalk.gray(' • ') +
-          depthStr +
-          formatStr
+        chalk.green('Copied to clipboard') + chalk.dim(' • ') + chalk.white(tokenStr)
       );
     } else {
       spinner.stop();
@@ -619,18 +599,35 @@ async function extractCommand(range: string, options: Record<string, any>) {
       const width = process.stdout.columns || 50;
       console.log('\n' + chalk.dim('─'.repeat(Math.min(width, 50))));
 
-      console.log(
+      let summaryMsg =
         chalk.cyan.bold('Summary: ') +
-          chalk.yellow(`${context.scope.filesChanged} files`) +
+        chalk.yellow(`${context.scope.filesChanged} files`) +
+        chalk.gray(' • ') +
+        chalk.green(`+${context.scope.linesAdded}`) +
+        chalk.gray('/') +
+        chalk.red(`-${context.scope.linesDeleted}`) +
+        chalk.gray(' • ') +
+        chalk.cyan(`~${context.metadata.tokens.estimated.toLocaleString()} tokens`);
+
+      // Add token savings info if available
+      if (context.tokenSavings && context.tokenSavings.saved > 0) {
+        summaryMsg +=
           chalk.gray(' • ') +
-          chalk.green(`+${context.scope.linesAdded}`) +
-          chalk.gray('/') +
-          chalk.red(`-${context.scope.linesDeleted}`) +
-          chalk.gray(' • ') +
-          chalk.cyan(`~${context.metadata.tokens.estimated.toLocaleString()} tokens`) +
-          chalk.gray(' • ') +
-          chalk.magenta(context.metadata.extraction.depth)
-      );
+          chalk.green(`~${(context.tokenSavings.saved / 1000).toFixed(1)}k saved`);
+      }
+
+      console.log(summaryMsg);
+
+      // Show additional context about excluded files
+      if (context.additionalContext?.notIncluded) {
+        console.log(
+          chalk.dim('\n') +
+            chalk.white(`${context.additionalContext.notIncluded} unstaged changes not included`) +
+            chalk.dim(' • Use ') +
+            chalk.white('--all') +
+            chalk.dim(' to include both staged and unstaged')
+        );
+      }
     }
   } catch (error) {
     spinner.fail(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));

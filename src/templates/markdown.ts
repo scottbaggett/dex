@@ -28,12 +28,10 @@ export class MarkdownFormatter extends Formatter {
     }
 
     // Impact analysis (placeholder for future AST analysis)
-    if (options.bootstrap || options.depth === 'extended') {
-      sections.push(this.formatImpactAnalysis());
-    }
+    // TODO: Add when AST analysis is implemented
 
-    // Add AI prompt unless disabled
-    if (!options.noPrompt) {
+    // Add AI prompt only if explicitly requested
+    if (options.prompt || options.promptTemplate) {
       sections.push('## AI Analysis Request');
       sections.push(PromptGenerator.generate(context, options));
     }
@@ -54,7 +52,7 @@ export class MarkdownFormatter extends Formatter {
     lines.push(`- **Generated:** ${metadata.generated}`);
     lines.push(`- **Repository:** ${metadata.repository.name} (${metadata.repository.branch})`);
     lines.push(`- **Commit:** ${metadata.repository.commit}`);
-    lines.push(`- **Extraction Depth:** ${metadata.extraction.depth}`);
+    lines.push(`- **Extraction Method:** ${metadata.extraction.method}`);
     
     if (metadata.extraction.filters?.path || metadata.extraction.filters?.type) {
       lines.push('- **Filters:**');
@@ -130,11 +128,5 @@ export class MarkdownFormatter extends Formatter {
     return lines.join('\n');
   }
 
-  private formatImpactAnalysis(): string {
-    return `## Impact Analysis
-- **Breaking Changes:** None detected
-- **Performance:** No significant impact
-- **Security:** No security implications identified
-- **Dependencies:** No new dependencies`;
-  }
+
 }

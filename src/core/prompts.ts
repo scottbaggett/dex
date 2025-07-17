@@ -168,8 +168,8 @@ export class PromptGenerator {
       parts.push('- Code style and best practices');
     }
     
-    // Add output format hint based on format type
-    if (options.format === 'grok' || options.format === 'mistral') {
+    // Add output format hint for JSON
+    if (options.format === 'json') {
       parts.push('');
       parts.push('Provide structured JSON output with: summary, issues[], suggestions[]');
     }

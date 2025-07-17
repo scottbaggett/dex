@@ -39,9 +39,9 @@ export class DexHelpFormatter extends Help {
     lines.push(chalk.yellow('CORE FLAGS'));
     lines.push('  -s, --staged               only staged changes');
     lines.push('  -a, --all                  staged + unstaged');
-    lines.push('  -d, --depth <lvl>          minimal|focused|full|extended');
-    lines.push('  -f, --format <fmt>         markdown|json|claude|gpt|...');
+    lines.push('  -f, --format <fmt>         markdown|json|xml');
     lines.push('  -c, --clipboard            copy to clipboard');
+    lines.push('      --full <pattern>       include full files matching pattern');
     lines.push('      --select               interactive file picker');
     lines.push('      --task <src>           description / file / URL');
     lines.push('      --ai-action <type>     refactor|security|perf|...\n');

@@ -30,19 +30,19 @@ export class GitExtractor {
   async getCurrentChanges(staged: boolean = false): Promise<GitChange[]> {
     const args = staged ? ['--cached'] : [];
     const diff = await this.git.diff(args);
-    const changes = await this.parseDiff(diff);
+    const changes = this.parseDiff(diff);
     return this.addFileModificationTimes(changes);
   }
 
   async getChangesSince(base: string): Promise<GitChange[]> {
     const diff = await this.git.diff([`${base}...HEAD`]);
-    const changes = await this.parseDiff(diff);
+    const changes = this.parseDiff(diff);
     return this.addFileModificationTimes(changes);
   }
 
   async getChangesInRange(from: string, to: string): Promise<GitChange[]> {
     const diff = await this.git.diff([`${from}..${to}`]);
-    const changes = await this.parseDiff(diff);
+    const changes = this.parseDiff(diff);
     return this.addFileModificationTimes(changes);
   }
 
@@ -168,6 +168,85 @@ export class GitExtractor {
       // File might not exist in HEAD (new file)
       return '';
     }
+  }
+
+  /**
+   * Check if current branch is a feature branch (not main/master/develop)
+   */
+  async isFeatureBranch(): Promise<boolean> {
+    const currentBranch = await this.getCurrentBranch();
+    const mainBranches = ['main', 'master', 'develop', 'dev'];
+    return !mainBranches.includes(currentBranch);
+  }
+
+  /**
+   * Find the main branch (main, master, or develop)
+   */
+  async findMainBranch(): Promise<string | null> {
+    try {
+      const branches = await this.git.branch(['-a']);
+      const branchNames = branches.all.map(b => b.replace(/^origin\//, ''));
+      
+      // Check in order of preference
+      const mainBranches = ['main', 'master', 'develop'];
+      for (const mainBranch of mainBranches) {
+        if (branchNames.includes(mainBranch)) {
+          return mainBranch;
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get merge-base between current branch and main branch
+   */
+  async getMergeBase(baseBranch?: string): Promise<string | null> {
+    try {
+      const currentBranch = await this.getCurrentBranch();
+      const mainBranch = baseBranch || await this.findMainBranch();
+      
+      if (!mainBranch || currentBranch === mainBranch) {
+        return null;
+      }
+
+      const mergeBase = await this.git.raw(['merge-base', mainBranch, 'HEAD']);
+      return mergeBase.trim();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get changes since merge-base with main branch
+   */
+  async getFeatureBranchChanges(baseBranch?: string): Promise<GitChange[]> {
+    const mergeBase = await this.getMergeBase(baseBranch);
+    if (!mergeBase) {
+      throw new Error('Could not determine merge-base for feature branch');
+    }
+
+    const diff = await this.git.diff([`${mergeBase}...HEAD`]);
+    const changes = this.parseDiff(diff);
+    return this.addFileModificationTimes(changes);
+  }
+
+  /**
+   * Check if there are staged changes
+   */
+  async hasStagedChanges(): Promise<boolean> {
+    const status = await this.git.status();
+    return status.staged.length > 0;
+  }
+
+  /**
+   * Check if there are unstaged changes
+   */
+  async hasUnstagedChanges(): Promise<boolean> {
+    const status = await this.git.status();
+    return status.modified.length > 0 || status.not_added.length > 0;
   }
 
   private async addFileModificationTimes(changes: GitChange[]): Promise<GitChange[]> {

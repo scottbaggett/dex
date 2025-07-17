@@ -7,12 +7,6 @@ import { resolve, relative } from 'path';
 import { XmlFormatter } from '../templates/xml';
 import { MarkdownFormatter } from '../templates/markdown';
 import { JsonFormatter } from '../templates/json';
-import { ClaudeFormatter } from '../templates/claude';
-import { GptFormatter } from '../templates/gpt';
-import { GeminiFormatter } from '../templates/gemini';
-import { GrokFormatter } from '../templates/grok';
-import { LlamaFormatter } from '../templates/llama';
-import { MistralFormatter } from '../templates/mistral';
 import { ExtractedContext, GitChange, DexOptions, OutputFormat, Formatter } from '../types';
 import { FileScanner, formatFileSize } from '../utils/file-scanner';
 
@@ -39,7 +33,7 @@ export function createCombineCommand(): Command {
     .addOption(
       new Option('--output-format <format>', 'Output format')
         .default('xml')
-        .choices(['xml', 'markdown', 'json', 'claude', 'gpt', 'gemini', 'grok', 'llama', 'mistral'])
+        .choices(['xml', 'markdown', 'json'])
     )
     .option('--copy', 'Copy output to clipboard')
     .option('--prompt <text>', 'Custom AI analysis prompt')
@@ -258,7 +252,7 @@ async function combineCommand(filePaths: string[], options: any) {
           commit: 'local',
         },
         extraction: {
-          depth: 'full',
+          method: 'combine',
         },
         tokens: {
           estimated: Math.ceil(totalChars / 4), // Rough token estimation
@@ -291,24 +285,6 @@ async function combineCommand(filePaths: string[], options: any) {
         break;
       case 'json':
         formatter = new JsonFormatter();
-        break;
-      case 'claude':
-        formatter = new ClaudeFormatter();
-        break;
-      case 'gpt':
-        formatter = new GptFormatter();
-        break;
-      case 'gemini':
-        formatter = new GeminiFormatter();
-        break;
-      case 'grok':
-        formatter = new GrokFormatter();
-        break;
-      case 'llama':
-        formatter = new LlamaFormatter();
-        break;
-      case 'mistral':
-        formatter = new MistralFormatter();
         break;
       case 'markdown':
         formatter = new MarkdownFormatter();
