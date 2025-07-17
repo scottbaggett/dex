@@ -5,6 +5,7 @@ import ora from 'ora';
 import clipboardy from 'clipboardy';
 import { ContextEngine } from './core/context';
 import { GitExtractor } from './core/git';
+import { SessionManager } from './core/session';
 import { MarkdownFormatter } from './templates/markdown';
 import { JsonFormatter } from './templates/json';
 import { XmlFormatter } from './templates/xml';
@@ -86,6 +87,128 @@ program.addCommand(createDistillCommand());
 
 // Add combine command
 program.addCommand(createCombineCommand());
+
+// Session command
+const sessionCmd = program
+  .command('session')
+  .description('Manage dex sessions for tracking work');
+
+sessionCmd
+  .command('start [description]')
+  .description('Start a new session')
+  .action(async (description) => {
+    const spinner = ora('Starting session...').start();
+    try {
+      const gitExtractor = new GitExtractor();
+      const sessionManager = new SessionManager();
+      
+      // Check if session already exists
+      if (await sessionManager.hasActiveSession()) {
+        spinner.fail(chalk.red('A session is already active. End it first with: dex session end'));
+        process.exit(1);
+      }
+      
+      // Get current commit and branch
+      const [commit, branch] = await Promise.all([
+        gitExtractor.getLatestCommit(),
+        gitExtractor.getCurrentBranch()
+      ]);
+      
+      // Start session
+      const session = await sessionManager.startSession(commit, branch, description);
+      
+      spinner.succeed(chalk.green('Session started'));
+      console.log(chalk.dim(`  ID: ${session.id}`));
+      console.log(chalk.dim(`  Branch: ${branch}`));
+      console.log(chalk.dim(`  Starting commit: ${commit}`));
+      if (description) {
+        console.log(chalk.dim(`  Description: ${description}`));
+      }
+      console.log(chalk.dim(`\nUse 'dex' to package all changes since session start`));
+    } catch (error) {
+      spinner.fail(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      process.exit(1);
+    }
+  });
+
+sessionCmd
+  .command('end')
+  .description('End the current session')
+  .action(async () => {
+    const spinner = ora('Ending session...').start();
+    try {
+      const sessionManager = new SessionManager();
+      
+      // Check if session exists
+      const session = await sessionManager.getCurrentSession();
+      if (!session) {
+        spinner.fail(chalk.yellow('No active session found'));
+        process.exit(1);
+      }
+      
+      // End session
+      await sessionManager.endSession();
+      
+      spinner.succeed(chalk.green('Session ended'));
+      
+      // Calculate session duration
+      const duration = Date.now() - new Date(session.startTime).getTime();
+      const hours = Math.floor(duration / (1000 * 60 * 60));
+      const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+      
+      console.log(chalk.dim(`  Duration: ${hours}h ${minutes}m`));
+      if (session.description) {
+        console.log(chalk.dim(`  Description: ${session.description}`));
+      }
+    } catch (error) {
+      spinner.fail(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      process.exit(1);
+    }
+  });
+
+sessionCmd
+  .command('status')
+  .description('Show current session status')
+  .action(async () => {
+    try {
+      const sessionManager = new SessionManager();
+      const { active, session } = await sessionManager.getSessionStatus();
+      
+      if (!active || !session) {
+        console.log(chalk.yellow('No active session'));
+        console.log(chalk.dim(`\nStart a session with: dex session start [description]`));
+        return;
+      }
+      
+      console.log(chalk.green('Active session'));
+      console.log(chalk.dim(`  ID: ${session.id}`));
+      console.log(chalk.dim(`  Branch: ${session.branch}`));
+      console.log(chalk.dim(`  Started: ${new Date(session.startTime).toLocaleString()}`));
+      
+      // Calculate duration
+      const duration = Date.now() - new Date(session.startTime).getTime();
+      const hours = Math.floor(duration / (1000 * 60 * 60));
+      const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+      console.log(chalk.dim(`  Duration: ${hours}h ${minutes}m`));
+      
+      if (session.description) {
+        console.log(chalk.dim(`  Description: ${session.description}`));
+      }
+      
+      // Show what would be included
+      const gitExtractor = new GitExtractor();
+      const changes = await gitExtractor.getChangesSince(session.startCommit);
+      if (changes.length > 0) {
+        console.log(chalk.dim(`\n  Changes since start: ${changes.length} files`));
+        console.log(chalk.dim(`  Run 'dex' to package these changes`));
+      } else {
+        console.log(chalk.dim(`\n  No changes since session start`));
+      }
+    } catch (error) {
+      console.error(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      process.exit(1);
+    }
+  });
 
 // Prompts command with subcommands
 const promptsCmd = program

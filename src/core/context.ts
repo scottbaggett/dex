@@ -331,7 +331,7 @@ export class ContextEngine {
     const session = await this.sessionManager.getCurrentSession();
     if (session) {
       // Get all changes since session start
-      const changes = await this.gitExtractor.getChangesSince(session.startTime);
+      const changes = await this.gitExtractor.getChangesSince(session.startCommit);
       return {
         changes,
         method: `session (started ${new Date(session.startTime).toLocaleTimeString()})`,
