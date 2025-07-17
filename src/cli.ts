@@ -74,38 +74,7 @@ program
     await extractCommand(range, options);
   });
 
-// Extract subcommand (explicit version of default)
-program
-  .command('extract [range]')
-  .description('Extract and format code changes')
-  .option('-s, --staged', 'Include only staged changes')
-  .option('-a, --all', 'Include both staged and unstaged changes')
-  .option('--since <commit>', 'Show changes since a specific commit')
-  .option('-d, --depth <level>', 'Extraction depth: minimal, focused, full, extended', 'focused')
-  .option('--full <pattern>', 'Include full files matching pattern (use * for all)')
-  .option('-p, --path <pattern>', 'Filter by file path pattern')
-  .option('-t, --type <types>', 'Filter by file types (comma-separated)')
-  .addOption(
-    new Option('-f, --format <format>', 'Output format')
-      .default('markdown')
-      .choices(['markdown', 'json', 'claude', 'gpt', 'gemini', 'grok', 'llama', 'mistral', 'xml', 'pr'])
-  )
-  .option('-c, --clipboard', 'Copy output to clipboard')
-  .option('--task <source>', 'Task context (description, file path, URL, or - for stdin)')
-  .option('-i, --interactive', 'Interactive mode for task input')
-  .option('-u, --include-untracked', 'Include untracked files')
-  .option('--untracked-pattern <pattern>', 'Pattern for untracked files to include')
-  .option('--optimize <types...>', 'Optimizations: aid, symbols')
-  .option('--no-metadata', 'Exclude metadata from output')
-  .option('--prompt <text>', 'Custom AI analysis prompt')
-  .option(
-    '--prompt-template <name>',
-    'Use prompt template: security, performance, refactor, feature, bugfix, migration, api, testing'
-  )
-  .option('--no-prompt', 'Disable AI prompt generation')
-  .action(async (range, options) => {
-    await extractCommand(range || '', options);
-  });
+
 
 // Init subcommand
 program

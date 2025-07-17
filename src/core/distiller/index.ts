@@ -7,7 +7,7 @@ import {
   ProjectStructure,
   DependencyMap
 } from '../../types';
-import { TreeSitterParser } from '../parser/enhanced-parser';
+import { HybridParser } from '../parser/hybrid-parser';
 import { Parser } from '../parser/parser';
 import { promises as fs } from 'fs';
 import { join, relative } from 'path';
@@ -17,7 +17,7 @@ import { AidStyleFormatter } from './formatters/aid-style';
 import { DistillerProgress } from './progress';
 
 export class Distiller {
-  private parser: TreeSitterParser;
+  private parser: HybridParser;
   private options: DistillerOptions;
   private aidFormatter: AidStyleFormatter;
   private progress?: DistillerProgress;
@@ -50,7 +50,7 @@ export class Distiller {
       ...options,
     } as DistillerOptions;
     
-    this.parser = new TreeSitterParser({
+    this.parser = new HybridParser({
       includeComments: this.options.includeComments || false,
       includeDocstrings: this.options.includeDocstrings !== false,
     });
@@ -223,7 +223,7 @@ export class Distiller {
         parsed.path = file.path;
 
         // Auto-detect depth if needed
-        const depth = this.options.depth || TreeSitterParser.getAutoDepth(file.size);
+        const depth = this.options.depth || HybridParser.getAutoDepth(file.size);
         const extracted = this.parser.extract(parsed, depth);
         
         apis.push(extracted);

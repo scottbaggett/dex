@@ -25,10 +25,10 @@ interface EnhancedExtractedAPI {
 }
 
 /**
- * Enhanced regex-based parser that extracts more detailed information
- * to match AI Distiller's output quality
+ * Regex-based parser that extracts code information using regular expressions
+ * Used as fallback when Tree-sitter is not available for a language
  */
-export class TreeSitterParser extends BaseParser {
+export class RegexParser extends BaseParser {
   protected options: ParserOptions;
   private initialized = false;
 
