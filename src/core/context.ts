@@ -14,13 +14,8 @@ export class ContextEngine {
     let detectionMethod = 'none';
     let additionalContext: { totalChanges?: number; notIncluded?: number } = {};
 
-    // Time-based extraction
-    if (options.since) {
-      changes = await this.getTimeBasedChanges(options.since);
-      detectionMethod = `time-based (${options.since})`;
-    }
     // Staged changes
-    else if (options.staged) {
+    if (options.staged) {
       changes = await this.gitExtractor.getCurrentChanges(true);
       detectionMethod = 'staged';
       // Check for unstaged changes to inform user
@@ -278,14 +273,7 @@ export class ContextEngine {
     return Math.ceil(charCount / 4);
   }
 
-  private async getTimeBasedChanges(timeRange: string): Promise<GitChange[]> {
-    // For now, time-based changes are not supported
-    // We'll default to showing current changes
-    console.log(
-      `⚠️  Time-based changes (${timeRange}) not yet supported, showing current changes instead`
-    );
-    return this.gitExtractor.getCurrentChanges(false);
-  }
+
 
   private createAddedDiff(content: string): string {
     const lines = content.split('\n');

@@ -5,7 +5,7 @@ import * as yaml from 'js-yaml';
 import { createReadStream, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { createGzip, createGunzip } from 'zlib';
-import { promisify } from 'util';
+
 import { 
   Snapshot, 
   SnapshotMetadata, 
@@ -194,7 +194,7 @@ export class SnapshotManager {
   }
 
   async get(idOrName: string): Promise<Snapshot | null> {
-    // Handle relative references like @-1, @2h
+    // Handle relative references like @-1
     if (idOrName.startsWith('@')) {
       const resolvedId = await this.resolveRelativeSnapshotId(idOrName);
       if (!resolvedId) return null;
@@ -430,8 +430,7 @@ export class SnapshotManager {
       }
     }
     
-    // Note: Time-based references (@2h, @30m) are now handled differently
-    // They show all files changed in that time period, not snapshots
+
     
     return null;
   }

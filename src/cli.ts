@@ -38,7 +38,7 @@ program
   .argument('[range]', 'Git commit range (e.g., HEAD~5..HEAD)', '')
   .option('-s, --staged', 'Include only staged changes')
   .option('-a, --all', 'Include both staged and unstaged changes')
-  .option('--since <commit>', 'Show changes since a specific commit')
+
   .option('--full <pattern>', 'Include full files matching pattern')
   .option('-p, --path <pattern>', 'Filter by file path pattern')
   .option('-t, --type <types>', 'Filter by file types (comma-separated)')
@@ -315,21 +315,14 @@ async function extractCommand(range: string, options: Record<string, any>) {
       process.exit(1);
     }
 
-    // Check if range is a time-based or snapshot reference
+    // Check if range is a snapshot reference
     let isSnapshot = false;
-    let isTimeRange = false;
 
     if (range) {
-      // Check for time-based pattern: @2h, @30m, @1d
-      const isTimePattern = range.match(/^@\d+[mhdwM]$/);
-
       // Check for snapshot position pattern: @-1, @-2
       const isSnapshotPosition = range.match(/^@-\d+$/);
 
-      if (isTimePattern) {
-        // Time-based file changes
-        isTimeRange = true;
-      } else if (isSnapshotPosition || !range.includes('..')) {
+      if (isSnapshotPosition || !range.includes('..')) {
         // Try to resolve as snapshot
         const { SnapshotManager } = await import('./core/snapshot');
         const snapshotManager = new SnapshotManager(process.cwd());
@@ -379,14 +372,11 @@ async function extractCommand(range: string, options: Record<string, any>) {
 
     // Parse options
     let dexOptions: DexOptions = {
-      range: isSnapshot || isTimeRange ? undefined : range,
+      range: isSnapshot ? undefined : range,
       snapshot: isSnapshot ? range : undefined,
       isSnapshot,
-      timeRange: isTimeRange ? range.substring(1) : undefined, // Remove @ prefix
-      isTimeRange,
       staged: options.staged,
       all: options.all,
-      since: options.since,
       full: options.full,
       includeUntracked: options.includeUntracked,
       untrackedPattern: options.untrackedPattern,
@@ -503,7 +493,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
 
     if (context.changes.length === 0) {
       spinner.warn(
-        chalk.yellow('No changes found') + chalk.gray(' - try --staged or --since=<branch>')
+        chalk.yellow('No changes found') + chalk.gray(' - try --staged or --all')
       );
       process.exit(0);
     }
