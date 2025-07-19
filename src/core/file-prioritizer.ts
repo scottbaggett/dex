@@ -589,15 +589,17 @@ Return your selections with priority levels (high/medium/low) and reasoning for 
         ),
       });
 
-      // Log the request being sent to AI
-      console.log('\n=== AI REQUEST ===');
-      console.log('Provider:', provider);
-      console.log('Model:', model);
-      console.log('Max Files:', maxFiles);
-      console.log('Prompt Length:', enhancedPrompt.length, 'characters');
-      console.log('\n--- FULL PROMPT ---');
-      console.log(enhancedPrompt);
-      console.log('\n--- END PROMPT ---\n');
+      // Log the request being sent to AI (if DEBUG enabled)
+      if (process.env.DEBUG) {
+        console.log('\n=== AI REQUEST ===');
+        console.log('Provider:', provider);
+        console.log('Model:', model);
+        console.log('Max Files:', maxFiles);
+        console.log('Prompt Length:', enhancedPrompt.length, 'characters');
+        console.log('\n--- FULL PROMPT ---');
+        console.log(enhancedPrompt);
+        console.log('\n--- END PROMPT ---\n');
+      }
 
       const result = await generateObject({
         model: aiModel,
@@ -608,17 +610,19 @@ Return your selections with priority levels (high/medium/low) and reasoning for 
 
       const response = result.object;
 
-      // Log the response from AI
-      console.log('\n=== AI RESPONSE ===');
-      console.log('Files returned:', response.files.length);
-      console.log('Response structure:', JSON.stringify(response, null, 2));
-      console.log('\n--- SELECTED FILES ---');
-      response.files.forEach((file, index) => {
-        console.log(`${index + 1}. ${file.path}`);
-        console.log(`   Priority: ${file.priority}`);
-        console.log(`   Reason: ${file.reason}`);
-      });
-      console.log('\n=== END AI RESPONSE ===\n');
+      // Log the response from AI (if DEBUG enabled)
+      if (process.env.DEBUG) {
+        console.log('\n=== AI RESPONSE ===');
+        console.log('Files returned:', response.files.length);
+        console.log('Response structure:', JSON.stringify(response, null, 2));
+        console.log('\n--- SELECTED FILES ---');
+        response.files.forEach((file, index) => {
+          console.log(`${index + 1}. ${file.path}`);
+          console.log(`   Priority: ${file.priority}`);
+          console.log(`   Reason: ${file.reason}`);
+        });
+        console.log('\n=== END AI RESPONSE ===\n');
+      }
 
       // Only return files that AI actually selected
       const aiResultMap = new Map(response.files.map((f) => [f.path, f]));
@@ -637,11 +641,13 @@ Return your selections with priority levels (high/medium/low) and reasoning for 
         })
         .filter((file) => file !== null);
     } catch (error) {
-      console.log('\n=== AI ERROR ===');
-      console.log('Error type:', error?.constructor?.name);
-      console.log('Error message:', error instanceof Error ? error.message : 'Unknown error');
-      console.log('Full error:', error);
-      console.log('=== END AI ERROR ===\n');
+      if (process.env.DEBUG) {
+        console.log('\n=== AI ERROR ===');
+        console.log('Error type:', error?.constructor?.name);
+        console.log('Error message:', error instanceof Error ? error.message : 'Unknown error');
+        console.log('Full error:', error);
+        console.log('=== END AI ERROR ===\n');
+      }
 
       console.warn(
         `AI provider failed: ${error instanceof Error ? error.message : 'Unknown error'}, falling back to heuristics`
