@@ -87,6 +87,7 @@ import { createCombineCommand } from './commands/combine';
 import { createBootstrapCommand } from './commands/bootstrap';
 import { createGenerateCommand } from './commands/generate';
 import { createConfigCommand } from './commands/config';
+import { createTreeCommand } from './commands/tree';
 
 // Add snapshot command
 program.addCommand(createSnapshotCommand());
@@ -106,10 +107,11 @@ program.addCommand(createGenerateCommand());
 // Add config command
 program.addCommand(createConfigCommand());
 
+// Add tree command
+program.addCommand(createTreeCommand());
+
 // Session command
-const sessionCmd = program
-  .command('session')
-  .description('Manage dex sessions for tracking work');
+const sessionCmd = program.command('session').description('Manage dex sessions for tracking work');
 
 sessionCmd
   .command('start [description]')
@@ -119,22 +121,22 @@ sessionCmd
     try {
       const gitExtractor = new GitExtractor();
       const sessionManager = new SessionManager();
-      
+
       // Check if session already exists
       if (await sessionManager.hasActiveSession()) {
         spinner.fail(chalk.red('A session is already active. End it first with: dex session end'));
         process.exit(1);
       }
-      
+
       // Get current commit and branch
       const [commit, branch] = await Promise.all([
         gitExtractor.getLatestCommit(),
-        gitExtractor.getCurrentBranch()
+        gitExtractor.getCurrentBranch(),
       ]);
-      
+
       // Start session
       const session = await sessionManager.startSession(commit, branch, description);
-      
+
       spinner.succeed(chalk.green('Session started'));
       console.log(chalk.dim(`  ID: ${session.id}`));
       console.log(chalk.dim(`  Branch: ${branch}`));
@@ -157,24 +159,24 @@ sessionCmd
     const spinner = ora('Ending session...').start();
     try {
       const sessionManager = new SessionManager();
-      
+
       // Check if session exists
       const session = await sessionManager.getCurrentSession();
       if (!session) {
         spinner.fail(chalk.yellow('No active session found'));
         process.exit(1);
       }
-      
+
       // End session
       await sessionManager.endSession();
-      
+
       spinner.succeed(chalk.green('Session ended'));
-      
+
       // Calculate session duration
       const duration = Date.now() - new Date(session.startTime).getTime();
       const hours = Math.floor(duration / (1000 * 60 * 60));
       const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
-      
+
       console.log(chalk.dim(`  Duration: ${hours}h ${minutes}m`));
       if (session.description) {
         console.log(chalk.dim(`  Description: ${session.description}`));
@@ -192,32 +194,35 @@ sessionCmd
     try {
       const sessionManager = new SessionManager();
       const { active, session } = await sessionManager.getSessionStatus();
-      
+
       if (!active || !session) {
         console.log(chalk.yellow('No active session'));
         console.log(chalk.dim(`\nStart a session with: dex session start [description]`));
         return;
       }
-      
+
       console.log(chalk.green('Active session'));
       console.log(chalk.dim(`  ID: ${session.id}`));
       console.log(chalk.dim(`  Branch: ${session.branch}`));
       console.log(chalk.dim(`  Started: ${new Date(session.startTime).toLocaleString()}`));
-      
+
       // Calculate duration
       const duration = Date.now() - new Date(session.startTime).getTime();
       const hours = Math.floor(duration / (1000 * 60 * 60));
       const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
       console.log(chalk.dim(`  Duration: ${hours}h ${minutes}m`));
-      
+
       if (session.description) {
         console.log(chalk.dim(`  Description: ${session.description}`));
       }
-      
+
       // Show what would be included
       const sessionChanges = await sessionManager.getSessionChanges();
-      const totalChanges = sessionChanges.added.length + sessionChanges.modified.length + sessionChanges.deleted.length;
-      
+      const totalChanges =
+        sessionChanges.added.length +
+        sessionChanges.modified.length +
+        sessionChanges.deleted.length;
+
       if (totalChanges > 0) {
         console.log(chalk.dim(`\n  Changes since session start:`));
         if (sessionChanges.added.length > 0) {
@@ -234,7 +239,9 @@ sessionCmd
         console.log(chalk.dim(`\n  No changes since session start`));
       }
     } catch (error) {
-      console.error(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      console.error(
+        chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      );
       process.exit(1);
     }
   });
@@ -659,11 +666,11 @@ async function extractCommand(range: string, options: Record<string, any>) {
     if (options.ai || options.smart) {
       const { AIContextEngine } = await import('./core/ai-context-engine');
       const { ContextExporter } = await import('./core/context-exporter');
-      
+
       spinner.text = 'Initializing AI context engine...';
       const aiEngine = new AIContextEngine();
       const codebasePath = process.cwd();
-      
+
       // Determine the prompt to use
       let aiPrompt: string;
       if (options.smart) {
@@ -671,25 +678,27 @@ async function extractCommand(range: string, options: Record<string, any>) {
       } else if (task) {
         aiPrompt = task;
       } else {
-        aiPrompt = "Select relevant files for understanding this codebase and recent changes.";
+        aiPrompt = 'Select relevant files for understanding this codebase and recent changes.';
       }
-      
+
       try {
         // Analyze codebase with AI
         spinner.text = 'Analyzing codebase with AI...';
         const analysisResult = await aiEngine.analyze({
           prompt: aiPrompt,
           codebasePath,
-          maxFiles: 20
+          maxFiles: 20,
         });
-        
+
         // Display analysis summary
         const { summary } = analysisResult;
         spinner.succeed(
-          chalk.green('AI analysis complete') + 
-          chalk.dim(` • Found ${summary.selectedFiles} relevant files from ${summary.totalFiles} total`)
+          chalk.green('AI analysis complete') +
+            chalk.dim(
+              ` • Found ${summary.selectedFiles} relevant files from ${summary.totalFiles} total`
+            )
         );
-        
+
         // Show priority breakdown
         console.log(chalk.cyan('\nAI File Selection Summary:'));
         console.log(chalk.white('─'.repeat(40)));
@@ -697,26 +706,28 @@ async function extractCommand(range: string, options: Record<string, any>) {
         console.log(chalk.yellow(`🟠 Medium Priority:  ${summary.mediumPriorityCount} files`));
         console.log(chalk.blue(`🔵 Low Priority:     ${summary.lowPriorityCount} files`));
         console.log(chalk.white('─'.repeat(40)));
-        
+
         // Show token estimates
-        const tokenStr = summary.totalTokens >= 1000 
-          ? `${Math.round(summary.totalTokens / 1000)}k tokens` 
-          : `${summary.totalTokens} tokens`;
+        const tokenStr =
+          summary.totalTokens >= 1000
+            ? `${Math.round(summary.totalTokens / 1000)}k tokens`
+            : `${summary.totalTokens} tokens`;
         console.log(chalk.white(`💾 Total Context: ${tokenStr}`));
-        
+
         if (summary.estimatedCost > 0) {
           console.log(chalk.white(`💰 Estimated Cost: $${summary.estimatedCost.toFixed(4)}`));
         }
-        
+
         // Handle dry-run mode
         if (options.dryRun) {
           console.log(chalk.yellow('\n🔍 Dry run complete - no output generated'));
           console.log(chalk.dim('Remove --dry-run flag to generate context'));
-          
+
           // Show selected files
           console.log(chalk.cyan('\nSelected Files:'));
           for (const file of analysisResult.selections) {
-            const priorityIcon = file.priority === 'high' ? '🔴' : file.priority === 'medium' ? '🟠' : '🔵';
+            const priorityIcon =
+              file.priority === 'high' ? '🔴' : file.priority === 'medium' ? '🟠' : '🔵';
             console.log(`${priorityIcon} ${file.file} (${file.tokenEstimate} tokens)`);
             if (file.reason) {
               console.log(chalk.gray(`  → ${file.reason}`));
@@ -724,69 +735,79 @@ async function extractCommand(range: string, options: Record<string, any>) {
           }
           return;
         }
-        
+
         // Handle export mode
         if (options.export) {
           const validExportFormats: OutputFormat[] = ['text', 'markdown', 'json'];
           const exportFormat = options.export as OutputFormat;
-          
+
           if (!validExportFormats.includes(exportFormat)) {
-            spinner.fail(chalk.red(`Invalid export format '${exportFormat}'. Valid formats: ${validExportFormats.join(', ')}`));
+            spinner.fail(
+              chalk.red(
+                `Invalid export format '${exportFormat}'. Valid formats: ${validExportFormats.join(', ')}`
+              )
+            );
             process.exit(1);
           }
-          
+
           spinner.start('Generating AI-selected context...');
           const contextExporter = new ContextExporter();
           const context = await contextExporter.export(analysisResult.selections, {
             format: exportFormat,
             includeContent: true,
             includePriority: true,
-            includeReason: true
+            includeReason: true,
           });
-          
+
           // Handle output
           if (dexOptions.clipboard) {
             await clipboardy.write(context);
             spinner.succeed(
-              chalk.green('AI-selected context copied to clipboard') + 
-              chalk.dim(` • ${tokenStr}`)
+              chalk.green('AI-selected context copied to clipboard') + chalk.dim(` • ${tokenStr}`)
             );
           } else {
             // Save to file
             const outputManager = new OutputManager();
-            const contextString = options.smart ? 
-              options.smart.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 30) :
-              'ai-selected';
-            
+            const contextString = options.smart
+              ? options.smart
+                  .toLowerCase()
+                  .replace(/[^a-z0-9\s-]/g, '')
+                  .replace(/\s+/g, '-')
+                  .substring(0, 30)
+              : 'ai-selected';
+
             await outputManager.saveOutput(context, {
               command: 'ai-extract',
               context: contextString,
-              format: exportFormat
+              format: exportFormat,
             });
-            
+
             const relativePath = outputManager.getRelativePath({
               command: 'ai-extract',
               context: contextString,
-              format: exportFormat
+              format: exportFormat,
             });
-            
+
             spinner.succeed(
-              chalk.green('AI-selected context saved to ') + 
-              chalk.white(relativePath) + 
-              chalk.dim(` • ${tokenStr}`)
+              chalk.green('AI-selected context saved to ') +
+                chalk.white(relativePath) +
+                chalk.dim(` • ${tokenStr}`)
             );
-            
+
             console.log(chalk.dim(`\nFor agents: cat ${relativePath}`));
           }
           return;
         }
-        
+
         // If not dry-run or export, use AI-selected files for regular context extraction
-        dexOptions.selectedFiles = analysisResult.selections.map(s => s.file);
+        dexOptions.selectedFiles = analysisResult.selections.map((s) => s.file);
         spinner.start('Extracting context from AI-selected files...');
-        
       } catch (error) {
-        spinner.fail(chalk.red(`AI analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
+        spinner.fail(
+          chalk.red(
+            `AI analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          )
+        );
         console.error(error);
         process.exit(1);
       }
@@ -801,13 +822,13 @@ async function extractCommand(range: string, options: Record<string, any>) {
         fileSelector.showTTYError();
         process.exit(1);
       }
-      
+
       spinner.text = chalk.gray('Scanning files for selection...');
-      
+
       try {
         const { FileSelector } = await import('./utils/file-selector');
         const fileSelector = new FileSelector();
-        
+
         // Collect all files in the repository (similar to combine command)
         const { files: allFiles, errors } = await fileSelector.collectFiles([process.cwd()], {
           excludePatterns: [
@@ -832,11 +853,11 @@ async function extractCommand(range: string, options: Record<string, any>) {
             'Cargo.lock',
             'package-lock.json',
             'yarn.lock',
-            'pnpm-lock.yaml'
+            'pnpm-lock.yaml',
           ],
           maxFiles: 10000,
           maxDepth: 20,
-          respectGitignore: true
+          respectGitignore: true,
         });
 
         if (errors.length > 0) {
@@ -863,7 +884,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
         }
 
         // Update dexOptions to include selected files for context extraction
-        dexOptions.selectedFiles = result.files.map(change => change.file);
+        dexOptions.selectedFiles = result.files.map((change) => change.file);
 
         spinner.start('Extracting context from selected files...');
       } catch (error) {
@@ -885,9 +906,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
     const extractionTime = Date.now() - startTime;
 
     if (context.changes.length === 0) {
-      spinner.warn(
-        chalk.yellow('No changes found') + chalk.gray(' - try --staged or --all')
-      );
+      spinner.warn(chalk.yellow('No changes found') + chalk.gray(' - try --staged or --all'));
       process.exit(0);
     }
 
@@ -961,7 +980,10 @@ async function extractCommand(range: string, options: Record<string, any>) {
     const output = formatter.format({ context, options: dexOptions });
 
     // Generate context string for filename
-    const contextString = generateContextString(dexOptions, context.metadata.extraction.method || 'default');
+    const contextString = generateContextString(
+      dexOptions,
+      context.metadata.extraction.method || 'default'
+    );
 
     // Handle output
     if (dexOptions.clipboard) {
@@ -981,13 +1003,13 @@ async function extractCommand(range: string, options: Record<string, any>) {
       await outputManager.saveOutput(output, {
         command: 'extract',
         context: contextString,
-        format: dexOptions.format || 'xml'
+        format: dexOptions.format || 'xml',
       });
-      
+
       const relativePath = outputManager.getRelativePath({
         command: 'extract',
         context: contextString,
-        format: dexOptions.format || 'xml'
+        format: dexOptions.format || 'xml',
       });
 
       // Format token display
@@ -996,7 +1018,10 @@ async function extractCommand(range: string, options: Record<string, any>) {
         tokenCount >= 1000 ? `${Math.round(tokenCount / 1000)}k tokens` : `${tokenCount} tokens`;
 
       spinner.succeed(
-        chalk.green('Saved to ') + chalk.white(relativePath) + chalk.dim(' • ') + chalk.white(tokenStr)
+        chalk.green('Saved to ') +
+          chalk.white(relativePath) +
+          chalk.dim(' • ') +
+          chalk.white(tokenStr)
       );
 
       // Show agent instruction
