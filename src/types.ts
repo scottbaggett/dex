@@ -1,4 +1,4 @@
-export type OutputFormat = 'markdown' | 'json' | 'xml';
+export type OutputFormat = 'markdown' | 'json' | 'xml' | 'text';
 
 export interface DexOptions {
   // Git options

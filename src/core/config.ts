@@ -1,6 +1,8 @@
 import { cosmiconfigSync } from 'cosmiconfig';
 import { DexOptions } from '../types';
 import { PromptsConfig } from '../types/prompts';
+import { AIConfig } from '../types/ai-context';
+import { mergeAIConfig, validateAIConfig, AIConfigError, DEFAULT_AI_CONFIG } from './ai-config';
 
 export interface DexConfig {
   defaults?: Partial<DexOptions>;
@@ -17,6 +19,7 @@ export interface DexConfig {
     saveDirectory?: string;
     excludePatterns?: string[];
   };
+  ai?: AIConfig;
 }
 
 const explorer = cosmiconfigSync('dex', {
@@ -45,6 +48,16 @@ export function loadConfig(): DexConfig {
   try {
     const result = explorer.search();
     const config = result?.config || {};
+    
+    // Validate AI configuration if present
+    if (config.ai) {
+      const validationErrors = validateAIConfig(config.ai);
+      if (validationErrors.length > 0) {
+        console.warn('AI configuration validation warnings:');
+        validationErrors.forEach(error => console.warn(`  - ${error}`));
+      }
+    }
+    
     configCache = config;
     return config;
   } catch (error) {
@@ -53,6 +66,42 @@ export function loadConfig(): DexConfig {
     configCache = config;
     return config;
   }
+}
+
+/**
+ * Load and merge AI configuration with defaults
+ */
+export function loadAIConfig(): typeof DEFAULT_AI_CONFIG {
+  const config = loadConfig();
+  return mergeAIConfig(config.ai);
+}
+
+/**
+ * Clear configuration cache (useful for testing)
+ */
+export function clearConfigCache(): void {
+  configCache = null;
+}
+
+/**
+ * Validate the current configuration
+ */
+export function validateConfig(): { valid: boolean; errors: string[] } {
+  const config = loadConfig();
+  const errors: string[] = [];
+  
+  // Validate AI configuration
+  if (config.ai) {
+    const aiErrors = validateAIConfig(config.ai);
+    errors.push(...aiErrors);
+  }
+  
+  // Add other configuration validations here as needed
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
 }
 
 export function mergeWithConfig(options: DexOptions): DexOptions {

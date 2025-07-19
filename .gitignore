@@ -18,3 +18,4 @@ coverage/
 .opencode
 .workarea
 dex-roadmap.md
+.dexrc

@@ -63,6 +63,10 @@ program
   )
   .option('--no-prompt', 'Disable AI prompt generation')
   .option('--select', 'Interactive file selection mode')
+  .option('--ai', 'Enable AI-assisted file selection')
+  .option('--smart <task>', 'AI-powered file selection based on task description')
+  .option('--dry-run', 'Preview AI file selection without generating output')
+  .option('--export <format>', 'Export AI-selected context in specified format')
   .action(async (range, options) => {
     await extractCommand(range, options);
   });
@@ -80,6 +84,9 @@ program
 import { createSnapshotCommand } from './commands/snapshot';
 import { createDistillCommand } from './commands/distill';
 import { createCombineCommand } from './commands/combine';
+import { createBootstrapCommand } from './commands/bootstrap';
+import { createGenerateCommand } from './commands/generate';
+import { createConfigCommand } from './commands/config';
 
 // Add snapshot command
 program.addCommand(createSnapshotCommand());
@@ -89,6 +96,15 @@ program.addCommand(createDistillCommand());
 
 // Add combine command
 program.addCommand(createCombineCommand());
+
+// Add bootstrap command
+program.addCommand(createBootstrapCommand());
+
+// Add generate command
+program.addCommand(createGenerateCommand());
+
+// Add config command
+program.addCommand(createConfigCommand());
 
 // Session command
 const sessionCmd = program
@@ -639,8 +655,144 @@ async function extractCommand(range: string, options: Record<string, any>) {
       }
     }
 
+    // Handle AI-assisted file selection
+    if (options.ai || options.smart) {
+      const { AIContextEngine } = await import('./core/ai-context-engine');
+      const { ContextExporter } = await import('./core/context-exporter');
+      
+      spinner.text = 'Initializing AI context engine...';
+      const aiEngine = new AIContextEngine();
+      const codebasePath = process.cwd();
+      
+      // Determine the prompt to use
+      let aiPrompt: string;
+      if (options.smart) {
+        aiPrompt = options.smart;
+      } else if (task) {
+        aiPrompt = task;
+      } else {
+        aiPrompt = "Select relevant files for understanding this codebase and recent changes.";
+      }
+      
+      try {
+        // Analyze codebase with AI
+        spinner.text = 'Analyzing codebase with AI...';
+        const analysisResult = await aiEngine.analyze({
+          prompt: aiPrompt,
+          codebasePath,
+          maxFiles: 20
+        });
+        
+        // Display analysis summary
+        const { summary } = analysisResult;
+        spinner.succeed(
+          chalk.green('AI analysis complete') + 
+          chalk.dim(` • Found ${summary.selectedFiles} relevant files from ${summary.totalFiles} total`)
+        );
+        
+        // Show priority breakdown
+        console.log(chalk.cyan('\nAI File Selection Summary:'));
+        console.log(chalk.white('─'.repeat(40)));
+        console.log(chalk.red(`🔴 High Priority:    ${summary.highPriorityCount} files`));
+        console.log(chalk.yellow(`🟠 Medium Priority:  ${summary.mediumPriorityCount} files`));
+        console.log(chalk.blue(`🔵 Low Priority:     ${summary.lowPriorityCount} files`));
+        console.log(chalk.white('─'.repeat(40)));
+        
+        // Show token estimates
+        const tokenStr = summary.totalTokens >= 1000 
+          ? `${Math.round(summary.totalTokens / 1000)}k tokens` 
+          : `${summary.totalTokens} tokens`;
+        console.log(chalk.white(`💾 Total Context: ${tokenStr}`));
+        
+        if (summary.estimatedCost > 0) {
+          console.log(chalk.white(`💰 Estimated Cost: $${summary.estimatedCost.toFixed(4)}`));
+        }
+        
+        // Handle dry-run mode
+        if (options.dryRun) {
+          console.log(chalk.yellow('\n🔍 Dry run complete - no output generated'));
+          console.log(chalk.dim('Remove --dry-run flag to generate context'));
+          
+          // Show selected files
+          console.log(chalk.cyan('\nSelected Files:'));
+          for (const file of analysisResult.selections) {
+            const priorityIcon = file.priority === 'high' ? '🔴' : file.priority === 'medium' ? '🟠' : '🔵';
+            console.log(`${priorityIcon} ${file.file} (${file.tokenEstimate} tokens)`);
+            if (file.reason) {
+              console.log(chalk.gray(`  → ${file.reason}`));
+            }
+          }
+          return;
+        }
+        
+        // Handle export mode
+        if (options.export) {
+          const validExportFormats: OutputFormat[] = ['text', 'markdown', 'json'];
+          const exportFormat = options.export as OutputFormat;
+          
+          if (!validExportFormats.includes(exportFormat)) {
+            spinner.fail(chalk.red(`Invalid export format '${exportFormat}'. Valid formats: ${validExportFormats.join(', ')}`));
+            process.exit(1);
+          }
+          
+          spinner.start('Generating AI-selected context...');
+          const contextExporter = new ContextExporter();
+          const context = await contextExporter.export(analysisResult.selections, {
+            format: exportFormat,
+            includeContent: true,
+            includePriority: true,
+            includeReason: true
+          });
+          
+          // Handle output
+          if (dexOptions.clipboard) {
+            await clipboardy.write(context);
+            spinner.succeed(
+              chalk.green('AI-selected context copied to clipboard') + 
+              chalk.dim(` • ${tokenStr}`)
+            );
+          } else {
+            // Save to file
+            const outputManager = new OutputManager();
+            const contextString = options.smart ? 
+              options.smart.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 30) :
+              'ai-selected';
+            
+            await outputManager.saveOutput(context, {
+              command: 'ai-extract',
+              context: contextString,
+              format: exportFormat
+            });
+            
+            const relativePath = outputManager.getRelativePath({
+              command: 'ai-extract',
+              context: contextString,
+              format: exportFormat
+            });
+            
+            spinner.succeed(
+              chalk.green('AI-selected context saved to ') + 
+              chalk.white(relativePath) + 
+              chalk.dim(` • ${tokenStr}`)
+            );
+            
+            console.log(chalk.dim(`\nFor agents: cat ${relativePath}`));
+          }
+          return;
+        }
+        
+        // If not dry-run or export, use AI-selected files for regular context extraction
+        dexOptions.selectedFiles = analysisResult.selections.map(s => s.file);
+        spinner.start('Extracting context from AI-selected files...');
+        
+      } catch (error) {
+        spinner.fail(chalk.red(`AI analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
+        console.error(error);
+        process.exit(1);
+      }
+    }
     // Handle interactive selection if requested - do this BEFORE context extraction
-    if (options.select) {
+    else if (options.select) {
       // Check if interactive mode is possible
       if (!process.stdin.isTTY || !process.stdin.setRawMode) {
         spinner.fail(chalk.red('Interactive mode requires a TTY terminal'));
@@ -729,7 +881,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
     const { SessionManager } = await import('./core/session');
     const sessionManager = new SessionManager();
     const contextEngine = new ContextEngine(gitExtractor, sessionManager);
-    let context = await contextEngine.extract(dexOptions);
+    const context = await contextEngine.extract(dexOptions);
     const extractionTime = Date.now() - startTime;
 
     if (context.changes.length === 0) {

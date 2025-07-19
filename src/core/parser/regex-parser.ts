@@ -294,8 +294,8 @@ export class RegexParser extends BaseParser {
 
   private extractClassMembers(content: string, startPos: number): Array<{name: string; signature: string; type: 'property' | 'method'}> {
     const members: Array<{name: string; signature: string; type: 'property' | 'method'}> = [];
-    let braceCount = 1;
-    let currentPos = startPos;
+    const braceCount = 1;
+    const currentPos = startPos;
     
     const memberContent = this.extractBracedContent(content, startPos - 1);
     

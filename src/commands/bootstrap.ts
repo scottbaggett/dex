@@ -1,0 +1,239 @@
+import { Command } from 'commander';
+import chalk from 'chalk';
+import ora from 'ora';
+import { AIContextEngine } from '../core/ai-context-engine';
+import { ContextExporter } from '../core/context-exporter';
+import { OutputManager } from '../utils/output-manager';
+import { CLIFeedback } from '../utils/cli-feedback';
+import { getAICache } from '../core/ai-cache';
+import clipboardy from 'clipboardy';
+import { OutputFormat } from '../types';
+
+export interface BootstrapOptions {
+  dryRun?: boolean;
+  export?: OutputFormat;
+  clipboard?: boolean;
+  maxFiles?: number;
+  aiProvider?: string;
+  aiModel?: string;
+}
+
+export function createBootstrapCommand(): Command {
+  const command = new Command('bootstrap');
+
+  command
+    .description('Bootstrap AI agent with core codebase files')
+    .option('--dry-run', 'Preview file selection without generating output')
+    .option(
+      '--export <format>',
+      'Export context in specified format (text, markdown, json)',
+      'markdown'
+    )
+    .option('-c, --clipboard', 'Copy output to clipboard')
+    .option('--max-files <number>', 'Maximum number of files to select', '20')
+    .option('--ai-provider <provider>', 'AI provider to use (anthropic, openai)')
+    .option('--ai-model <model>', 'AI model to use')
+    .action(async (options: BootstrapOptions) => {
+      await bootstrapCommand(options);
+    });
+
+  return command;
+}
+
+async function bootstrapCommand(options: BootstrapOptions): Promise<void> {
+  const spinner = ora('Initializing AI context engine...').start();
+
+  try {
+    // Initialize AI Context Engine
+    const aiEngine = new AIContextEngine();
+    const codebasePath = process.cwd();
+
+    // Validate export format
+    const validFormats: OutputFormat[] = ['text', 'markdown', 'json'];
+    const exportFormat = options.export || 'markdown';
+    if (!validFormats.includes(exportFormat as OutputFormat)) {
+      spinner.fail(
+        chalk.red(
+          `Invalid export format '${exportFormat}'. Valid formats: ${validFormats.join(', ')}`
+        )
+      );
+      process.exit(1);
+    }
+
+    // Parse max files
+    const maxFiles = options.maxFiles ? parseInt(options.maxFiles.toString(), 10) : 20;
+    if (isNaN(maxFiles) || maxFiles <= 0) {
+      spinner.fail(chalk.red('Invalid max-files value. Must be a positive number.'));
+      process.exit(1);
+    }
+
+    // Analyze codebase with bootstrap prompt
+    spinner.text = 'Analyzing codebase with AI...';
+    const analysisResult = await aiEngine.bootstrap(codebasePath, {
+      maxFiles,
+      aiProvider: options.aiProvider,
+      aiModel: options.aiModel,
+    });
+
+    // Display analysis summary
+    const { summary } = analysisResult;
+    spinner.succeed(
+      chalk.green('Analysis complete') +
+        chalk.dim(
+          ` • Found ${summary.selectedFiles} relevant files from ${summary.totalFiles} total`
+        )
+    );
+
+    // Show priority breakdown
+    console.log(chalk.cyan('\nFile Selection Summary:'));
+    console.log(chalk.white('─'.repeat(40)));
+    console.log(chalk.red(`🔴 High Priority:    ${summary.highPriorityCount} files`));
+    console.log(chalk.yellow(`🟠 Medium Priority:  ${summary.mediumPriorityCount} files`));
+    console.log(chalk.blue(`🔵 Low Priority:     ${summary.lowPriorityCount} files`));
+    console.log(chalk.white('─'.repeat(40)));
+
+    // Show token estimates
+    const tokenStr =
+      summary.totalTokens >= 1000
+        ? `${Math.round(summary.totalTokens / 1000)}k tokens`
+        : `${summary.totalTokens} tokens`;
+    console.log(chalk.white(`💾 Total Context: ${tokenStr}`));
+
+    if (summary.estimatedCost > 0) {
+      console.log(chalk.white(`💰 Estimated Cost: $${summary.estimatedCost.toFixed(4)}`));
+    }
+
+    // Show selected files grouped by priority
+    console.log(chalk.cyan('\nSelected Files:'));
+    console.log(chalk.white('─'.repeat(40)));
+
+    const filesByPriority = {
+      high: analysisResult.selections.filter((s) => s.priority === 'high'),
+      medium: analysisResult.selections.filter((s) => s.priority === 'medium'),
+      low: analysisResult.selections.filter((s) => s.priority === 'low'),
+    };
+
+    for (const [priority, files] of Object.entries(filesByPriority)) {
+      if (files.length === 0) continue;
+
+      const priorityIcon = priority === 'high' ? '🔴' : priority === 'medium' ? '🟠' : '🔵';
+      const priorityColor =
+        priority === 'high' ? chalk.red : priority === 'medium' ? chalk.yellow : chalk.blue;
+
+      console.log(priorityColor(`\n${priorityIcon} ${priority.toUpperCase()} PRIORITY:`));
+      for (const file of files) {
+        const tokenStr =
+          file.tokenEstimate >= 1000
+            ? `${Math.round(file.tokenEstimate / 1000)}k`
+            : `${file.tokenEstimate}`;
+        console.log(chalk.white(`  ✓ ${file.file}`) + chalk.dim(` (${tokenStr} tokens)`));
+        if (file.reason) {
+          console.log(chalk.gray(`    → ${file.reason}`));
+        }
+      }
+    }
+
+    // Handle dry-run mode
+    if (options.dryRun) {
+      console.log(chalk.yellow('\n🔍 Dry run complete - no output generated'));
+      console.log(chalk.dim('Remove --dry-run flag to generate context'));
+      return;
+    }
+
+    // Ask for confirmation
+    console.log(chalk.cyan('\nContinue with context generation?'));
+    const { default: readline } = await import('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    let confirmed = false;
+    try {
+      confirmed = await new Promise<boolean>((resolve, reject) => {
+        rl.question(chalk.blue('Generate context? [Y/n] '), (answer) => {
+          resolve(answer.toLowerCase() !== 'n' && answer.toLowerCase() !== 'no');
+        });
+
+        // Set a timeout to prevent hanging
+        const timeout = setTimeout(() => {
+          reject(new Error('Input timeout'));
+        }, 30000);
+
+        rl.on('close', () => {
+          clearTimeout(timeout);
+        });
+      });
+    } finally {
+      rl.close();
+    }
+
+    if (!confirmed) {
+      console.log(chalk.yellow('\nContext generation cancelled.'));
+      return;
+    }
+
+    // Generate context
+    spinner.start('Generating context...');
+    const contextExporter = new ContextExporter();
+    const context = await contextExporter.export(analysisResult.selections, {
+      format: exportFormat as OutputFormat,
+      includeContent: true,
+      includePriority: true,
+      includeReason: true,
+    });
+
+    // Handle output
+    if (options.clipboard) {
+      await clipboardy.write(context);
+      spinner.succeed(chalk.green('Context copied to clipboard') + chalk.dim(` • ${tokenStr}`));
+    } else {
+      // Save to file
+      const outputManager = new OutputManager();
+      await outputManager.saveOutput(context, {
+        command: 'bootstrap',
+        context: 'ai-selected',
+        format: exportFormat as OutputFormat,
+      });
+
+      const relativePath = outputManager.getRelativePath({
+        command: 'bootstrap',
+        context: 'ai-selected',
+        format: exportFormat as OutputFormat,
+      });
+
+      spinner.succeed(
+        chalk.green('Context saved to ') + chalk.white(relativePath) + chalk.dim(` • ${tokenStr}`)
+      );
+
+      // Show agent instruction
+      console.log(chalk.dim(`\nFor agents: cat ${relativePath}`));
+    }
+  } catch (error) {
+    spinner.fail(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    console.error(error);
+
+    // Cleanup cache before exiting
+    try {
+      const cache = getAICache();
+      cache.dispose();
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
+
+    process.exit(1);
+  } finally {
+    // Always cleanup cache to prevent hanging
+    try {
+      const cache = getAICache();
+      cache.dispose();
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
+
+    // Force exit if process is still hanging
+    setTimeout(() => {
+      process.exit(0);
+    }, 100);
+  }
+}
