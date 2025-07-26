@@ -15,7 +15,7 @@ export class GitExtractor {
 
   private async getGitRoot(): Promise<string> {
     if (this.gitRoot) return this.gitRoot;
-    
+
     try {
       const root = await this.git.revparse(['--show-toplevel']);
       this.gitRoot = root.trim();
@@ -52,7 +52,8 @@ export class GitExtractor {
     } catch {
       // File might be new, read from filesystem
       const fs = await import('fs/promises');
-      return await fs.readFile(path, 'utf-8');
+      const gitRoot = await this.getGitRoot();
+      return await fs.readFile(join(gitRoot, path), 'utf-8');
     }
   }
 
@@ -73,20 +74,20 @@ export class GitExtractor {
       if (!fileMatch) continue;
 
       const [, oldPath, newPath] = fileMatch;
-      
+
       let status: GitChange['status'] = 'modified';
-      if (lines.some(l => l.startsWith('new file mode'))) {
+      if (lines.some((l) => l.startsWith('new file mode'))) {
         status = 'added';
-      } else if (lines.some(l => l.startsWith('deleted file mode'))) {
+      } else if (lines.some((l) => l.startsWith('deleted file mode'))) {
         status = 'deleted';
-      } else if (lines.some(l => l.startsWith('rename from'))) {
+      } else if (lines.some((l) => l.startsWith('rename from'))) {
         status = 'renamed';
       }
 
       let additions = 0;
       let deletions = 0;
       const diffContent: string[] = [];
-      
+
       for (const line of lines) {
         if (line.startsWith('+') && !line.startsWith('+++')) {
           additions++;
@@ -151,7 +152,7 @@ export class GitExtractor {
     } catch {
       // Fallback to directory name
     }
-    
+
     const path = await import('path');
     return path.basename(process.cwd());
   }
@@ -185,8 +186,8 @@ export class GitExtractor {
   async findMainBranch(): Promise<string | null> {
     try {
       const branches = await this.git.branch(['-a']);
-      const branchNames = branches.all.map(b => b.replace(/^origin\//, ''));
-      
+      const branchNames = branches.all.map((b) => b.replace(/^origin\//, ''));
+
       // Check in order of preference
       const mainBranches = ['main', 'master', 'develop'];
       for (const mainBranch of mainBranches) {
@@ -206,8 +207,8 @@ export class GitExtractor {
   async getMergeBase(baseBranch?: string): Promise<string | null> {
     try {
       const currentBranch = await this.getCurrentBranch();
-      const mainBranch = baseBranch || await this.findMainBranch();
-      
+      const mainBranch = baseBranch || (await this.findMainBranch());
+
       if (!mainBranch || currentBranch === mainBranch) {
         return null;
       }
@@ -259,7 +260,7 @@ export class GitExtractor {
           const stats = await fs.stat(filePath);
           return {
             ...change,
-            lastModified: stats.mtime
+            lastModified: stats.mtime,
           };
         } catch (error) {
           // File might have been deleted or doesn't exist

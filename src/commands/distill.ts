@@ -12,10 +12,12 @@ import { FileSelector } from '../utils/file-selector';
 
 export function createDistillCommand(): Command {
   const command = new Command('distill');
-  
+
   command
-    .description('Compress and distill entire codebases into token-efficient formats (defaults to saving in .dex/)')
-    .argument('<path>', 'Path to directory or file to distill')
+    .description(
+      'Compress and distill entire codebases into token-efficient formats (defaults to saving in .dex/)'
+    )
+    .argument('[path]', 'Path to directory or file to distill (defaults to current directory)')
     .option('-d, --depth <level>', 'Extraction depth (minimal, public, extended, full)', 'public')
     .option('-f, --format <type>', 'Output format (compressed, distilled, both)', 'distilled')
     .option('-o, --output <file>', 'Write output to specific file')
@@ -31,15 +33,15 @@ export function createDistillCommand(): Command {
     .option('--since <ref>', 'Only process files changed since git ref')
     .option('--staged', 'Only process staged files')
     .action((...args: any[]) => {
-      const targetPath = args[0];
+      // Handle optional path argument - if no path provided, args[0] will be the command object
+      const targetPath = typeof args[0] === 'string' ? args[0] : '.';
       const cmdObject = args[args.length - 1]; // Commander puts the command object last
       const localOptions = cmdObject.opts();
       const parentOptions = cmdObject.parent?.opts() || {};
-      
+
       // Merge parent and local options
       const options = { ...parentOptions, ...localOptions };
-      
-      
+
       return distillCommand(targetPath, options);
     });
 
@@ -47,14 +49,14 @@ export function createDistillCommand(): Command {
 }
 
 async function distillCommand(targetPath: string, options: any): Promise<void> {
-  
   // Load config first
   const config = loadConfig();
-  
+
   // Determine if we should show progress
   const defaultOutput = config.distiller?.defaultOutput || 'save';
-  const isStdout = options.stdout || (!options.clipboard && !options.output && defaultOutput === 'stdout');
-  
+  const isStdout =
+    options.stdout || (!options.clipboard && !options.output && defaultOutput === 'stdout');
+
   // Use progress reporter only if not outputting to stdout
   const progress = new DistillerProgress();
   if (isStdout) {
@@ -63,10 +65,9 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
   }
 
   try {
-    
     // Resolve path
     const resolvedPath = resolve(targetPath);
-    
+
     // Check if path exists
     try {
       await fs.access(resolvedPath);
@@ -78,7 +79,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
     // Build distiller options with config defaults
     const configExcludes = config.distiller?.excludePatterns || [];
     const cliExcludes = options.exclude || [];
-    
+
     const distillerOptions: DistillerOptions = {
       path: resolvedPath,
       depth: options.depth,
@@ -105,7 +106,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
         fileSelector.showTTYError();
         process.exit(1);
       }
-      
+
       try {
         // Collect files first
         const fileSelector = new FileSelector();
@@ -113,7 +114,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
           excludePatterns: [...configExcludes, ...cliExcludes],
           maxFiles: 10000, // Higher limit for distill
           maxDepth: 20,
-          respectGitignore: true
+          respectGitignore: true,
         });
 
         if (errors.length > 0) {
@@ -133,8 +134,8 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
         const result = await fileSelector.selectFiles(fileChanges);
 
         // Convert back to file paths
-        filesToProcess = result.files.map(change => resolve(change.file));
-        
+        filesToProcess = result.files.map((change) => resolve(change.file));
+
         // Override clipboard option if user pressed 'c'
         if (result.copyToClipboard) {
           options.clipboard = true;
@@ -150,13 +151,17 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
 
     // Create distiller instance
     const distiller = new Distiller(distillerOptions);
-    
+
     // Run distillation with progress (unless outputting to stdout)
     // If we have selected files, we need to modify the distiller to use them
-    const result = filesToProcess 
-      ? await distiller.distillSelectedFiles(filesToProcess, resolvedPath, isStdout ? undefined : progress)
+    const result = filesToProcess
+      ? await distiller.distillSelectedFiles(
+          filesToProcess,
+          resolvedPath,
+          isStdout ? undefined : progress
+        )
       : await distiller.distill(resolvedPath, isStdout ? undefined : progress);
-    
+
     // Format result
     const formatted = distiller.formatResult(result, resolvedPath);
 
@@ -169,29 +174,29 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
     // Handle output based on explicit options first, then fall back to config
     if (options.clipboard) {
       await clipboardy.write(output);
-      
+
       // Complete progress
       if ('apis' in result && result.metadata) {
         progress.complete({
           originalTokens: result.metadata.originalTokens || 0,
           distilledTokens: result.metadata.distilledTokens || 0,
-          fileCount: result.structure?.fileCount || 0
+          fileCount: result.structure?.fileCount || 0,
         });
       }
-      
+
       console.log(chalk.cyan('📋 Distilled output copied to clipboard'));
     } else if (options.output) {
       await fs.writeFile(options.output, output, 'utf-8');
-      
+
       // Complete progress
       if ('apis' in result && result.metadata) {
         progress.complete({
           originalTokens: result.metadata.originalTokens || 0,
           distilledTokens: result.metadata.distilledTokens || 0,
-          fileCount: result.structure?.fileCount || 0
+          fileCount: result.structure?.fileCount || 0,
         });
       }
-      
+
       console.log(chalk.cyan('💾 Distilled output written to: ') + chalk.green(options.output));
     } else if (isStdout) {
       // Print to stdout if explicitly requested or configured
@@ -199,47 +204,46 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
     } else if (!options.clipboard && defaultOutput === 'clipboard') {
       // Use clipboard if configured as default
       await clipboardy.write(output);
-      
+
       // Complete progress
       if ('apis' in result && result.metadata) {
         progress.complete({
           originalTokens: result.metadata.originalTokens || 0,
           distilledTokens: result.metadata.distilledTokens || 0,
-          fileCount: result.structure?.fileCount || 0
+          fileCount: result.structure?.fileCount || 0,
         });
       }
-      
+
       console.log(chalk.cyan('📋 Distilled output copied to clipboard'));
     } else {
       // Default: save using OutputManager
       const outputManager = new OutputManager();
       const folderName = basename(resolvedPath);
-      
+
       await outputManager.saveOutput(output, {
         command: 'distill',
         context: folderName,
-        format: 'markdown' // distill outputs markdown format
+        format: 'markdown', // distill outputs markdown format
       });
-      
+
       const relativePath = outputManager.getRelativePath({
         command: 'distill',
         context: folderName,
-        format: 'markdown'
+        format: 'markdown',
       });
-      
+
       // Complete progress with cool output
       if ('apis' in result && result.metadata) {
         progress.complete({
           originalTokens: result.metadata.originalTokens || 0,
           distilledTokens: result.metadata.distilledTokens || 0,
-          fileCount: result.structure?.fileCount || 0
+          fileCount: result.structure?.fileCount || 0,
         });
       }
-      
+
       console.log(chalk.cyan('💾 Distilled output saved to: ') + chalk.green(relativePath));
       console.log(chalk.dim(`\nFor agents: cat ${relativePath}`));
     }
-
   } catch (error) {
     progress.fail(error instanceof Error ? error.message : String(error));
     if (process.env.DEBUG) {
@@ -306,4 +310,3 @@ Provide insights that would help a new developer quickly understand the codebase
 
   return prompts[action] || prompts.analyze;
 }
-

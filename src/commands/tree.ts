@@ -26,7 +26,7 @@ export function createTreeCommand(): Command {
 
   command
     .description('Generate beautiful visual trees of codebase APIs and structure')
-    .argument('<path>', 'Path to directory to analyze')
+    .argument('[path]', 'Path to directory to analyze (defaults to current directory)')
 
     .option('-f, --format <type>', 'Tree format (tree, outline, json)', 'tree')
     .option('-o, --output <file>', 'Write output to specific file')
@@ -38,7 +38,8 @@ export function createTreeCommand(): Command {
     .option('--show-params', 'Show function parameters')
     .option('--group-by <method>', 'Group APIs by file, type, or none', 'file')
     .action((...args: any[]) => {
-      const targetPath = args[0];
+      // Handle optional path argument - if no path provided, args[0] will be the command object
+      const targetPath = typeof args[0] === 'string' ? args[0] : '.';
       const cmdObject = args[args.length - 1]; // Commander puts the command object last
       const localOptions = cmdObject.opts();
       const parentOptions = cmdObject.parent?.opts() || {};

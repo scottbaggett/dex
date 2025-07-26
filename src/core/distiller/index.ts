@@ -1,11 +1,11 @@
-import { 
-  DistillerOptions, 
-  CompressionResult, 
+import {
+  DistillerOptions,
+  CompressionResult,
   DistillationResult,
   CompressedFile,
   ExtractedAPI,
   ProjectStructure,
-  DependencyMap
+  DependencyMap,
 } from '../../types';
 import { HybridParser } from '../parser/hybrid-parser';
 import { Parser } from '../parser/parser';
@@ -49,39 +49,52 @@ export class Distiller {
       parallel: true,
       ...options,
     } as DistillerOptions;
-    
+
     this.parser = new HybridParser({
       includeComments: this.options.includeComments || false,
       includeDocstrings: this.options.includeDocstrings !== false,
     });
-    
+
     this.aidFormatter = new AidStyleFormatter();
   }
 
-  async distill(targetPath: string, progress?: DistillerProgress): Promise<CompressionResult | DistillationResult | { compression: CompressionResult; distillation: DistillationResult }> {
+  async distill(
+    targetPath: string,
+    progress?: DistillerProgress
+  ): Promise<
+    | CompressionResult
+    | DistillationResult
+    | { compression: CompressionResult; distillation: DistillationResult }
+  > {
     this.progress = progress;
-    
+
     // Initialize parser
     await this.parser.initialize();
 
     // Phase 1: Compression (if enabled)
     let compressionResult: CompressionResult | undefined;
-    if (this.options.compressFirst !== false || this.options.format === 'compressed' || this.options.format === 'both') {
+    if (
+      this.options.compressFirst !== false ||
+      this.options.format === 'compressed' ||
+      this.options.format === 'both'
+    ) {
       compressionResult = await this.compress(targetPath);
     }
 
-    // Phase 2: Distillation (if not full depth)
+    // Phase 2: Distillation (if format requires it)
     let distillationResult: DistillationResult | undefined;
-    if (this.options.depth !== 'full' && (this.options.format === 'distilled' || this.options.format === 'both')) {
-      const filesToDistill = compressionResult 
-        ? compressionResult.files.filter(f => this.parser.isLanguageSupported(Parser.detectLanguage(f.path) || ''))
+    if (this.options.format === 'distilled' || this.options.format === 'both') {
+      const filesToDistill = compressionResult
+        ? compressionResult.files.filter((f) =>
+            this.parser.isLanguageSupported(Parser.detectLanguage(f.path) || '')
+          )
         : await this.getFilesToProcess(targetPath);
-      
+
       // Don't restart progress if already running from compression phase
       if (!compressionResult && this.progress) {
         this.progress.start(filesToDistill.length);
       }
-        
+
       distillationResult = await this.distillFiles(filesToDistill, targetPath);
     }
 
@@ -98,30 +111,44 @@ export class Distiller {
     }
   }
 
-  async distillSelectedFiles(selectedFiles: string[], basePath: string, progress?: DistillerProgress): Promise<CompressionResult | DistillationResult | { compression: CompressionResult; distillation: DistillationResult }> {
+  async distillSelectedFiles(
+    selectedFiles: string[],
+    basePath: string,
+    progress?: DistillerProgress
+  ): Promise<
+    | CompressionResult
+    | DistillationResult
+    | { compression: CompressionResult; distillation: DistillationResult }
+  > {
     this.progress = progress;
-    
+
     // Initialize parser
     await this.parser.initialize();
 
     // Phase 1: Compression (if enabled)
     let compressionResult: CompressionResult | undefined;
-    if (this.options.compressFirst !== false || this.options.format === 'compressed' || this.options.format === 'both') {
+    if (
+      this.options.compressFirst !== false ||
+      this.options.format === 'compressed' ||
+      this.options.format === 'both'
+    ) {
       compressionResult = await this.compressSelectedFiles(selectedFiles, basePath);
     }
 
-    // Phase 2: Distillation (if not full depth)
+    // Phase 2: Distillation (if format requires it)
     let distillationResult: DistillationResult | undefined;
-    if (this.options.depth !== 'full' && (this.options.format === 'distilled' || this.options.format === 'both')) {
-      const filesToDistill = compressionResult 
-        ? compressionResult.files.filter(f => this.parser.isLanguageSupported(Parser.detectLanguage(f.path) || ''))
+    if (this.options.format === 'distilled' || this.options.format === 'both') {
+      const filesToDistill = compressionResult
+        ? compressionResult.files.filter((f) =>
+            this.parser.isLanguageSupported(Parser.detectLanguage(f.path) || '')
+          )
         : selectedFiles;
-      
+
       // Don't restart progress if already running from compression phase
       if (!compressionResult && this.progress) {
         this.progress.start(filesToDistill.length);
       }
-        
+
       distillationResult = await this.distillFiles(filesToDistill, basePath);
     }
 
@@ -143,7 +170,10 @@ export class Distiller {
     return this.compressFiles(files, targetPath);
   }
 
-  private async compressSelectedFiles(selectedFiles: string[], basePath: string): Promise<CompressionResult> {
+  private async compressSelectedFiles(
+    selectedFiles: string[],
+    basePath: string
+  ): Promise<CompressionResult> {
     return this.compressFiles(selectedFiles, basePath);
   }
 
@@ -151,7 +181,7 @@ export class Distiller {
     const compressedFiles: CompressedFile[] = [];
     let totalSize = 0;
     const excludedCount = 0;
-    
+
     // Start progress if available
     if (this.progress) {
       this.progress.start(files.length);
@@ -162,19 +192,20 @@ export class Distiller {
       const batchSize = 50;
       let cumulativeOriginalSize = 0;
       let cumulativeDistilledSize = 0;
-      
+
       for (let i = 0; i < files.length; i += batchSize) {
         const batch = files.slice(i, i + batchSize);
-        const results = await Promise.all(
-          batch.map(file => this.compressFile(file))
-        );
+        const results = await Promise.all(batch.map((file) => this.compressFile(file)));
         compressedFiles.push(...results);
         totalSize += results.reduce((sum, f) => sum + f.size, 0);
-        
+
         // Update cumulative sizes
         cumulativeOriginalSize += results.reduce((sum, f) => sum + f.size, 0);
-        cumulativeDistilledSize += results.reduce((sum, f) => sum + Math.ceil(f.content.length / 4) * 4, 0);
-        
+        cumulativeDistilledSize += results.reduce(
+          (sum, f) => sum + Math.ceil(f.content.length / 4) * 4,
+          0
+        );
+
         // Update progress
         if (this.progress) {
           const processedCount = Math.min(i + batchSize, files.length);
@@ -216,13 +247,16 @@ export class Distiller {
     };
   }
 
-  private async distillFiles(files: CompressedFile[] | string[], basePath: string): Promise<DistillationResult> {
+  private async distillFiles(
+    files: CompressedFile[] | string[],
+    basePath: string
+  ): Promise<DistillationResult> {
     // Start progress if not already started
     if (this.progress && !this.progress.isSpinning) {
       const fileCount = files.length;
       this.progress.start(fileCount);
     }
-    
+
     const apis: ExtractedAPI[] = [];
     const directoriesSet = new Set<string>();
     const structure: ProjectStructure = {
@@ -236,14 +270,15 @@ export class Distiller {
     let distilledTokens = 0;
 
     // Process files
-    const filesToProcess = typeof files[0] === 'string' 
-      ? await Promise.all((files as string[]).map(f => this.compressFile(f)))
-      : files as CompressedFile[];
+    const filesToProcess =
+      typeof files[0] === 'string'
+        ? await Promise.all((files as string[]).map((f) => this.compressFile(f)))
+        : (files as CompressedFile[]);
 
     let processedCount = 0;
     let cumulativeOriginalSize = 0;
     let cumulativeDistilledSize = 0;
-    
+
     for (const file of filesToProcess) {
       const language = file.language || Parser.detectLanguage(file.path);
       if (!language || !this.parser.isLanguageSupported(language)) {
@@ -273,7 +308,7 @@ export class Distiller {
         // Auto-detect depth if needed
         const depth = this.options.depth || HybridParser.getAutoDepth(file.size);
         const extracted = this.parser.extract(parsed, depth);
-        
+
         apis.push(extracted);
 
         // Estimate distilled tokens
@@ -290,7 +325,7 @@ export class Distiller {
           console.warn(`Failed to distill ${file.path}:`, error);
         }
       }
-      
+
       // Update progress
       processedCount++;
       if (this.progress) {
@@ -308,14 +343,14 @@ export class Distiller {
       metadata: {
         originalTokens,
         distilledTokens,
-        compressionRatio: originalTokens > 0 ? (1 - distilledTokens / originalTokens) : 0,
+        compressionRatio: originalTokens > 0 ? 1 - distilledTokens / originalTokens : 0,
       },
     };
   }
 
   private async getFilesToProcess(targetPath: string): Promise<string[]> {
     const stats = await fs.stat(targetPath);
-    
+
     if (stats.isFile()) {
       return [targetPath];
     }
@@ -343,14 +378,14 @@ export class Distiller {
 
   private serializeExtractedAPI(api: ExtractedAPI): string {
     let result = `File: ${api.file}\n\n`;
-    
+
     for (const exp of api.exports) {
       if (exp.docstring) {
         result += `/**\n * ${exp.docstring.split('\n').join('\n * ')}\n */\n`;
       }
       result += `${exp.signature}\n\n`;
     }
-    
+
     return result;
   }
 
@@ -366,7 +401,10 @@ export class Distiller {
   /**
    * Format the distillation result based on output format
    */
-  formatResult(result: CompressionResult | DistillationResult | any, originalPath?: string): string {
+  formatResult(
+    result: CompressionResult | DistillationResult | any,
+    originalPath?: string
+  ): string {
     if ('files' in result) {
       // Compression result - XML format
       return this.formatCompression(result as CompressionResult);
@@ -377,7 +415,7 @@ export class Distiller {
       // Both results
       return `${this.formatCompression(result.compression)}\n\n---\n\n${this.formatDistillation(result.distillation, originalPath)}`;
     }
-    
+
     return JSON.stringify(result, null, 2);
   }
 
@@ -385,13 +423,13 @@ export class Distiller {
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += '<context>\n';
     xml += `  <metadata generated="${result.metadata.timestamp}" files="${result.metadata.totalFiles}" size="${result.metadata.totalSize}"/>\n`;
-    
+
     for (const file of result.files) {
       xml += `  <file path="${file.path}" size="${file.size}" hash="${file.hash}"${file.language ? ` language="${file.language}"` : ''}>\n`;
       xml += this.escapeXml(file.content);
       xml += '\n  </file>\n';
     }
-    
+
     xml += '</context>';
     return xml;
   }
@@ -401,24 +439,24 @@ export class Distiller {
     if (this.options.useAidStyle !== false) {
       return this.aidFormatter.formatDistillation(result, originalPath || '');
     }
-    
+
     // Original format for backward compatibility
     let output = '# Distilled Context\n\n';
-    
+
     // Metadata
     output += `## Summary\n`;
     output += `- Files analyzed: ${result.structure.fileCount}\n`;
     output += `- Original tokens: ${result.metadata.originalTokens.toLocaleString()}\n`;
     output += `- Distilled tokens: ${result.metadata.distilledTokens.toLocaleString()}\n`;
     output += `- Compression ratio: ${(result.metadata.compressionRatio * 100).toFixed(1)}%\n\n`;
-    
+
     // Languages breakdown
     output += `## Languages\n`;
     for (const [lang, count] of Object.entries(result.structure.languages)) {
       output += `- ${lang}: ${count} files\n`;
     }
     output += '\n';
-    
+
     // APIs by file
     output += `## Extracted APIs\n\n`;
     for (const api of result.apis) {
@@ -430,7 +468,7 @@ export class Distiller {
         output += `\`\`\`${this.getLanguageForFile(api.file)}\n${exp.signature}\n\`\`\`\n\n`;
       }
     }
-    
+
     return output;
   }
 
