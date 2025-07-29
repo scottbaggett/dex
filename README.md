@@ -308,7 +308,12 @@ class GitExtractor {
 dex combine src/auth/ src/api/         # Combine directories
 dex combine file1.ts file2.ts          # Combine specific files
 dex combine . -t "*.config.*"          # Combine by pattern
+dex combine -s                         # Combine all staged files (full content)
+dex combine -s -c                      # Copy staged files to clipboard
 ```
+
+**Staged Files Integration**
+The `-s, --staged` flag provides full file content of all staged files (not just diffs like `dex -s`), making it perfect for comprehensive code review or sharing complete staged changes with AI agents. Use `-c` to copy directly to clipboard.
 
 ### 🎯 Session Tracking
 

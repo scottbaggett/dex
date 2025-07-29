@@ -13,7 +13,7 @@ export class DexHelpFormatter extends Help {
    * @returns {string} The formatted help string
    */
   formatHelp(cmd: Command, _helper: Help): string {
-        const v = cmd.version() || '-';
+    const v = cmd.version() || '-';
     const lines: string[] = [];
 
     // Header
@@ -44,6 +44,9 @@ export class DexHelpFormatter extends Help {
     lines.push('  -c, --clipboard            copy to clipboard');
     lines.push('      --full <pattern>       include full files matching pattern');
     lines.push('      --select               interactive file picker');
+    lines.push('      --sort-by <opt>        name|updated|size|status');
+    lines.push('      --sort-order <ord>     asc|desc');
+    lines.push('      --filter-by <opt>      all|staged|unstaged|untracked');
     lines.push('      --task <src>           description / file / URL');
     lines.push('      --ai-action <type>     refactor|security|perf|...\n');
 
@@ -64,7 +67,8 @@ export class DexHelpFormatter extends Help {
     // Help routing
     lines.push(chalk.yellow('MORE'));
     lines.push('  dex --help-extended   full option list (original Commander)');
-    lines.push('  dex help <command>    command-specific docs\n');
+    lines.push('  dex help <command>    command-specific docs');
+    lines.push('  dex help-selection    file selection sorting/filtering options\n');
 
     // Footer
     lines.push(

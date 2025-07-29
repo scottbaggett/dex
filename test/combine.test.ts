@@ -12,21 +12,26 @@ describe('Combine Command', () => {
   beforeEach(() => {
     // Create test directory and files
     mkdirSync(testDir, { recursive: true });
-    
-    writeFileSync(testFile1, `// TypeScript file
+
+    writeFileSync(
+      testFile1,
+      `// TypeScript file
 export function hello(name: string): string {
   return \`Hello, \${name}!\`;
 }
 
 export class Greeter {
   constructor(private name: string) {}
-  
+
   greet(): string {
     return hello(this.name);
   }
-}`);
+}`
+    );
 
-    writeFileSync(testFile2, `// JavaScript file
+    writeFileSync(
+      testFile2,
+      `// JavaScript file
 function add(a, b) {
   return a + b;
 }
@@ -35,7 +40,8 @@ function multiply(a, b) {
   return a * b;
 }
 
-module.exports = { add, multiply };`);
+module.exports = { add, multiply };`
+    );
   });
 
   afterEach(() => {
@@ -63,14 +69,20 @@ module.exports = { add, multiply };`);
       ];
 
       const fullFiles = new Map<string, string>();
-      fullFiles.set('test1.ts', `// TypeScript file
+      fullFiles.set(
+        'test1.ts',
+        `// TypeScript file
 export function hello(name: string): string {
   return \`Hello, \${name}!\`;
-}`);
-      fullFiles.set('test2.js', `// JavaScript file
+}`
+      );
+      fullFiles.set(
+        'test2.js',
+        `// JavaScript file
 function add(a, b) {
   return a + b;
-}`);
+}`
+      );
 
       const context: ExtractedContext = {
         changes,
@@ -117,7 +129,7 @@ function add(a, b) {
       expect(result).toContain('<changes>');
       expect(result).toContain('<files_changed>2</files_changed>');
       expect(result).toContain('<lines_added>18</lines_added>');
-      
+
       // Verify file content is included
       expect(result).toContain('<path>test1.ts</path>');
       expect(result).toContain('<path>test2.js</path>');
@@ -178,7 +190,7 @@ function add(a, b) {
 
       // Content should be in CDATA section, so special characters are preserved
       expect(result).toContain('<![CDATA[<tag>Content with & < > " \' characters</tag>]]>');
-      
+
       // But XML attributes should be escaped
       expect(result).toContain('<path>test.xml</path>');
     });
@@ -236,7 +248,9 @@ function add(a, b) {
       });
 
       expect(result).toContain('<task_overview>');
-      expect(result).toContain('<description>Add new feature for user authentication</description>');
+      expect(result).toContain(
+        '<description>Add new feature for user authentication</description>'
+      );
       expect(result).toContain('<goals>');
       expect(result).toContain('<goal>Implement login</goal>');
       expect(result).toContain('<goal>Add security</goal>');
@@ -296,6 +310,152 @@ function add(a, b) {
       expect(result).not.toContain('<metadata>');
       expect(result).toContain('<scope>');
       expect(result).toContain('<changes>');
+    });
+  });
+
+  describe('Staged Files Integration', () => {
+    it('should handle staged files extraction method in metadata', () => {
+      const changes: GitChange[] = [
+        {
+          file: 'staged-file.ts',
+          status: 'modified',
+          additions: 15,
+          deletions: 2,
+          diff: '',
+        },
+      ];
+
+      const fullFiles = new Map<string, string>();
+      fullFiles.set(
+        'staged-file.ts',
+        `// Staged TypeScript file
+export function stagedFunction(): string {
+  return 'This file is staged';
+}
+
+export const stagedConst = 'staged-value';`
+      );
+
+      const context: ExtractedContext = {
+        changes,
+        scope: {
+          filesChanged: 1,
+          functionsModified: 0,
+          linesAdded: 15,
+          linesDeleted: 2,
+        },
+        fullFiles,
+        metadata: {
+          generated: '2024-01-01T00:00:00.000Z',
+          repository: {
+            name: 'staged-changes',
+            branch: 'feature-branch',
+            commit: 'def456',
+          },
+          extraction: {
+            method: 'staged-files-combine',
+          },
+          tokens: {
+            estimated: 120,
+          },
+          tool: {
+            name: 'dex',
+            version: '1.0.0',
+          },
+        },
+      };
+
+      const formatter = new XmlFormatter();
+      const result = formatter.format({
+        context,
+        options: { noPrompt: true },
+      });
+
+      // Verify staged-specific metadata
+      expect(result).toContain('<repository>');
+      expect(result).toContain('<name>staged-changes</name>');
+      expect(result).toContain('<branch>feature-branch</branch>');
+      expect(result).toContain('<commit>def456</commit>');
+      expect(result).toContain('<extraction>');
+      expect(result).toContain('<method>staged-files-combine</method>');
+
+      // Verify file shows as modified (not added)
+      expect(result).toContain('<status>modified</status>');
+      expect(result).toContain('<path>staged-file.ts</path>');
+      expect(result).toContain('<additions>15</additions>');
+      expect(result).toContain('<deletions>2</deletions>');
+
+      // Verify content is included
+      expect(result).toContain('<![CDATA[// Staged TypeScript file');
+      expect(result).toContain('export function stagedFunction()');
+    });
+
+    it('should include token savings calculation for staged files', () => {
+      const changes: GitChange[] = [
+        {
+          file: 'staged1.ts',
+          status: 'modified',
+          additions: 50,
+          deletions: 5,
+          diff: '',
+        },
+        {
+          file: 'staged2.js',
+          status: 'added',
+          additions: 30,
+          deletions: 0,
+          diff: '',
+        },
+      ];
+
+      const fullFiles = new Map<string, string>();
+      fullFiles.set('staged1.ts', 'x'.repeat(2000)); // 2000 chars = ~500 tokens
+      fullFiles.set('staged2.js', 'y'.repeat(1200)); // 1200 chars = ~300 tokens
+
+      const context: ExtractedContext = {
+        changes,
+        scope: {
+          filesChanged: 2,
+          functionsModified: 0,
+          linesAdded: 80,
+          linesDeleted: 5,
+        },
+        fullFiles,
+        tokenSavings: {
+          fullFileTokens: 800,
+          actualTokens: 800, // Same since we're showing full files
+          saved: 0,
+          percentSaved: 0,
+        },
+        metadata: {
+          generated: '2024-01-01T00:00:00.000Z',
+          repository: {
+            name: 'staged-changes',
+            branch: 'main',
+            commit: 'abc123',
+          },
+          extraction: {
+            method: 'staged-files-combine',
+          },
+          tokens: {
+            estimated: 800,
+          },
+          tool: {
+            name: 'dex',
+            version: '1.0.0',
+          },
+        },
+      };
+
+      const formatter = new XmlFormatter();
+      const result = formatter.format({
+        context,
+        options: { noPrompt: true },
+      });
+
+      expect(result).toContain('<files_changed>2</files_changed>');
+      expect(result).toContain('<lines_added>80</lines_added>');
+      expect(result).toContain('<estimated>800</estimated>');
     });
   });
 });

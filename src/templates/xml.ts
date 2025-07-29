@@ -44,10 +44,10 @@ export class XmlFormatter extends Formatter {
   }
 
   private formatHeader(context: ExtractedContext, _options: FormatterOptions['options']): string {
-    const title = context.task?.description 
+    const title = context.task?.description
       ? `Context: ${context.task.description}`
       : 'Code Context';
-    
+
     return `  <title>${this.escapeXml(title)}</title>`;
   }
 
@@ -60,18 +60,24 @@ export class XmlFormatter extends Formatter {
     lines.push(`      <commit>${this.escapeXml(metadata.repository.commit)}</commit>`);
     lines.push(`    </repository>`);
     lines.push(`    <extraction>`);
-    
+
+    if (metadata.extraction.method) {
+      lines.push(`      <method>${this.escapeXml(metadata.extraction.method)}</method>`);
+    }
+
     if (metadata.extraction.filters?.path || metadata.extraction.filters?.type) {
       lines.push(`      <filters>`);
       if (metadata.extraction.filters.path) {
         lines.push(`        <path>${this.escapeXml(metadata.extraction.filters.path)}</path>`);
       }
       if (metadata.extraction.filters.type?.length) {
-        lines.push(`        <types>${this.escapeXml(metadata.extraction.filters.type.join(', '))}</types>`);
+        lines.push(
+          `        <types>${this.escapeXml(metadata.extraction.filters.type.join(', '))}</types>`
+        );
       }
       lines.push(`      </filters>`);
     }
-    
+
     lines.push(`    </extraction>`);
     lines.push(`    <tokens>`);
     lines.push(`      <estimated>${metadata.tokens.estimated}</estimated>`);
@@ -81,17 +87,17 @@ export class XmlFormatter extends Formatter {
     lines.push(`      <version>${this.escapeXml(metadata.tool.version)}</version>`);
     lines.push(`    </tool>`);
     lines.push(`  </metadata>`);
-    
+
     return lines.join('\n');
   }
 
   private formatTaskSection(task: TaskContext): string {
     const lines = ['  <task_overview>'];
-    
+
     if (task.description) {
       lines.push(`    <description>${this.escapeXml(task.description)}</description>`);
     }
-    
+
     if (task.goals && task.goals.length > 0) {
       lines.push(`    <goals>`);
       for (const goal of task.goals) {
@@ -99,7 +105,7 @@ export class XmlFormatter extends Formatter {
       }
       lines.push(`    </goals>`);
     }
-    
+
     if (task.issueUrl) {
       lines.push(`    <issue>`);
       lines.push(`      <url>${this.escapeXml(task.issueUrl)}</url>`);
@@ -111,7 +117,7 @@ export class XmlFormatter extends Formatter {
       }
       lines.push(`    </issue>`);
     }
-    
+
     if (task.labels && task.labels.length > 0) {
       lines.push(`    <labels>`);
       for (const label of task.labels) {
@@ -143,17 +149,17 @@ export class XmlFormatter extends Formatter {
       lines.push(`      <status>${this.escapeXml(change.status)}</status>`);
       lines.push(`      <additions>${change.additions}</additions>`);
       lines.push(`      <deletions>${change.deletions}</deletions>`);
-      
+
       if (change.oldFile) {
         lines.push(`      <old_path>${this.escapeXml(change.oldFile)}</old_path>`);
       }
-      
+
       // Include full file if available
       if (context.fullFiles?.has(change.file)) {
         const content = context.fullFiles.get(change.file);
         const ext = this.getFileExtension(change.file);
         const lang = this.getLanguageFromExtension(ext);
-        
+
         lines.push(`      <content language="${this.escapeXml(lang)}">`);
         lines.push(`<![CDATA[${content}]]>`);
         lines.push(`      </content>`);
@@ -163,7 +169,7 @@ export class XmlFormatter extends Formatter {
         lines.push(`<![CDATA[${this.formatDiff(change.diff)}]]>`);
         lines.push(`      </diff>`);
       }
-      
+
       lines.push(`    </file>`);
     }
 

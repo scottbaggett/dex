@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import clipboardy from 'clipboardy';
 import { readFileSync, statSync } from 'fs';
-import { resolve, relative } from 'path';
+import { resolve, relative, join } from 'path';
 import { XmlFormatter } from '../templates/xml';
 import { MarkdownFormatter } from '../templates/markdown';
 import { JsonFormatter } from '../templates/json';
@@ -11,24 +11,35 @@ import { ExtractedContext, GitChange, DexOptions, OutputFormat, Formatter } from
 import { formatFileSize } from '../utils/file-scanner';
 import { FileSelector } from '../utils/file-selector';
 import { OutputManager } from '../utils/output-manager';
+import { GitExtractor } from '../core/git';
 
 export function createCombineCommand(): Command {
   const combine = new Command('combine')
     .description('Combine multiple files and directories into a single, LLM-friendly document')
-    .argument('[files...]', 'List of file paths and directories to combine (optional if using --select)')
+    .argument(
+      '[files...]',
+      'List of file paths and directories to combine (optional if using --select or --staged)'
+    )
     .addOption(
       new Option('--output-format <format>', 'Output format')
         .default('xml')
         .choices(['xml', 'markdown', 'json'])
     )
-    .option('--copy', 'Copy output to clipboard')
+    .option('-s, --staged', 'Combine all staged files (shows full file content, not just diffs)')
+    .option('-c, --copy', 'Copy output to clipboard')
     .option('--prompt <text>', 'Custom AI analysis prompt')
-    .option('--prompt-template <name>', 'Use prompt template: security, performance, refactor, feature, bugfix, migration, api, testing')
+    .option(
+      '--prompt-template <name>',
+      'Use prompt template: security, performance, refactor, feature, bugfix, migration, api, testing'
+    )
     .option('--no-prompt', 'Disable AI prompt generation')
     .option('--no-metadata', 'Exclude metadata from output')
     .option('-o, --output <file>', 'Write output to file instead of stdout')
     .option('--include <patterns>', 'Include file patterns (comma-separated, e.g., "*.ts,*.js")')
-    .option('--exclude <patterns>', 'Exclude file patterns (comma-separated, e.g., "*.test.*,*.spec.*")')
+    .option(
+      '--exclude <patterns>',
+      'Exclude file patterns (comma-separated, e.g., "*.test.*,*.spec.*")'
+    )
     .option('--max-files <number>', 'Maximum number of files to process', '1000')
     .option('--max-depth <number>', 'Maximum directory depth to scan', '10')
     .option('--no-gitignore', 'Do not respect .gitignore patterns')
@@ -46,34 +57,101 @@ async function combineCommand(filePaths: string[], options: any) {
   const spinner = ora('Scanning files...').start();
 
   try {
+    // Handle --staged mode
+    if (options.staged) {
+      spinner.text = 'Getting staged files...';
+
+      const gitExtractor = new GitExtractor();
+      const isGitRepo = await gitExtractor.isGitRepository();
+
+      if (!isGitRepo) {
+        spinner.fail(chalk.red('Error: Not in a git repository (--staged requires git)'));
+        process.exit(1);
+      }
+
+      const hasStagedChanges = await gitExtractor.hasStagedChanges();
+      if (!hasStagedChanges) {
+        spinner.fail(chalk.red('No staged files found'));
+        console.log(chalk.gray('Tip: Use "git add <files>" to stage files first'));
+        process.exit(1);
+      }
+
+      // Get staged files
+      const stagedChanges = await gitExtractor.getCurrentChanges(true);
+      const gitRoot = await gitExtractor.getRepositoryRoot();
+
+      // Convert staged changes to absolute file paths
+      filePaths = stagedChanges
+        .filter((change) => change.status !== 'deleted') // Skip deleted files
+        .map((change) => join(gitRoot, change.file));
+
+      spinner.text = chalk.gray(`Found ${filePaths.length} staged files...`);
+
+      // Show staged files info
+      const filesList = stagedChanges
+        .filter((change) => change.status !== 'deleted')
+        .map((c) => c.file)
+        .join(', ');
+      console.log(chalk.dim(`Staged files: ${filesList}`));
+    }
+
     // Handle --select mode without file arguments
     if (options.select && filePaths.length === 0) {
       filePaths.push(process.cwd());
     }
 
-    // If no files provided and not in select mode, show error
+    // If no files provided and not in select or staged mode, show error
     if (filePaths.length === 0) {
       spinner.fail(chalk.red('No files or directories specified'));
-      console.error(chalk.red('Usage: dex combine <files...> or dex combine --select'));
+      console.error(
+        chalk.red('Usage: dex combine <files...>, dex combine --select, or dex combine --staged')
+      );
       process.exit(1);
     }
 
     // Parse options
-    const includePatterns = options.include ? options.include.split(',').map((p: string) => p.trim()) : [];
-    const excludePatterns = options.exclude ? options.exclude.split(',').map((p: string) => p.trim()) : [];
+    const includePatterns = options.include
+      ? options.include.split(',').map((p: string) => p.trim())
+      : [];
+    const excludePatterns = options.exclude
+      ? options.exclude.split(',').map((p: string) => p.trim())
+      : [];
     const maxFiles = parseInt(String(options.maxFiles || '1000'), 10);
     const maxDepth = parseInt(String(options.maxDepth || '10'), 10);
     const respectGitignore = !options.noGitignore;
 
-    // Collect all files from inputs (files and directories)
-    const fileSelector = new FileSelector();
-    const { files: allFiles, errors } = await fileSelector.collectFiles(filePaths, {
-      includePatterns,
-      excludePatterns,
-      maxFiles,
-      maxDepth,
-      respectGitignore
-    });
+    // For staged mode, skip file collection and use the staged files directly
+    let allFiles: string[];
+    let errors: string[] = [];
+
+    if (options.staged) {
+      // Use staged files directly, no need for file collection
+      allFiles = filePaths;
+
+      // Validate that staged files exist and are readable
+      const validFiles: string[] = [];
+      for (const filePath of allFiles) {
+        try {
+          statSync(filePath);
+          validFiles.push(filePath);
+        } catch (error) {
+          errors.push(`Staged file not accessible: ${relative(process.cwd(), filePath)}`);
+        }
+      }
+      allFiles = validFiles;
+    } else {
+      // Collect all files from inputs (files and directories) - existing logic
+      const fileSelector = new FileSelector();
+      const result = await fileSelector.collectFiles(filePaths, {
+        includePatterns,
+        excludePatterns,
+        maxFiles,
+        maxDepth,
+        respectGitignore,
+      });
+      allFiles = result.files;
+      errors = result.errors;
+    }
 
     if (errors.length > 0) {
       spinner.warn(chalk.yellow('Some paths had issues:'));
@@ -101,31 +179,37 @@ async function combineCommand(filePaths: string[], options: any) {
       }
     }, 0);
 
-    if (allFiles.length > 50) {
-      spinner.warn(chalk.yellow(`Processing ${allFiles.length} files (${formatFileSize(totalSize)}). Consider using --select to choose specific files.`));
+    if (allFiles.length > 50 && !options.staged) {
+      spinner.warn(
+        chalk.yellow(
+          `Processing ${allFiles.length} files (${formatFileSize(totalSize)}). Consider using --select to choose specific files.`
+        )
+      );
     }
 
-    // Handle interactive selection if requested
+    // Handle interactive selection if requested (skip for staged mode)
     let finalFiles = allFiles;
-    
-    if (options.select) {
+
+    if (options.select && !options.staged) {
       // Check if interactive mode is possible
       if (!process.stdin.isTTY || !process.stdin.setRawMode) {
         spinner.fail(chalk.red('Interactive mode requires a TTY terminal'));
+        const fileSelector = new FileSelector();
         fileSelector.showTTYError();
         process.exit(1);
       }
-      
+
       spinner.stop();
-      
+
       try {
         // Convert file paths to GitChange objects for the selector
+        const fileSelector = new FileSelector();
         const fileChanges = fileSelector.filesToGitChanges(allFiles);
         const result = await fileSelector.selectFiles(fileChanges);
 
         // Convert back to file paths
-        finalFiles = result.files.map(change => resolve(change.file));
-        
+        finalFiles = result.files.map((change) => resolve(change.file));
+
         // Override clipboard option if user pressed 'c'
         if (result.copyToClipboard) {
           options.copy = true;
@@ -142,7 +226,9 @@ async function combineCommand(filePaths: string[], options: any) {
     }
 
     // Read file contents
-    spinner.text = chalk.gray(`Reading ${finalFiles.length} files...`);
+    const processingText = options.staged ? 'Reading staged files...' : 'Reading files...';
+    spinner.text = chalk.gray(`${processingText} (${finalFiles.length} files)`);
+
     const changes: GitChange[] = [];
     const fullFiles = new Map<string, string>();
 
@@ -150,11 +236,11 @@ async function combineCommand(filePaths: string[], options: any) {
       try {
         const content = readFileSync(filePath, 'utf-8');
         const relativePath = relative(process.cwd(), filePath);
-        
+
         // Create a GitChange-like object for each file
         const change: GitChange = {
           file: relativePath,
-          status: 'added', // Treat all files as "added" for combine operation
+          status: options.staged ? 'modified' : 'added', // Use 'modified' for staged files
           additions: content.split('\n').length,
           deletions: 0,
           diff: '', // No diff for combine operation
@@ -163,7 +249,9 @@ async function combineCommand(filePaths: string[], options: any) {
         changes.push(change);
         fullFiles.set(relativePath, content);
       } catch (error) {
-        errors.push(`Failed to read ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        errors.push(
+          `Failed to read ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     }
 
@@ -180,8 +268,33 @@ async function combineCommand(filePaths: string[], options: any) {
     }
 
     // Create context object
-    const totalLines = Array.from(fullFiles.values()).reduce((sum, content) => sum + content.split('\n').length, 0);
-    const totalChars = Array.from(fullFiles.values()).reduce((sum, content) => sum + content.length, 0);
+    const totalLines = Array.from(fullFiles.values()).reduce(
+      (sum, content) => sum + content.split('\n').length,
+      0
+    );
+    const totalChars = Array.from(fullFiles.values()).reduce(
+      (sum, content) => sum + content.length,
+      0
+    );
+
+    // Determine extraction method and repository info based on mode
+    let extractionMethod: string;
+    let repoName: string;
+    let repoBranch: string;
+    let repoCommit: string;
+
+    if (options.staged) {
+      const gitExtractor = new GitExtractor();
+      extractionMethod = 'staged-files-combine';
+      repoName = 'staged-changes';
+      repoBranch = await gitExtractor.getCurrentBranch();
+      repoCommit = await gitExtractor.getLatestCommit();
+    } else {
+      extractionMethod = 'combine';
+      repoName = 'combined-files';
+      repoBranch = 'local';
+      repoCommit = 'local';
+    }
 
     const context: ExtractedContext = {
       changes,
@@ -195,12 +308,12 @@ async function combineCommand(filePaths: string[], options: any) {
       metadata: {
         generated: new Date().toISOString(),
         repository: {
-          name: 'combined-files',
-          branch: 'local',
-          commit: 'local',
+          name: repoName,
+          branch: repoBranch,
+          commit: repoCommit,
         },
         extraction: {
-          method: 'combine',
+          method: extractionMethod,
         },
         tokens: {
           estimated: Math.ceil(totalChars / 4), // Rough token estimation
@@ -247,17 +360,26 @@ async function combineCommand(filePaths: string[], options: any) {
     if (options.output) {
       const { writeFileSync } = await import('fs');
       writeFileSync(options.output, output);
-      spinner.succeed(chalk.green(`Combined files written to: ${options.output}`));
-    } else if (options.copy) {
+      const successMsg = options.staged
+        ? `Combined staged files written to: ${options.output}`
+        : `Combined files written to: ${options.output}`;
+      spinner.succeed(chalk.green(successMsg));
+    } else if (options.copy || options.clipboard) {
       try {
         await clipboardy.write(output);
 
         // Show enhanced success message with metadata
-        const tokenStr = chalk.cyan(`~${context.metadata.tokens.estimated.toLocaleString()} tokens`);
+        const tokenStr = chalk.cyan(
+          `~${context.metadata.tokens.estimated.toLocaleString()} tokens`
+        );
         const filesStr = chalk.yellow(`${context.scope.filesChanged} files`);
         const linesStr = chalk.green(`${context.scope.linesAdded} lines`);
+        const successMsg = options.staged
+          ? 'Combined staged files copied to clipboard'
+          : 'Combined files copied to clipboard';
+
         spinner.succeed(
-          chalk.green('Combined files copied to clipboard') +
+          chalk.green(successMsg) +
             chalk.gray(' • ') +
             tokenStr +
             chalk.gray(' • ') +
@@ -269,36 +391,47 @@ async function combineCommand(filePaths: string[], options: any) {
         );
       } catch (error) {
         spinner.fail(chalk.red('Failed to copy to clipboard'));
-        console.error(chalk.red(`Clipboard error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+        console.error(
+          chalk.red(`Clipboard error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        );
         console.log(chalk.yellow('Falling back to terminal output:'));
         console.log(output);
       }
     } else {
       // Save to .dex/ directory using OutputManager
       const outputManager = new OutputManager();
-      
+
       // Generate context string for filename
-      const contextParts = filePaths.map(p => p.replace(/[^a-zA-Z0-9]/g, '-')).join('-');
-      const contextString = contextParts.length > 20 ? contextParts.substring(0, 20) : contextParts;
-      
+      let contextString: string;
+      if (options.staged) {
+        contextString = 'staged-files';
+      } else {
+        const contextParts = filePaths.map((p) => p.replace(/[^a-zA-Z0-9]/g, '-')).join('-');
+        contextString = contextParts.length > 20 ? contextParts.substring(0, 20) : contextParts;
+      }
+
       await outputManager.saveOutput(output, {
         command: 'combine',
         context: contextString,
-        format: options.outputFormat || 'xml'
+        format: options.outputFormat || 'xml',
       });
-      
+
       const relativePath = outputManager.getRelativePath({
         command: 'combine',
         context: contextString,
-        format: options.outputFormat || 'xml'
+        format: options.outputFormat || 'xml',
       });
 
       // Format token display
       const tokenCount = context.metadata.tokens.estimated;
-      const tokenStr = tokenCount >= 1000 ? `${Math.round(tokenCount / 1000)}k tokens` : `${tokenCount} tokens`;
+      const tokenStr =
+        tokenCount >= 1000 ? `${Math.round(tokenCount / 1000)}k tokens` : `${tokenCount} tokens`;
 
       spinner.succeed(
-        chalk.green('Saved to ') + chalk.white(relativePath) + chalk.dim(' • ') + chalk.white(tokenStr)
+        chalk.green('Saved to ') +
+          chalk.white(relativePath) +
+          chalk.dim(' • ') +
+          chalk.white(tokenStr)
       );
 
       // Show agent instruction

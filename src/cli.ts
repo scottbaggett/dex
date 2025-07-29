@@ -63,6 +63,12 @@ program
   )
   .option('--no-prompt', 'Disable AI prompt generation')
   .option('--select', 'Interactive file selection mode')
+  .option('--sort-by <option>', 'Sort files by: name, updated, size, status (default: name)')
+  .option('--sort-order <order>', 'Sort direction: asc or desc (default: asc)')
+  .option(
+    '--filter-by <option>',
+    'Filter files by: all, staged, unstaged, untracked, modified, added, deleted (default: all)'
+  )
   .option('--ai', 'Enable AI-assisted file selection')
   .option('--smart <task>', 'AI-powered file selection based on task description')
   .option('--dry-run', 'Preview AI file selection without generating output')
@@ -876,7 +882,19 @@ async function extractCommand(range: string, options: Record<string, any>) {
 
         // Convert to GitChange objects for selection
         const fileChanges = fileSelector.filesToGitChanges(allFiles);
-        const result = await fileSelector.selectFiles(fileChanges);
+        const result = await fileSelector.selectFiles(fileChanges, {
+          sortBy: options.sortBy as 'name' | 'updated' | 'size' | 'status' | undefined,
+          sortOrder: options.sortOrder as 'asc' | 'desc' | undefined,
+          filterBy: options.filterBy as
+            | 'all'
+            | 'staged'
+            | 'unstaged'
+            | 'untracked'
+            | 'modified'
+            | 'added'
+            | 'deleted'
+            | undefined,
+        });
 
         // Override clipboard option if user pressed 'c'
         if (result.copyToClipboard) {
@@ -1032,6 +1050,16 @@ async function extractCommand(range: string, options: Record<string, any>) {
     process.exit(1);
   }
 }
+
+// Help command for file selection
+program
+  .command('help-selection')
+  .description('Show detailed file selection options')
+  .action(async () => {
+    const { FileSelector } = await import('./utils/file-selector');
+    console.log(FileSelector.getOptionsHelp());
+    process.exit(0);
+  });
 
 // Parse arguments
 program.parse();

@@ -3,8 +3,15 @@ import { render } from 'ink';
 import FileSelector from './FileSelector';
 import { GitChange } from '../types';
 
+export interface EnhancedGitChange extends GitChange {
+  fileSize?: number;
+  isStaged?: boolean;
+  isUnstaged?: boolean;
+  isUntracked?: boolean;
+}
+
 export interface InteractiveModeOptions {
-  changes: GitChange[];
+  changes: (GitChange | EnhancedGitChange)[];
 }
 
 export interface InteractiveModeResult {
@@ -17,7 +24,9 @@ export async function launchInteractiveMode(
 ): Promise<InteractiveModeResult> {
   // Check if raw mode is supported
   if (!process.stdin.isTTY || !process.stdin.setRawMode) {
-    throw new Error('Interactive mode requires a TTY terminal. Try running without --select or use a different terminal.');
+    throw new Error(
+      'Interactive mode requires a TTY terminal. Try running without --select or use a different terminal.'
+    );
   }
 
   return new Promise((resolve, reject) => {
@@ -36,7 +45,11 @@ export async function launchInteractiveMode(
 
       app.waitUntilExit().catch(reject);
     } catch (error) {
-      reject(new Error(`Interactive mode failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      reject(
+        new Error(
+          `Interactive mode failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+      );
     }
   });
 }

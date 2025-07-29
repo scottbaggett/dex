@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
+import { Box, Text, useApp, useInput } from 'ink';
 import { GitChange } from '../types';
+import { EnhancedGitChange } from './index';
 import * as path from 'path';
 import * as fs from 'fs';
 
 interface FileSelectorProps {
-  changes: GitChange[];
+  changes: (GitChange | EnhancedGitChange)[];
   onComplete: (selectedFiles: GitChange[], copyToClipboard?: boolean) => void;
   onCancel: () => void;
 }
+
+type SortBy = 'name' | 'updated' | 'size' | 'status';
+type FilterBy = 'all' | 'staged' | 'unstaged' | 'untracked' | 'modified' | 'added' | 'deleted';
+type ViewMode = 'files' | 'sort' | 'filter';
 
 interface FileItem extends GitChange {
   selected: boolean;
@@ -28,6 +33,10 @@ interface DisplayItem {
   deletions?: number;
   lastModified?: Date | string;
   diff?: string;
+  fileSize?: number;
+  isStaged?: boolean;
+  isUnstaged?: boolean;
+  isUntracked?: boolean;
   file?: string;
 }
 
@@ -172,6 +181,17 @@ function formatRelativeTime(date: Date | string | undefined): string {
   return 'just now';
 }
 
+// Format file size to human-readable string
+function formatFileSize(bytes: number): string {
+  if (!bytes || bytes === 0) return '0B';
+
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
+}
+
 const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCancel }) => {
   const { exit } = useApp();
   const [terminalSize, setTerminalSize] = useState({
@@ -183,10 +203,88 @@ const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCanc
   const [displayItems, setDisplayItems] = useState<DisplayItem[]>([]);
   const [tokenEstimates, setTokenEstimates] = useState<Map<string, number>>(new Map());
 
+  // Sorting and filtering state
+  const [viewMode, setViewMode] = useState<ViewMode>('files');
+  const [sortBy, setSortBy] = useState<SortBy>('name');
+  const [filterBy, setFilterBy] = useState<FilterBy>('all');
+  const [menuCursor, setMenuCursor] = useState(0);
+
+  // Apply sorting to files
+  const applySorting = (files: FileItem[], sort: SortBy): FileItem[] => {
+    return [...files].sort((a, b) => {
+      switch (sort) {
+        case 'name':
+          return a.file.localeCompare(b.file);
+        case 'updated':
+          if (a.lastModified && b.lastModified) {
+            return b.lastModified.getTime() - a.lastModified.getTime();
+          }
+          return 0;
+        case 'size':
+          const aTokens = tokenEstimates.get(a.file) || 0;
+          const bTokens = tokenEstimates.get(b.file) || 0;
+          return bTokens - aTokens;
+        case 'status':
+          return a.status.localeCompare(b.status);
+        default:
+          return 0;
+      }
+    });
+  };
+
+  // Calculate directory metrics for sorting
+  const getDirectoryMetrics = (dirFiles: FileItem[]) => {
+    const totalSize = dirFiles.reduce((sum, f) => sum + (tokenEstimates.get(f.file) || 0), 0);
+    const latestModified = dirFiles.reduce(
+      (latest, f) => {
+        if (!f.lastModified) return latest;
+        if (!latest) return f.lastModified;
+        return f.lastModified > latest ? f.lastModified : latest;
+      },
+      null as Date | null
+    );
+    const primaryStatus = dirFiles[0]?.status || 'modified';
+    return { totalSize, latestModified, primaryStatus };
+  };
+
+  // Apply filtering to files
+  const applyFiltering = (files: FileItem[], filter: FilterBy): FileItem[] => {
+    if (filter === 'all') return files;
+
+    return files.filter((file) => {
+      // Check if this is an enhanced change with staging info
+      const enhanced = file as EnhancedGitChange;
+
+      switch (filter) {
+        case 'staged':
+          return enhanced.isStaged === true;
+        case 'unstaged':
+          return enhanced.isUnstaged === true;
+        case 'untracked':
+          return enhanced.isUntracked === true;
+        case 'modified':
+          return file.status === 'modified';
+        case 'added':
+          return file.status === 'added';
+        case 'deleted':
+          return file.status === 'deleted';
+        default:
+          return true;
+      }
+    });
+  };
+
   // Initialize display items and calculate token estimates
   useEffect(() => {
     const initializeItems = async () => {
-      const files: FileItem[] = changes.map((change) => ({ ...change, selected: false }));
+      let files: FileItem[] = changes.map((change) => ({
+        ...change,
+        selected: false,
+        fileSize: (change as any).fileSize || 0,
+        isStaged: (change as any).isStaged || false,
+        isUnstaged: (change as any).isUnstaged || false,
+        isUntracked: (change as any).isUntracked || false,
+      }));
 
       // Calculate token estimates for all files
       const estimates = new Map<string, number>();
@@ -197,6 +295,10 @@ const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCanc
         })
       );
       setTokenEstimates(estimates);
+
+      // Apply filtering and sorting
+      files = applyFiltering(files, filterBy);
+      files = applySorting(files, sortBy);
 
       // Group files by directory
       const groupedFiles: Record<string, FileItem[]> = {};
@@ -211,7 +313,30 @@ const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCanc
 
       // Create display items with headers
       const items: DisplayItem[] = [];
-      const sortedDirs = Object.keys(groupedFiles).sort();
+
+      // Sort directories based on current sort criteria
+      const sortedDirs = Object.keys(groupedFiles).sort((a, b) => {
+        const aFiles = groupedFiles[a];
+        const bFiles = groupedFiles[b];
+        const aMetrics = getDirectoryMetrics(aFiles);
+        const bMetrics = getDirectoryMetrics(bFiles);
+
+        switch (sortBy) {
+          case 'name':
+            return a.localeCompare(b);
+          case 'updated':
+            if (aMetrics.latestModified && bMetrics.latestModified) {
+              return bMetrics.latestModified.getTime() - aMetrics.latestModified.getTime();
+            }
+            return 0;
+          case 'size':
+            return bMetrics.totalSize - aMetrics.totalSize;
+          case 'status':
+            return aMetrics.primaryStatus.localeCompare(bMetrics.primaryStatus);
+          default:
+            return a.localeCompare(b);
+        }
+      });
 
       for (const dir of sortedDirs) {
         const dirFiles = groupedFiles[dir];
@@ -235,6 +360,10 @@ const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCanc
             path: file.file,
             selected: file.selected,
             tokenEstimate: estimates.get(file.file) || 0,
+            fileSize: (file as any).fileSize || 0,
+            isStaged: (file as any).isStaged || false,
+            isUnstaged: (file as any).isUnstaged || false,
+            isUntracked: (file as any).isUntracked || false,
           });
         });
       }
@@ -243,7 +372,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCanc
     };
 
     initializeItems();
-  }, [changes]);
+  }, [changes, sortBy, filterBy]);
 
   const [cursor, setCursor] = useState(0);
   const [stats, setStats] = useState({
@@ -332,7 +461,50 @@ const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCanc
   };
 
   useInput((input, key) => {
-    if (key.escape || input === 'q' || input === 'Q') {
+    // Handle menu navigation first
+    if (viewMode === 'sort' || viewMode === 'filter') {
+      if (key.escape) {
+        setViewMode('files');
+        return;
+      }
+
+      if (key.upArrow || input === 'k') {
+        const maxOptions = viewMode === 'sort' ? 4 : 7; // 4 sort options, 7 filter options
+        setMenuCursor((prev) => (prev - 1 + maxOptions) % maxOptions);
+        return;
+      }
+
+      if (key.downArrow || input === 'j') {
+        const maxOptions = viewMode === 'sort' ? 4 : 7;
+        setMenuCursor((prev) => (prev + 1) % maxOptions);
+        return;
+      }
+
+      if (key.return) {
+        if (viewMode === 'sort') {
+          const sortOptions: SortBy[] = ['name', 'updated', 'size', 'status'];
+          setSortBy(sortOptions[menuCursor]);
+        } else if (viewMode === 'filter') {
+          const filterOptions: FilterBy[] = [
+            'all',
+            'staged',
+            'unstaged',
+            'untracked',
+            'modified',
+            'added',
+            'deleted',
+          ];
+          setFilterBy(filterOptions[menuCursor]);
+        }
+        setViewMode('files');
+        return;
+      }
+
+      return; // Don't process other keys in menu mode
+    }
+
+    // Regular file selection mode
+    if (key.escape) {
       onCancel();
       exit();
       return;
@@ -467,6 +639,20 @@ const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCanc
       });
       return;
     }
+
+    // Sort menu
+    if (input === 's' || input === 'S') {
+      setViewMode('sort');
+      setMenuCursor(0);
+      return;
+    }
+
+    // Filter menu
+    if (input === 'f' || input === 'F') {
+      setViewMode('filter');
+      setMenuCursor(0);
+      return;
+    }
   });
 
   return (
@@ -474,153 +660,263 @@ const FileSelector: React.FC<FileSelectorProps> = ({ changes, onComplete, onCanc
       {/* Header */}
       <Box borderStyle="round" borderColor="cyan" paddingX={1}>
         <Text color="cyan">DEX Interactive Mode</Text>
-        <Text color="gray"> - {changes.length} files changed</Text>
+        <Text color="gray"> - {changes.length} files</Text>
+        {filterBy !== 'all' && <Text color="yellow"> [{filterBy}]</Text>}
+        {sortBy !== 'name' && <Text color="yellow"> [sorted by {sortBy}]</Text>}
       </Box>
 
-      {/* Instructions */}
-      <Box paddingX={1} marginY={1}>
-        <Text color="white">Select files to include in extraction</Text>
-        <Text color="gray"> [Directory headers select all files in that directory]</Text>
-        <Text color="gray"> [Token estimates shown on the right]</Text>
-      </Box>
-
-      {/* Column headers */}
-      <Box paddingX={1} marginY={1}>
-        <Text color="gray"> </Text>
-        <Text color="gray"> </Text>
-        <Text color="gray"> </Text>
-        <Text color="gray" bold>
-          {'  File Path'.padEnd(Math.min(45, Math.max(25, terminalSize.columns - 30)))}
-        </Text>
-        <Text color="gray" bold>
-          {' '}
-          S{' '}
-        </Text>
-        <Text color="gray" bold>
-          {' '}
-          Add
-        </Text>
-        <Text color="gray" bold>
-          {' '}
-          Del
-        </Text>
-        <Text color="gray" bold>
-          {' '}
-          Modified
-        </Text>
-        <Text color="gray" bold>
-          {' '}
-          Tokens
-        </Text>
-      </Box>
-
-      {/* File list */}
-      <Box flexDirection="column" paddingX={1}>
-        {(() => {
-          // Calculate pagination
-          const headerHeight = 6;
-          const maxVisibleItems = Math.max(5, terminalSize.rows - headerHeight);
-          const startIndex = Math.max(
-            0,
-            Math.min(
-              cursor - Math.floor(maxVisibleItems / 2),
-              displayItems.length - maxVisibleItems
-            )
-          );
-          const endIndex = Math.min(displayItems.length, startIndex + maxVisibleItems);
-          const visibleItems = displayItems.slice(startIndex, endIndex);
-
-          return visibleItems.map((item, visibleIndex) => {
-            const actualIndex = startIndex + visibleIndex;
-            const isActive = actualIndex === cursor;
-
-            if (item.isHeader) {
-              // Directory header
-              const dirTokens = item.tokenEstimate || 0;
-              const dirTokenDisplay = formatTokens(dirTokens);
-              const headerText = `${item.path}/ (${item.fileCount} files, ${dirTokenDisplay} tokens)`;
-              const selectionIcon = item.selected ? '[x]' : item.mixed ? '[■]' : '[□]';
-
-              const headerColor = item.selected || item.mixed ? 'green' : 'white';
-
-              return (
-                <Box key={`header-${item.path}`}>
-                  <Text color={isActive ? 'cyan' : 'white'}>{isActive ? '>' : ' '}</Text>
-                  <Text color={headerColor}>{selectionIcon}</Text>
-                  <Text> </Text>
-                  <Text color={isActive ? 'cyan' : headerColor} bold>
-                    {headerText}
+      {/* Show menu or file list based on mode */}
+      {viewMode === 'sort' ? (
+        <Box flexDirection="column" paddingX={1} marginY={1}>
+          <Text color="yellow" bold>
+            Sort Files By:
+          </Text>
+          <Box marginTop={1} flexDirection="column">
+            {['name', 'updated', 'size', 'status'].map((option, i) => (
+              <Box key={option}>
+                <Text color={i === menuCursor ? 'cyan' : 'white'}>
+                  {i === menuCursor ? '>' : ' '} {option}
+                  {sortBy === option && <Text color="green"> ✓</Text>}
+                </Text>
+              </Box>
+            ))}
+          </Box>
+          <Box marginTop={1}>
+            <Text color="gray">Press ENTER to select, ESC to cancel</Text>
+          </Box>
+        </Box>
+      ) : viewMode === 'filter' ? (
+        <Box flexDirection="column" paddingX={1} marginY={1}>
+          <Text color="yellow" bold>
+            Filter Files:
+          </Text>
+          <Box marginTop={1} flexDirection="column">
+            {['all', 'staged', 'unstaged', 'untracked', 'modified', 'added', 'deleted'].map(
+              (option, i) => (
+                <Box key={option}>
+                  <Text color={i === menuCursor ? 'cyan' : 'white'}>
+                    {i === menuCursor ? '>' : ' '} {option}
+                    {filterBy === option && <Text color="green"> ✓</Text>}
                   </Text>
-                  <Text color="gray"> ────── all</Text>
                 </Box>
+              )
+            )}
+          </Box>
+          <Box marginTop={1}>
+            <Text color="gray">Press ENTER to select, ESC to cancel</Text>
+          </Box>
+        </Box>
+      ) : (
+        <>
+          {/* Instructions */}
+          <Box paddingX={1} marginY={1}>
+            <Text color="white">Select files to include in extraction</Text>
+            <Text color="gray"> [Directories select all files within]</Text>
+          </Box>
+
+          {/* Column headers */}
+          <Box paddingX={1} marginY={1}>
+            <Text color="gray"> </Text>
+            <Text color="gray"> </Text>
+            <Text color="gray"> </Text>
+            <Text color="gray" bold>
+              {'  File Path'.padEnd(Math.min(45, Math.max(25, terminalSize.columns - 30)))}
+            </Text>
+            <Text color="gray" bold>
+              {' '}
+              S{' '}
+            </Text>
+            <Text color="gray" bold>
+              {' '}
+              +/-{' '}
+            </Text>
+            <Text color="gray" bold>
+              {' '}
+              Size{' '}
+            </Text>
+            <Text color="gray" bold>
+              {' '}
+              Last{' '}
+            </Text>
+            <Text color="gray" bold>
+              {' '}
+              Tokens
+            </Text>
+          </Box>
+
+          {/* File list */}
+          <Box flexDirection="column" paddingX={1}>
+            {(() => {
+              // Calculate pagination
+              const headerHeight = 6;
+              const maxVisibleItems = Math.max(5, terminalSize.rows - headerHeight);
+              const startIndex = Math.max(
+                0,
+                Math.min(
+                  cursor - Math.floor(maxVisibleItems / 2),
+                  displayItems.length - maxVisibleItems
+                )
               );
-            } else {
-              // File item
-              const textColor = item.selected ? 'green' : 'white';
-              const pathWidth = Math.min(45, Math.max(25, terminalSize.columns - 30));
-              const truncatedPath = truncatePath(item.path, pathWidth);
-              const timeAgo = formatRelativeTime(item.lastModified);
-              const statusChar = (item.status || 'unknown').charAt(0).toUpperCase();
-              const additions = (item.additions || 0).toString();
-              const deletions = (item.deletions || 0).toString();
-              const tokens = item.tokenEstimate || 0;
-              const tokenDisplay = formatTokens(tokens);
+              const endIndex = Math.min(displayItems.length, startIndex + maxVisibleItems);
+              const visibleItems = displayItems.slice(startIndex, endIndex);
 
-              return (
-                <Box key={item.path}>
-                  <Text color={isActive ? 'cyan' : textColor}>{isActive ? '>' : ' '}</Text>
-                  <Text color={item.selected ? 'green' : 'gray'} bold={item.selected}>
-                    [{item.selected ? '✓' : ' '}]
-                  </Text>
-                  <Text> </Text>
-                  <Text
-                    color={isActive ? (item.selected ? 'green' : 'cyan') : textColor}
-                    bold={item.selected}
-                  >
-                    {'  ' + truncatedPath.padEnd(pathWidth)}
-                  </Text>
-                  <Text color={textColor}>{` ${statusChar} `}</Text>
-                  <Text color={textColor}>{`+${additions.padStart(3)}`}</Text>
-                  <Text color={textColor}>{`-${deletions.padStart(3)}`}</Text>
-                  <Text color={textColor}>{` ${timeAgo.padStart(7)}`}</Text>
-                  <Text color="yellow">{` ${tokenDisplay.padStart(6)} tok`}</Text>
-                </Box>
-              );
-            }
-          });
-        })()}
-      </Box>
+              return visibleItems.map((item, visibleIndex) => {
+                const actualIndex = startIndex + visibleIndex;
+                const isActive = actualIndex === cursor;
 
-      {/* Status bar */}
-      <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1}>
-        <Text>
-          {`Selected: ${stats.selectedCount} files | ${stats.totalAdditions} additions | ${stats.totalDeletions} deletions | ~${(stats.estimatedTokens / 1000).toFixed(1)}K tokens`}
-        </Text>
-        {displayItems.length > 10 && (
-          <Text color="gray">{` | ${cursor + 1}/${displayItems.length}`}</Text>
-        )}
-      </Box>
+                if (item.isHeader) {
+                  // Directory header
+                  const dirFiles = item.files || [];
+                  const dirMetrics = getDirectoryMetrics(dirFiles);
+                  const dirTokens = dirMetrics.totalSize;
+                  const dirTokenDisplay = formatTokens(dirTokens);
 
-      {/* Help */}
+                  // Calculate total size in bytes
+                  const totalSizeBytes = dirFiles.reduce(
+                    (sum, f) => sum + ((f as any).fileSize || 0),
+                    0
+                  );
+                  const sizeDisplay = totalSizeBytes > 0 ? formatFileSize(totalSizeBytes) : '';
+
+                  // Count file statuses
+                  const statusCounts = dirFiles.reduce(
+                    (acc, f) => {
+                      const enhanced = f as any;
+                      if (enhanced.isStaged) acc.staged++;
+                      else if (enhanced.isUnstaged) acc.unstaged++;
+                      else if (enhanced.isUntracked) acc.untracked++;
+
+                      if (f.status === 'added') acc.added++;
+                      else if (f.status === 'modified') acc.modified++;
+                      else if (f.status === 'deleted') acc.deleted++;
+
+                      return acc;
+                    },
+                    { staged: 0, unstaged: 0, untracked: 0, added: 0, modified: 0, deleted: 0 }
+                  );
+
+                  // Build status summary
+                  const statusParts = [];
+                  if (statusCounts.staged > 0) statusParts.push(`${statusCounts.staged}●`);
+                  if (statusCounts.unstaged > 0) statusParts.push(`${statusCounts.unstaged}○`);
+                  if (statusCounts.untracked > 0) statusParts.push(`${statusCounts.untracked}?`);
+                  const statusSummary = statusParts.length > 0 ? ` [${statusParts.join(' ')}]` : '';
+
+                  const headerText = `${item.path}/ (${item.fileCount} files${sizeDisplay ? ', ' + sizeDisplay : ''}, ${dirTokenDisplay} tokens)${statusSummary}`;
+                  const selectionIcon = item.selected ? '[x]' : item.mixed ? '[■]' : '[□]';
+
+                  const headerColor = item.selected || item.mixed ? 'green' : 'white';
+
+                  return (
+                    <Box key={`header-${item.path}`}>
+                      <Text color={isActive ? 'cyan' : 'white'}>{isActive ? '>' : ' '}</Text>
+                      <Text color={headerColor}>{selectionIcon}</Text>
+                      <Text> </Text>
+                      <Text color={isActive ? 'cyan' : headerColor} bold>
+                        {headerText}
+                      </Text>
+                      <Text color="gray"> ────── all</Text>
+                    </Box>
+                  );
+                } else {
+                  // File item
+                  const textColor = item.selected ? 'green' : 'white';
+                  const pathWidth = Math.min(45, Math.max(25, terminalSize.columns - 30));
+                  const truncatedPath = truncatePath(item.path, pathWidth);
+                  const timeAgo = formatRelativeTime(item.lastModified);
+                  const statusChar = (item.status || 'unknown').charAt(0).toUpperCase();
+                  const statusColor =
+                    {
+                      A: 'green',
+                      M: 'yellow',
+                      D: 'red',
+                      R: 'blue',
+                    }[statusChar] || 'gray';
+                  const additions = (item.additions || 0).toString();
+                  const deletions = (item.deletions || 0).toString();
+                  const tokens = item.tokenEstimate || 0;
+                  const tokenDisplay = formatTokens(tokens);
+
+                  // Calculate actual file size
+                  const fileSize = (item as any).fileSize;
+                  const sizeDisplay = fileSize ? formatFileSize(fileSize) : '?';
+
+                  // Add status indicators
+                  let statusIndicator = '';
+                  const enhanced = item as any;
+                  if (enhanced.isStaged) statusIndicator = '●';
+                  else if (enhanced.isUnstaged) statusIndicator = '○';
+                  else if (enhanced.isUntracked) statusIndicator = '?';
+
+                  return (
+                    <Box key={item.path}>
+                      <Text color={isActive ? 'cyan' : textColor}>{isActive ? '>' : ' '}</Text>
+                      <Text color={item.selected ? 'green' : 'gray'} bold={item.selected}>
+                        [{item.selected ? '✓' : ' '}]
+                      </Text>
+                      <Text> </Text>
+                      <Text
+                        color={isActive ? (item.selected ? 'green' : 'cyan') : textColor}
+                        bold={item.selected}
+                      >
+                        {'  ' + truncatedPath.padEnd(pathWidth)}
+                      </Text>
+                      <Text color={statusColor} bold>{`${statusIndicator}${statusChar} `}</Text>
+                      <Text color="green">{`+${additions.padStart(3)}`}</Text>
+                      <Text color="red">{`-${deletions.padStart(3)}`}</Text>
+                      <Text color="gray">{` ${sizeDisplay.padStart(6)}`}</Text>
+                      <Text color="gray">{` ${timeAgo.padStart(7)}`}</Text>
+                      <Text color="yellow">{` ${tokenDisplay.padStart(5)}t`}</Text>
+                    </Box>
+                  );
+                }
+              });
+            })()}
+          </Box>
+
+          {/* Status bar */}
+          <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1}>
+            <Text>
+              {`Selected: ${stats.selectedCount} files | ${stats.totalAdditions} additions | ${stats.totalDeletions} deletions | ~${(stats.estimatedTokens / 1000).toFixed(1)}K tokens`}
+            </Text>
+            {displayItems.length > 10 && (
+              <Text color="gray">{` | ${cursor + 1}/${displayItems.length}`}</Text>
+            )}
+          </Box>
+        </>
+      )}
+
+      {/* Help - simplified and contextual */}
       <Box paddingX={1} marginTop={1}>
-        <Text color="cyan">↑↓/jk</Text>
-        <Text color="whiteBright"> navigate | </Text>
-        <Text color="cyan">TAB</Text>
-        <Text color="whiteBright"> next dir | </Text>
-        <Text color="cyan">⇧TAB</Text>
-        <Text color="whiteBright"> prev dir | </Text>
-        <Text color="cyan">SPACE</Text>
-        <Text color="whiteBright"> select | </Text>
-        <Text color="cyan">a</Text>
-        <Text color="whiteBright"> all | </Text>
-        <Text color="cyan">n</Text>
-        <Text color="whiteBright"> none | </Text>
-        <Text color="cyan">c</Text>
-        <Text color="whiteBright"> copy | </Text>
-        <Text color="cyan">ENTER</Text>
-        <Text color="whiteBright"> confirm | </Text>
-        <Text color="cyan">ESC</Text>
-        <Text color="whiteBright"> cancel</Text>
+        {viewMode === 'files' ? (
+          <Box>
+            <Text color="cyan">↑↓</Text>
+            <Text color="white"> move | </Text>
+            <Text color="cyan">SPACE</Text>
+            <Text color="white"> select | </Text>
+            <Text color="cyan">a/n</Text>
+            <Text color="white"> all/none | </Text>
+            <Text color="cyan">s</Text>
+            <Text color="white"> sort | </Text>
+            <Text color="cyan">f</Text>
+            <Text color="white"> filter | </Text>
+            <Text color="cyan">c</Text>
+            <Text color="white"> copy | </Text>
+            <Text color="cyan">ENTER</Text>
+            <Text color="white"> confirm | </Text>
+            <Text color="cyan">ESC</Text>
+            <Text color="white"> cancel</Text>
+          </Box>
+        ) : (
+          <Box>
+            <Text color="cyan">↑↓</Text>
+            <Text color="white"> select option | </Text>
+            <Text color="cyan">ENTER</Text>
+            <Text color="white"> apply | </Text>
+            <Text color="cyan">ESC</Text>
+            <Text color="white"> back</Text>
+          </Box>
+        )}
       </Box>
     </Box>
   );
