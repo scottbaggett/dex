@@ -1,5 +1,5 @@
 # DEX
-AI-powered context extraction and codebase analysis tool. Generate precise, token-efficient context for any AI agent or workflow.
+Context extraction and codebase analysis tool. Generate precise, token-efficient context for any AI agent or workflow.
 
 <p align="center">
   <img src="https://img.shields.io/badge/Token_Efficiency-90%25_Reduction-cyan?style=for-the-badge" />
@@ -8,11 +8,12 @@ AI-powered context extraction and codebase analysis tool. Generate precise, toke
 </p>
 
 ```bash
-# AI-powered file selection for new agent onboarding
-dex bootstrap --export markdown
 
-# Generate context for specific tasks using AI
-dex generate "implement user authentication" --max-files 15
+# Extract - analyze recent changes
+dex HEAD~5..HEAD --format markdown
+
+# Distill - compress entire codebase
+dex distill . --ai-action audit
 
 # Visual API tree of your codebase structure
 dex tree src/ --show-types --show-params
@@ -32,9 +33,7 @@ dex distill . --ai-action audit
 DEX transforms how you work with AI agents by solving the context engineering problem:
 
 - **🎯 Precision Over Volume**: Extract exactly what matters, not everything
-- **🤖 AI-Powered Selection**: Let AI choose the most relevant files for your task
 - **📊 Token Efficiency**: 90% reduction in token usage through smart compression
-- **🔄 Change Tracking**: Snapshot-based workflow for efficient iteration
 - **🌳 Visual Understanding**: Beautiful API trees and codebase structure visualization
 - **⚡ Multi-Format**: Output optimized for any AI agent or workflow
 
@@ -47,137 +46,10 @@ npm install -g dex
 # Initialize in your project
 cd your-project
 dex init
-
-# Start with AI-powered codebase overview
-dex bootstrap
-
-# Generate context for a specific task
-dex generate "add rate limiting to API endpoints"
+dex -c
 ```
 
 ## Core Commands
-
-### 🤖 AI-Powered Context Generation
-
-**Bootstrap Agent Knowledge**
-```bash
-dex bootstrap                    # AI selects core files for agent onboarding
-dex bootstrap --max-files 30     # Customize selection size
-dex bootstrap --dry-run          # Preview selection without output
-```
-
-**Example Output:**
-```
-🤖 Analyzing codebase with AI...
-✅ Analysis complete • Found 18 relevant files from 247 total
-
-File Selection Summary:
-────────────────────────────────────────
-🔴 High Priority:    8 files
-🟠 Medium Priority:  7 files
-🔵 Low Priority:     3 files
-────────────────────────────────────────
-💾 Total Context: 12k tokens
-
-High Priority Files:
-  📁 src/
-    📄 main.ts                    (Entry point, 450 tokens)
-    📄 app.ts                     (Core app logic, 380 tokens)
-    📄 types/index.ts             (Type definitions, 290 tokens)
-  📁 src/core/
-    📄 context-engine.ts          (Main extraction engine, 520 tokens)
-    📄 git-extractor.ts           (Git operations, 410 tokens)
-
-✅ Context exported to .dex/dex.bootstrap.main.md
-```
-
-**Task-Driven File Selection**
-```bash
-dex generate "fix memory leaks"                # AI selects relevant files
-dex generate "implement OAuth" --max-files 10  # Limit selection size
-dex generate "security audit" --export json    # Export in specific format
-```
-
-**Example Output:**
-```
-🧠 Analyzing task: "implement OAuth"
-🔍 Scanning codebase structure...
-🎯 AI selecting most relevant files...
-
-AI Reasoning:
-• Authentication-related files for OAuth integration
-• Configuration files for environment setup  
-• API route handlers that need protection
-• User model for storing OAuth tokens
-
-Selected Files (8/247):
-🔴 src/auth/passport.ts          (Current auth strategy)
-🔴 src/routes/auth.ts            (Auth endpoints)
-🔴 src/models/User.ts            (User model)
-🟠 src/config/env.ts             (Environment config)
-🟠 src/middleware/auth.ts        (Auth middleware)
-🟠 src/types/auth.ts             (Auth types)
-🔵 src/utils/jwt.ts              (Token utilities)
-🔵 package.json                  (Dependencies)
-
-💾 Total Context: 8.2k tokens
-✅ Context saved to .dex/dex.generate.oauth.md
-```
-
-### 📸 Snapshot Management
-
-**Create & Use Snapshots**
-```bash
-dex snapshot create "clean-slate"     # Create named snapshot
-dex snapshot create -m "Pre-refactor" # With description
-dex snapshot list                     # View all snapshots
-dex snapshot diff main-features       # Compare with snapshot
-```
-
-**Example Output:**
-```bash
-# Creating a snapshot
-$ dex snapshot create "pre-refactor" -m "Before auth system refactor"
-📸 Creating snapshot...
-✅ Snapshot created: pre-refactor (snap_1704123456)
-   📁 Captured: 89 files
-   🏷️  Message: Before auth system refactor
-   📊 Size: 2.1MB
-
-# Listing snapshots  
-$ dex snapshot list
-📸 Available Snapshots:
-
-pre-refactor     (2 hours ago)
-├── ID: snap_1704123456
-├── Files: 89 tracked
-├── Message: Before auth system refactor
-└── Size: 2.1MB
-
-clean-start      (1 day ago)  
-├── ID: snap_1704037056
-├── Files: 67 tracked
-├── Message: Initial project setup
-└── Size: 1.8MB
-
-# Comparing with snapshot
-$ dex snapshot diff pre-refactor
-📊 Changes since 'pre-refactor':
-
-🟢 Added (3 files):
-   └── src/auth/oauth-provider.ts
-   └── src/auth/strategies/google.ts  
-   └── src/types/oauth.ts
-
-🟡 Modified (5 files):
-   └── src/auth/passport.ts          (+15 -8 lines)
-   └── src/routes/auth.ts            (+42 -12 lines)
-   └── src/models/User.ts            (+8 -2 lines)
-   └── package.json                  (+3 -0 lines)
-   └── src/config/env.ts             (+6 -1 lines)
-
-📈 Total: +74 lines, -23 lines across 8 files
-```
 
 ### 🔍 Change Extraction
 
@@ -201,7 +73,7 @@ dex --select --format json   # Interactive + custom format
 **API Trees**
 ```bash
 dex tree src/                          # Visual API structure
-dex tree src/ --show-types             # Include function signatures  
+dex tree src/ --show-types             # Include function signatures
 dex tree src/ --format outline         # Different view format
 dex tree . --group-by type --show-types # Organized by type with details
 ```
@@ -227,7 +99,7 @@ dex tree . --group-by type --show-types # Organized by type with details
 │   ├── 📁 routes/
 │   │   ├── 📄 auth.ts
 │   │   │   ├── 📤 POST /auth/login
-│   │   │   ├── 📤 POST /auth/logout  
+│   │   │   ├── 📤 POST /auth/logout
 │   │   │   └── 📤 GET /auth/profile
 │   │   └── 📄 api.ts
 │   │       ├── 📤 GET /api/health
@@ -241,13 +113,12 @@ dex tree . --group-by type --show-types # Organized by type with details
 📊 Summary: 15 files, 23 exports, 8 classes, 12 functions, 5 interfaces
 ```
 
-### 🗜️ Codebase Compression
+### 🗜️ Codebase Distillation
 
 **Distillation**
 ```bash
 dex distill .                         # Compress entire codebase
 dex distill src/                      # Distill specific directory
-dex distill . --ai-action security    # With AI analysis prompt
 dex distill . --since HEAD~10         # Only recent changes
 ```
 
@@ -276,25 +147,16 @@ class ContextEngine {
   applyFilters(files: string[]): string[]
 }
 
-// Git operations wrapper  
+// Git operations wrapper
 class GitExtractor {
   getDiff(range: string): Promise<GitDiff[]>
   getFileContents(path: string): Promise<string>
 }
 ```
 
-### API Layer (src/routes/)
-- **Authentication**: JWT-based auth with login/logout endpoints
-- **Extraction API**: POST /api/extract → context generation
-- **Health Check**: GET /api/health → service status
-
-### Type System (src/types/)
-- Core interfaces: `ExtractedContext`, `GitDiff`, `EngineOptions`
-- Union types for output formats and extraction depths
-
 ## Token Efficiency
 - **Original size**: 847 files, ~2.1M characters
-- **Distilled size**: 89 key files, ~180k characters  
+- **Distilled size**: 89 key files, ~180k characters
 - **Compression ratio**: 91.4% reduction
 - **Estimated tokens**: 45k → 4.2k (90% savings)
 
@@ -448,7 +310,7 @@ DEX automatically saves outputs to `.dex/` with descriptive filenames:
 ```
 .dex/
 ├── dex.extract.current.xml          # Current changes
-├── dex.extract.staged.xml            # Staged changes  
+├── dex.extract.staged.xml            # Staged changes
 ├── dex.bootstrap.xml                 # Bootstrap context
 ├── dex.distill.src.md               # Distilled codebase
 ├── dex.tree.src.md                  # API tree visualization
@@ -524,7 +386,7 @@ $ dex session end
 
 📊 Session Summary:
    🟢 Added: 4 files
-   🟡 Modified: 7 files  
+   🟡 Modified: 7 files
    📈 Total: +156 lines, -23 lines
 
 ✅ Full session context saved to .dex/dex.session.user-profiles.xml
@@ -581,7 +443,7 @@ DEX is built for token efficiency:
 
 DEX works with any text-based language, with enhanced support for:
 - TypeScript/JavaScript
-- Python  
+- Python
 - Go
 - Java
 - Rust

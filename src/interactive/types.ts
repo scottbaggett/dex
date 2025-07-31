@@ -1,20 +1,20 @@
-import { GitChange } from '../types';
+import type { GitChange } from "../types";
 
 export interface FileItem extends GitChange {
-  selected: boolean;
+    selected: boolean;
 }
 
 export interface InteractiveState {
-  files: FileItem[];
-  cursor: number;
-  selectedCount: number;
-  totalAdditions: number;
-  totalDeletions: number;
-  estimatedTokens: number;
+    files: FileItem[];
+    cursor: number;
+    selectedCount: number;
+    totalAdditions: number;
+    totalDeletions: number;
+    estimatedTokens: number;
 }
 
 export interface InteractiveModeProps {
-  changes: GitChange[];
-  onComplete: (selectedFiles: GitChange[], copyToClipboard?: boolean) => void;
-  onCancel: () => void;
+    changes: GitChange[];
+    onComplete: (selectedFiles: GitChange[], copyToClipboard?: boolean) => void;
+    onCancel: () => void;
 }

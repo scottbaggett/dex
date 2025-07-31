@@ -52,7 +52,7 @@ const DEFAULT_THRESHOLDS: PerformanceThresholds = {
     tokenEstimationTime: 5, // 5 seconds
     totalTime: 60, // 1 minute
     filesPerSecond: 10,
-    tokensPerSecond: 5000
+    tokensPerSecond: 5000,
 };
 
 /**
@@ -76,7 +76,7 @@ export class PerformanceMonitor {
         const metric: PerformanceMetric = {
             name,
             startTime: Date.now(),
-            metadata
+            metadata,
         };
 
         this.metrics.set(name, metric);
@@ -140,36 +140,40 @@ export class PerformanceMonitor {
 
         // Extract phase durations
         const phases = {
-            scanning: this.getPhaseDuration('scanning'),
-            prioritization: this.getPhaseDuration('prioritization'),
-            tokenEstimation: this.getPhaseDuration('tokenEstimation'),
-            fileReading: this.getPhaseDuration('fileReading'),
-            caching: this.getPhaseDuration('caching'),
-            truncation: this.getPhaseDuration('truncation')
+            scanning: this.getPhaseDuration("scanning"),
+            prioritization: this.getPhaseDuration("prioritization"),
+            tokenEstimation: this.getPhaseDuration("tokenEstimation"),
+            fileReading: this.getPhaseDuration("fileReading"),
+            caching: this.getPhaseDuration("caching"),
+            truncation: this.getPhaseDuration("truncation"),
         };
 
         // Extract metrics
         const metrics = {
-            filesScanned: this.getCounter('filesScanned'),
-            filesProcessed: this.getCounter('filesProcessed'),
-            totalTokens: this.getCounter('totalTokens'),
-            cacheHits: this.getCounter('cacheHits'),
-            cacheMisses: this.getCounter('cacheMisses'),
-            parallelOperations: this.getCounter('parallelOperations')
+            filesScanned: this.getCounter("filesScanned"),
+            filesProcessed: this.getCounter("filesProcessed"),
+            totalTokens: this.getCounter("totalTokens"),
+            cacheHits: this.getCounter("cacheHits"),
+            cacheMisses: this.getCounter("cacheMisses"),
+            parallelOperations: this.getCounter("parallelOperations"),
         };
 
         // Identify bottlenecks
         const bottlenecks = this.identifyBottlenecks(phases, totalDuration);
 
         // Generate recommendations
-        const recommendations = this.generateRecommendations(phases, metrics, totalDuration);
+        const recommendations = this.generateRecommendations(
+            phases,
+            metrics,
+            totalDuration,
+        );
 
         return {
             totalDuration,
             phases,
             metrics,
             bottlenecks,
-            recommendations
+            recommendations,
         };
     }
 
@@ -177,30 +181,49 @@ export class PerformanceMonitor {
      * Identify performance bottlenecks
      */
     private identifyBottlenecks(
-        phases: PerformanceReport['phases'],
-        totalDuration: number
-    ): PerformanceReport['bottlenecks'] {
-        const bottlenecks: PerformanceReport['bottlenecks'] = [];
+        phases: PerformanceReport["phases"],
+        totalDuration: number,
+    ): PerformanceReport["bottlenecks"] {
+        const bottlenecks: PerformanceReport["bottlenecks"] = [];
 
         // Check each phase against thresholds
         const phaseChecks = [
-            { name: 'scanning', duration: phases.scanning, threshold: this.thresholds.scanningTime * 1000 },
-            { name: 'prioritization', duration: phases.prioritization, threshold: this.thresholds.prioritizationTime * 1000 },
-            { name: 'tokenEstimation', duration: phases.tokenEstimation, threshold: this.thresholds.tokenEstimationTime * 1000 },
-            { name: 'fileReading', duration: phases.fileReading, threshold: 10000 }, // 10 seconds
-            { name: 'caching', duration: phases.caching, threshold: 2000 } // 2 seconds
+            {
+                name: "scanning",
+                duration: phases.scanning,
+                threshold: this.thresholds.scanningTime * 1000,
+            },
+            {
+                name: "prioritization",
+                duration: phases.prioritization,
+                threshold: this.thresholds.prioritizationTime * 1000,
+            },
+            {
+                name: "tokenEstimation",
+                duration: phases.tokenEstimation,
+                threshold: this.thresholds.tokenEstimationTime * 1000,
+            },
+            {
+                name: "fileReading",
+                duration: phases.fileReading,
+                threshold: 10000,
+            }, // 10 seconds
+            { name: "caching", duration: phases.caching, threshold: 2000 }, // 2 seconds
         ];
 
         for (const check of phaseChecks) {
             if (check.duration > check.threshold) {
                 const percentage = (check.duration / totalDuration) * 100;
-                const suggestions = this.getBottleneckSuggestions(check.name, check.duration);
+                const suggestions = this.getBottleneckSuggestions(
+                    check.name,
+                    check.duration,
+                );
 
                 bottlenecks.push({
                     phase: check.name,
                     duration: check.duration,
                     percentage,
-                    suggestions
+                    suggestions,
                 });
             }
         }
@@ -214,42 +237,69 @@ export class PerformanceMonitor {
     /**
      * Get suggestions for specific bottlenecks
      */
-    private getBottleneckSuggestions(phase: string, duration: number): string[] {
+    private getBottleneckSuggestions(
+        phase: string,
+        duration: number,
+    ): string[] {
         const suggestions: string[] = [];
 
         switch (phase) {
-            case 'scanning':
-                suggestions.push('Consider using more restrictive exclude patterns');
-                suggestions.push('Reduce maxFiles limit for faster scanning');
-                suggestions.push('Use includePatterns to focus on specific file types');
+            case "scanning":
+                suggestions.push(
+                    "Consider using more restrictive exclude patterns",
+                );
+                suggestions.push("Reduce maxFiles limit for faster scanning");
+                suggestions.push(
+                    "Use includePatterns to focus on specific file types",
+                );
                 if (duration > 20000) {
-                    suggestions.push('Repository is very large - consider analyzing specific directories');
+                    suggestions.push(
+                        "Repository is very large - consider analyzing specific directories",
+                    );
                 }
                 break;
 
-            case 'prioritization':
-                suggestions.push('AI provider response is slow - consider switching providers');
-                suggestions.push('Use more specific prompts to reduce analysis complexity');
-                suggestions.push('Enable caching to avoid re-analyzing similar prompts');
+            case "prioritization":
+                suggestions.push(
+                    "AI provider response is slow - consider switching providers",
+                );
+                suggestions.push(
+                    "Use more specific prompts to reduce analysis complexity",
+                );
+                suggestions.push(
+                    "Enable caching to avoid re-analyzing similar prompts",
+                );
                 if (duration > 60000) {
-                    suggestions.push('Consider reducing the number of files sent for prioritization');
+                    suggestions.push(
+                        "Consider reducing the number of files sent for prioritization",
+                    );
                 }
                 break;
 
-            case 'tokenEstimation':
-                suggestions.push('Token estimation is slow - consider optimizing file reading');
-                suggestions.push('Enable parallel processing for token estimation');
+            case "tokenEstimation":
+                suggestions.push(
+                    "Token estimation is slow - consider optimizing file reading",
+                );
+                suggestions.push(
+                    "Enable parallel processing for token estimation",
+                );
                 break;
 
-            case 'fileReading':
-                suggestions.push('File I/O is slow - consider using SSD storage');
-                suggestions.push('Enable parallel file reading');
-                suggestions.push('Consider file size limits to skip very large files');
+            case "fileReading":
+                suggestions.push(
+                    "File I/O is slow - consider using SSD storage",
+                );
+                suggestions.push("Enable parallel file reading");
+                suggestions.push(
+                    "Consider file size limits to skip very large files",
+                );
                 break;
 
-            case 'caching':
-                suggestions.push('Cache operations are slow - consider reducing cache size');
-                suggestions.push('Check disk space and I/O performance');
+            case "caching":
+                suggestions.push(
+                    "Cache operations are slow - consider reducing cache size",
+                );
+                suggestions.push("Check disk space and I/O performance");
                 break;
         }
 
@@ -260,27 +310,33 @@ export class PerformanceMonitor {
      * Generate performance recommendations
      */
     private generateRecommendations(
-        phases: PerformanceReport['phases'],
-        metrics: PerformanceReport['metrics'],
-        totalDuration: number
+        phases: PerformanceReport["phases"],
+        metrics: PerformanceReport["metrics"],
+        totalDuration: number,
     ): string[] {
         const recommendations: string[] = [];
 
         // Overall performance
         if (totalDuration > this.thresholds.totalTime * 1000) {
-            recommendations.push('Analysis took longer than expected - consider optimizations');
+            recommendations.push(
+                "Analysis took longer than expected - consider optimizations",
+            );
         }
 
         // Files per second
         const filesPerSecond = metrics.filesProcessed / (totalDuration / 1000);
         if (filesPerSecond < this.thresholds.filesPerSecond) {
-            recommendations.push(`File processing rate is low (${filesPerSecond.toFixed(1)}/sec) - enable parallel processing`);
+            recommendations.push(
+                `File processing rate is low (${filesPerSecond.toFixed(1)}/sec) - enable parallel processing`,
+            );
         }
 
         // Tokens per second
         const tokensPerSecond = metrics.totalTokens / (totalDuration / 1000);
         if (tokensPerSecond < this.thresholds.tokensPerSecond) {
-            recommendations.push(`Token processing rate is low (${tokensPerSecond.toFixed(0)}/sec) - optimize token estimation`);
+            recommendations.push(
+                `Token processing rate is low (${tokensPerSecond.toFixed(0)}/sec) - optimize token estimation`,
+            );
         }
 
         // Cache efficiency
@@ -288,21 +344,29 @@ export class PerformanceMonitor {
         if (totalCacheOperations > 0) {
             const cacheHitRate = metrics.cacheHits / totalCacheOperations;
             if (cacheHitRate < 0.3) {
-                recommendations.push(`Low cache hit rate (${(cacheHitRate * 100).toFixed(1)}%) - consider adjusting cache TTL`);
+                recommendations.push(
+                    `Low cache hit rate (${(cacheHitRate * 100).toFixed(1)}%) - consider adjusting cache TTL`,
+                );
             } else if (cacheHitRate > 0.8) {
-                recommendations.push(`High cache hit rate (${(cacheHitRate * 100).toFixed(1)}%) - good cache performance`);
+                recommendations.push(
+                    `High cache hit rate (${(cacheHitRate * 100).toFixed(1)}%) - good cache performance`,
+                );
             }
         }
 
         // Parallel processing
         if (metrics.parallelOperations === 0) {
-            recommendations.push('No parallel operations detected - enable parallel processing for better performance');
+            recommendations.push(
+                "No parallel operations detected - enable parallel processing for better performance",
+            );
         }
 
         // Repository size recommendations
         if (metrics.filesScanned > 1000) {
-            recommendations.push('Large repository detected - consider using chunked analysis');
-            recommendations.push('Use more specific prompts to reduce scope');
+            recommendations.push(
+                "Large repository detected - consider using chunked analysis",
+            );
+            recommendations.push("Use more specific prompts to reduce scope");
         }
 
         return recommendations;
@@ -314,51 +378,61 @@ export class PerformanceMonitor {
     formatReport(report: PerformanceReport): string {
         const lines: string[] = [];
 
-        lines.push('=== Performance Report ===');
-        lines.push(`Total Duration: ${(report.totalDuration / 1000).toFixed(2)}s`);
-        lines.push('');
+        lines.push("=== Performance Report ===");
+        lines.push(
+            `Total Duration: ${(report.totalDuration / 1000).toFixed(2)}s`,
+        );
+        lines.push("");
 
         // Phase breakdown
-        lines.push('Phase Breakdown:');
+        lines.push("Phase Breakdown:");
         Object.entries(report.phases).forEach(([phase, duration]) => {
             if (duration > 0) {
                 const percentage = (duration / report.totalDuration) * 100;
-                lines.push(`  ${phase}: ${(duration / 1000).toFixed(2)}s (${percentage.toFixed(1)}%)`);
+                lines.push(
+                    `  ${phase}: ${(duration / 1000).toFixed(2)}s (${percentage.toFixed(1)}%)`,
+                );
             }
         });
-        lines.push('');
+        lines.push("");
 
         // Metrics
-        lines.push('Metrics:');
+        lines.push("Metrics:");
         lines.push(`  Files Scanned: ${report.metrics.filesScanned}`);
         lines.push(`  Files Processed: ${report.metrics.filesProcessed}`);
-        lines.push(`  Total Tokens: ${report.metrics.totalTokens.toLocaleString()}`);
+        lines.push(
+            `  Total Tokens: ${report.metrics.totalTokens.toLocaleString()}`,
+        );
         lines.push(`  Cache Hits: ${report.metrics.cacheHits}`);
         lines.push(`  Cache Misses: ${report.metrics.cacheMisses}`);
-        lines.push(`  Parallel Operations: ${report.metrics.parallelOperations}`);
-        lines.push('');
+        lines.push(
+            `  Parallel Operations: ${report.metrics.parallelOperations}`,
+        );
+        lines.push("");
 
         // Bottlenecks
         if (report.bottlenecks.length > 0) {
-            lines.push('Performance Bottlenecks:');
-            report.bottlenecks.forEach(bottleneck => {
-                lines.push(`  ${bottleneck.phase}: ${(bottleneck.duration / 1000).toFixed(2)}s (${bottleneck.percentage.toFixed(1)}%)`);
-                bottleneck.suggestions.forEach(suggestion => {
+            lines.push("Performance Bottlenecks:");
+            report.bottlenecks.forEach((bottleneck) => {
+                lines.push(
+                    `  ${bottleneck.phase}: ${(bottleneck.duration / 1000).toFixed(2)}s (${bottleneck.percentage.toFixed(1)}%)`,
+                );
+                bottleneck.suggestions.forEach((suggestion) => {
                     lines.push(`    - ${suggestion}`);
                 });
             });
-            lines.push('');
+            lines.push("");
         }
 
         // Recommendations
         if (report.recommendations.length > 0) {
-            lines.push('Recommendations:');
-            report.recommendations.forEach(rec => {
+            lines.push("Recommendations:");
+            report.recommendations.forEach((rec) => {
                 lines.push(`  - ${rec}`);
             });
         }
 
-        return lines.join('\n');
+        return lines.join("\n");
     }
 
     /**
@@ -380,17 +454,21 @@ export class PerformanceMonitor {
         bottlenecks: number;
     } {
         const report = this.generateReport();
-        const filesPerSecond = report.metrics.filesProcessed / (report.totalDuration / 1000);
-        const tokensPerSecond = report.metrics.totalTokens / (report.totalDuration / 1000);
-        const totalCacheOps = report.metrics.cacheHits + report.metrics.cacheMisses;
-        const cacheHitRate = totalCacheOps > 0 ? report.metrics.cacheHits / totalCacheOps : 0;
+        const filesPerSecond =
+            report.metrics.filesProcessed / (report.totalDuration / 1000);
+        const tokensPerSecond =
+            report.metrics.totalTokens / (report.totalDuration / 1000);
+        const totalCacheOps =
+            report.metrics.cacheHits + report.metrics.cacheMisses;
+        const cacheHitRate =
+            totalCacheOps > 0 ? report.metrics.cacheHits / totalCacheOps : 0;
 
         return {
             duration: `${(report.totalDuration / 1000).toFixed(2)}s`,
             filesPerSecond: filesPerSecond.toFixed(1),
             tokensPerSecond: tokensPerSecond.toFixed(0),
             cacheHitRate: `${(cacheHitRate * 100).toFixed(1)}%`,
-            bottlenecks: report.bottlenecks.length
+            bottlenecks: report.bottlenecks.length,
         };
     }
 

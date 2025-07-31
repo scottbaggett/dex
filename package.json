@@ -1,97 +1,92 @@
 {
-  "name": "dex",
-  "version": "0.1.1",
-  "publishConfig": {
-    "access": "public"
-  },
-  "description": "Context engineering for code changes - Extract and format code changes with surgical precision for LLM consumption",
-  "keywords": [
-    "git",
-    "diff",
-    "context",
-    "llm",
-    "ai",
-    "agentic",
-    "vibecoder",
-    "code-changes",
-    "cli"
-  ],
-  "author": "Scott Baggett <scott@scottbaggett.com>",
-  "license": "MIT",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "bin": {
-    "dex": "./bin/dex"
-  },
-  "files": [
-    "dist",
-    "bin"
-  ],
-  "scripts": {
-    "build": "tsc && node scripts/copy-prompts.js",
-    "dev": "tsc --watch",
-    "dev:interactive": "node dist/cli.js --select",
-    "test": "vitest run",
-    "test:watch": "vitest --watch",
-    "test:ui": "vitest --ui",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm run test run && npm run lint"
-  },
-  "dependencies": {
-    "@ai-sdk/anthropic": "1.2.12",
-    "@ai-sdk/google": "1.2.22",
-    "@ai-sdk/groq": "1.2.9",
-    "@ai-sdk/openai": "1.3.23",
-    "ai": "4.3.19",
-    "chalk": "^5.3.0",
-    "clipboardy": "^4.0.0",
-    "commander": "^12.1.0",
-    "cosmiconfig": "^9.0.0",
-    "dex": "link:../../Library/pnpm/global/5/node_modules/dex",
-    "diff": "^5.2.0",
-    "globby": "^14.1.0",
-    "ink": "3.2.0",
-    "ink-select-input": "4.2.2",
-    "ink-text-input": "4.0.3",
-    "js-yaml": "^4.1.0",
-    "minimatch": "^10.0.1",
-    "ora": "^8.1.0",
-    "react": "17.0.2",
-    "simple-git": "^3.25.0",
-    "tree-sitter": "^0.25.0",
-    "tree-sitter-javascript": "^0.23.1",
-    "tree-sitter-python": "^0.23.6",
-    "tree-sitter-typescript": "^0.23.2",
-    "zod": "^3.25.76"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.9.0",
-    "@types/diff": "^5.2.0",
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^22.1.0",
-    "@types/react": "17.0.2",
-    "@vitest/coverage-v8": "^2.1.9",
-    "@vitest/ui": "^2.1.9",
-    "eslint": "^9.9.0",
-    "ink-testing-library": "^4.0.0",
-    "prettier": "^3.3.3",
-    "typescript": "^5.5.4",
-    "typescript-eslint": "^8.0.0",
-    "vitest": "^2.1.9"
-  },
-  "engines": {
-    "node": ">=16.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/scottbaggett/dex.git"
-  },
-  "bugs": {
-    "url": "https://github.com/scottbaggett/dex/issues"
-  },
-  "homepage": "https://github.com/scottbaggett/dex#readme",
-  "packageManager": "pnpm@10.12.4+sha512.5ea8b0deed94ed68691c9bad4c955492705c5eeb8a87ef86bc62c74a26b037b08ff9570f108b2e4dbd1dd1a9186fea925e527f141c648e85af45631074680184"
+    "name": "dex",
+    "version": "0.1.4",
+    "publishConfig": {
+        "access": "public"
+    },
+    "description": "Extract and format code changes with surgical precision to keep your agents and LLM partners in check",
+    "keywords": [
+        "git",
+        "diff",
+        "context",
+        "llm",
+        "ai",
+        "agentic",
+        "vibecoder",
+        "code-changes",
+        "cli"
+    ],
+    "author": "Scott Baggett <scott@scottbaggett.com>",
+    "license": "MIT",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "bin": {
+        "dex": "./bin/dex"
+    },
+    "prettier": {
+        "tabWidth": 4,
+        "useTabs": false
+    },
+    "files": [
+        "dist",
+        "bin"
+    ],
+    "scripts": {
+        "build": "tsc && node scripts/copy-prompts.js",
+        "dev": "tsc --watch",
+        "dev:interactive": "node dist/cli.js --select",
+        "test": "vitest run",
+        "test:watch": "vitest --watch",
+        "test:ui": "vitest --ui",
+        "lint": "eslint src",
+        "lint:fix": "eslint src --fix",
+        "format": "prettier --write \"src/**/*.ts\"",
+        "typecheck": "tsc --noEmit",
+        "prepublishOnly": "npm run build && npm run test run && npm run lint"
+    },
+    "dependencies": {
+        "chalk": "^5.3.0",
+        "clipboardy": "^4.0.0",
+        "commander": "^12.1.0",
+        "cosmiconfig": "^9.0.0",
+        "diff": "^5.2.0",
+        "globby": "^14.1.0",
+        "ink": "3.2.0",
+        "ink-select-input": "4.2.2",
+        "ink-text-input": "4.0.3",
+        "js-yaml": "^4.1.0",
+        "minimatch": "^10.0.1",
+        "ora": "^8.1.0",
+        "react": "17.0.2",
+        "simple-git": "^3.25.0",
+        "tree-sitter": "^0.25.0",
+        "tree-sitter-javascript": "^0.23.1",
+        "tree-sitter-python": "^0.23.6"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.9.0",
+        "@types/diff": "^5.2.0",
+        "@types/js-yaml": "^4.0.9",
+        "@types/node": "^24.1.0",
+        "@types/react": "17.0.2",
+        "@vitest/coverage-v8": "^2.1.9",
+        "@vitest/ui": "^2.1.9",
+        "eslint": "^9.9.0",
+        "ink-testing-library": "^4.0.0",
+        "prettier": "^3.3.3",
+        "typescript": "^5.5.4",
+        "vitest": "^2.1.9"
+    },
+    "engines": {
+        "node": ">=16.0.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/scottbaggett/dex.git"
+    },
+    "bugs": {
+        "url": "https://github.com/scottbaggett/dex/issues"
+    },
+    "homepage": "https://github.com/scottbaggett/dex#readme",
+    "packageManager": "pnpm@10.13.1+sha512.37ebf1a5c7a30d5fabe0c5df44ee8da4c965ca0c5af3dbab28c3a1681b70a256218d05c81c9c0dcf767ef6b8551eb5b960042b9ed4300c59242336377e01cfad"
 }

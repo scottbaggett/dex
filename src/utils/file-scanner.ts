@@ -1,6 +1,6 @@
-import { readdir, stat, readFile } from 'fs/promises';
-import { join, relative, resolve, basename } from 'path';
-import { existsSync } from 'fs';
+import { readdir, stat, readFile } from "fs/promises";
+import { join, relative, resolve, basename } from "path";
+import { existsSync } from "fs";
 
 export interface FileInfo {
     path: string;
@@ -22,59 +22,62 @@ export interface ScanOptions {
 export class FileScanner {
     private gitignorePatterns: string[] = [];
     private defaultIgnorePatterns = [
-        'node_modules/**',
-        '.git/**',
-        'dist/**',
-        'build/**',
-        'coverage/**',
-        '.next/**',
-        '.nuxt/**',
-        '.cache/**',
-        '*.log',
-        '*.lock',
-        '.DS_Store',
-        'Thumbs.db',
-        '*.pyc',
-        '__pycache__/**',
-        '.pytest_cache/**',
-        '.mypy_cache/**',
-        '*.class',
-        'target/**',
-        '*.o',
-        '*.obj',
-        '*.exe',
-        '*.dll',
-        '*.so',
-        '*.dylib',
-        '*.jpg',
-        '*.jpeg',
-        '*.png',
-        '*.gif',
-        '*.ico',
-        '*.svg',
-        '*.mp3',
-        '*.mp4',
-        '*.avi',
-        '*.mov',
-        '*.pdf',
-        '*.zip',
-        '*.tar',
-        '*.gz',
-        '*.rar',
-        '*.7z',
-        '.dex/**',
-        '.opencode/**',
-        '.workarea/**'
+        "node_modules/**",
+        ".git/**",
+        "dist/**",
+        "build/**",
+        "coverage/**",
+        ".next/**",
+        ".nuxt/**",
+        ".cache/**",
+        "*.log",
+        "*.lock",
+        ".DS_Store",
+        "Thumbs.db",
+        "*.pyc",
+        "__pycache__/**",
+        ".pytest_cache/**",
+        ".mypy_cache/**",
+        "*.class",
+        "target/**",
+        "*.o",
+        "*.obj",
+        "*.exe",
+        "*.dll",
+        "*.so",
+        "*.dylib",
+        "*.jpg",
+        "*.jpeg",
+        "*.png",
+        "*.gif",
+        "*.ico",
+        "*.svg",
+        "*.mp3",
+        "*.mp4",
+        "*.avi",
+        "*.mov",
+        "*.pdf",
+        "*.zip",
+        "*.tar",
+        "*.gz",
+        "*.rar",
+        "*.7z",
+        ".dex/**",
+        ".opencode/**",
+        ".workarea/**",
     ];
 
-    async scan(rootPath: string, options: ScanOptions = {}): Promise<FileInfo[]> {
+    async scan(
+        rootPath: string,
+        options: ScanOptions = {},
+    ): Promise<FileInfo[]> {
         const {
             includePatterns = [],
             excludePatterns = [],
             maxDepth = 10,
             respectGitignore = true,
             maxFiles = 1000,
-            followSymlinks = false
+            followSymlinks = false,
         } = options;
 
         const resolvedRoot = resolve(rootPath);
@@ -97,7 +100,7 @@ export class FileScanner {
             includePatterns,
             excludePatterns,
             followSymlinks,
-            maxFiles
+            maxFiles,
         );
 
         return allFiles;
@@ -113,7 +116,7 @@ export class FileScanner {
         includePatterns: string[],
         excludePatterns: string[],
         followSymlinks: boolean,
-        maxFiles: number
+        maxFiles: number,
     ): Promise<void> {
         if (currentDepth > maxDepth || files.length >= maxFiles) {
             return;
@@ -149,7 +152,10 @@ export class FileScanner {
                 }
 
                 // Check exclude patterns
-                if (excludePatterns.length > 0 && this.matchesPatterns(relativePath, excludePatterns)) {
+                if (
+                    excludePatterns.length > 0 &&
+                    this.matchesPatterns(relativePath, excludePatterns)
+                ) {
                     continue;
                 }
 
@@ -167,11 +173,14 @@ export class FileScanner {
                         includePatterns,
                         excludePatterns,
                         followSymlinks,
-                        maxFiles
+                        maxFiles,
                     );
                 } else if (entry.isFile()) {
                     // Check include patterns (if specified)
-                    if (includePatterns.length > 0 && !this.matchesPatterns(relativePath, includePatterns)) {
+                    if (
+                        includePatterns.length > 0 &&
+                        !this.matchesPatterns(relativePath, includePatterns)
+                    ) {
                         continue;
                     }
 
@@ -182,14 +191,16 @@ export class FileScanner {
                             relativePath,
                             size: stats.size,
                             lastModified: stats.mtime,
-                            isDirectory: false
+                            isDirectory: false,
                         });
                     }
                 }
             }
         } catch (error) {
             // Skip directories we can't read (permission errors, etc.)
-            console.warn(`Warning: Could not read directory ${dirPath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            console.warn(
+                `Warning: Could not read directory ${dirPath}: ${error instanceof Error ? error.message : "Unknown error"}`,
+            );
         }
     }
 
@@ -198,22 +209,22 @@ export class FileScanner {
 
         // Look for .gitignore files up the directory tree
         let currentDir = rootPath;
-        const root = resolve('/');
+        const root = resolve("/");
 
         while (currentDir !== root) {
-            const gitignorePath = join(currentDir, '.gitignore');
+            const gitignorePath = join(currentDir, ".gitignore");
 
             if (existsSync(gitignorePath)) {
                 try {
-                    const content = await readFile(gitignorePath, 'utf-8');
+                    const content = await readFile(gitignorePath, "utf-8");
                     const patterns = content
-                        .split('\n')
-                        .map(line => line.trim())
-                        .filter(line => line && !line.startsWith('#'))
-                        .map(line => {
+                        .split("\n")
+                        .map((line) => line.trim())
+                        .filter((line) => line && !line.startsWith("#"))
+                        .map((line) => {
                             // Convert gitignore patterns to glob patterns
-                            if (line.endsWith('/')) {
-                                return line + '**';
+                            if (line.endsWith("/")) {
+                                return line + "**";
                             }
                             return line;
                         });
@@ -224,26 +235,31 @@ export class FileScanner {
                 }
             }
 
-            const parentDir = resolve(currentDir, '..');
+            const parentDir = resolve(currentDir, "..");
             if (parentDir === currentDir) break;
             currentDir = parentDir;
         }
     }
 
     private shouldIgnore(relativePath: string): boolean {
-        const allIgnorePatterns = [...this.defaultIgnorePatterns, ...this.gitignorePatterns];
+        const allIgnorePatterns = [
+            ...this.defaultIgnorePatterns,
+            ...this.gitignorePatterns,
+        ];
         return this.matchesPatterns(relativePath, allIgnorePatterns);
     }
 
     private matchesPatterns(filePath: string, patterns: string[]): boolean {
-        return patterns.some(pattern => {
+        return patterns.some((pattern) => {
             // Simple glob matching
-            if (pattern.includes('*')) {
+            if (pattern.includes("*")) {
                 const regex = new RegExp(
-                    '^' + pattern
-                        .replace(/\./g, '\\.')
-                        .replace(/\*\*/g, '.*')
-                        .replace(/\*/g, '[^/]*') + '$'
+                    "^" +
+                        pattern
+                            .replace(/\./g, "\\.")
+                            .replace(/\*\*/g, ".*")
+                            .replace(/\*/g, "[^/]*") +
+                        "$",
                 );
 
                 // Test against full path and just filename
@@ -251,26 +267,84 @@ export class FileScanner {
             }
 
             // Exact match or directory match
-            return filePath === pattern ||
-                filePath.startsWith(pattern + '/') ||
-                basename(filePath) === pattern;
+            return (
+                filePath === pattern ||
+                filePath.startsWith(pattern + "/") ||
+                basename(filePath) === pattern
+            );
         });
     }
 
     private async isTextFile(filePath: string): Promise<boolean> {
         try {
             // Check file extension first
-            const ext = filePath.split('.').pop()?.toLowerCase();
+            const ext = filePath.split(".").pop()?.toLowerCase();
             const textExtensions = [
-                'txt', 'md', 'markdown', 'rst', 'asciidoc',
-                'js', 'jsx', 'ts', 'tsx', 'vue', 'svelte',
-                'py', 'rb', 'php', 'java', 'c', 'cpp', 'cc', 'cxx', 'h', 'hpp',
-                'cs', 'go', 'rs', 'swift', 'kt', 'scala', 'clj', 'cljs',
-                'html', 'htm', 'xml', 'svg', 'css', 'scss', 'sass', 'less',
-                'json', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf',
-                'sql', 'sh', 'bash', 'zsh', 'fish', 'ps1', 'psm1', 'psd1',
-                'dockerfile', 'makefile', 'cmake', 'gradle',
-                'r', 'R', 'm', 'mm', 'pl', 'pm', 'lua', 'vim', 'el'
+                "txt",
+                "md",
+                "markdown",
+                "rst",
+                "asciidoc",
+                "js",
+                "jsx",
+                "ts",
+                "tsx",
+                "vue",
+                "svelte",
+                "py",
+                "rb",
+                "php",
+                "java",
+                "c",
+                "cpp",
+                "cc",
+                "cxx",
+                "h",
+                "hpp",
+                "cs",
+                "go",
+                "rs",
+                "swift",
+                "kt",
+                "scala",
+                "clj",
+                "cljs",
+                "html",
+                "htm",
+                "xml",
+                "svg",
+                "css",
+                "scss",
+                "sass",
+                "less",
+                "json",
+                "yaml",
+                "yml",
+                "toml",
+                "ini",
+                "cfg",
+                "conf",
+                "sql",
+                "sh",
+                "bash",
+                "zsh",
+                "fish",
+                "ps1",
+                "psm1",
+                "psd1",
+                "dockerfile",
+                "makefile",
+                "cmake",
+                "gradle",
+                "r",
+                "R",
+                "m",
+                "mm",
+                "pl",
+                "pm",
+                "lua",
+                "vim",
+                "el",
             ];
 
             if (ext && textExtensions.includes(ext)) {
@@ -292,7 +366,13 @@ export class FileScanner {
             let printableCount = 0;
             for (let i = 0; i < sample.length; i++) {
                 const byte = sample[i];
-                if ((byte >= 32 && byte <= 126) || byte === 9 || byte === 10 || byte === 13) {
+                if (
+                    byte !== undefined &&
+                    ((byte >= 32 && byte <= 126) ||
+                        byte === 9 ||
+                        byte === 10 ||
+                        byte === 13)
+                ) {
                     printableCount++;
                 }
             }
@@ -306,14 +386,17 @@ export class FileScanner {
     /**
      * Scan files in parallel for better performance
      */
-    async scanParallel(rootPath: string, options: ScanOptions = {}): Promise<FileInfo[]> {
+    async scanParallel(
+        rootPath: string,
+        options: ScanOptions = {},
+    ): Promise<FileInfo[]> {
         const {
             includePatterns = [],
             excludePatterns = [],
             maxDepth = 10,
             respectGitignore = true,
             maxFiles = 1000,
-            followSymlinks = false
+            followSymlinks = false,
         } = options;
 
         const resolvedRoot = resolve(rootPath);
@@ -325,20 +408,34 @@ export class FileScanner {
 
         // First, collect all potential files
         const allPaths: string[] = [];
-        await this.collectPaths(resolvedRoot, resolvedRoot, allPaths, 0, maxDepth, excludePatterns, followSymlinks, maxFiles);
+        await this.collectPaths(
+            resolvedRoot,
+            resolvedRoot,
+            allPaths,
+            0,
+            maxDepth,
+            excludePatterns,
+            followSymlinks,
+            maxFiles,
+        );
 
         // Process files in parallel batches
         const maxConcurrency = 10;
         const fileInfos: FileInfo[] = [];
 
-        const processPath = async (fullPath: string): Promise<FileInfo | null> => {
+        const processPath = async (
+            fullPath: string,
+        ): Promise<FileInfo | null> => {
             try {
                 const relativePath = relative(resolvedRoot, fullPath);
                 const stats = await stat(fullPath);
 
                 if (stats.isFile()) {
                     // Check include patterns (if specified)
-                    if (includePatterns.length > 0 && !this.matchesPatterns(relativePath, includePatterns)) {
+                    if (
+                        includePatterns.length > 0 &&
+                        !this.matchesPatterns(relativePath, includePatterns)
+                    ) {
                         return null;
                     }
 
@@ -349,7 +446,7 @@ export class FileScanner {
                             relativePath,
                             size: stats.size,
                             lastModified: stats.mtime,
-                            isDirectory: false
+                            isDirectory: false,
                         };
                     }
                 }
@@ -361,7 +458,11 @@ export class FileScanner {
         };
 
         // Process paths in parallel
-        const results = await this.processInParallel(allPaths, processPath, maxConcurrency);
+        const results = await this.processInParallel(
+            allPaths,
+            processPath,
+            maxConcurrency,
+        );
 
         // Filter out null results
         for (const result of results) {
@@ -384,7 +485,7 @@ export class FileScanner {
         maxDepth: number,
         excludePatterns: string[],
         followSymlinks: boolean,
-        maxFiles: number
+        maxFiles: number,
     ): Promise<void> {
         if (currentDepth > maxDepth || paths.length >= maxFiles) {
             return;
@@ -412,7 +513,10 @@ export class FileScanner {
                 }
 
                 // Check exclude patterns
-                if (excludePatterns.length > 0 && this.matchesPatterns(relativePath, excludePatterns)) {
+                if (
+                    excludePatterns.length > 0 &&
+                    this.matchesPatterns(relativePath, excludePatterns)
+                ) {
                     continue;
                 }
 
@@ -426,7 +530,7 @@ export class FileScanner {
                         maxDepth,
                         excludePatterns,
                         followSymlinks,
-                        maxFiles
+                        maxFiles,
                     );
                 } else if (entry.isFile()) {
                     paths.push(fullPath);
@@ -443,7 +547,7 @@ export class FileScanner {
     private async processInParallel<T, R>(
         items: T[],
         processor: (item: T) => Promise<R>,
-        maxConcurrency: number
+        maxConcurrency: number,
     ): Promise<R[]> {
         const results: R[] = [];
         const executing: Promise<void>[] = [];
@@ -452,7 +556,7 @@ export class FileScanner {
             const item = items[i];
 
             // Create a promise for this item
-            const promise = processor(item).then(result => {
+            const promise = processor(item as any).then((result) => {
                 results[i] = result;
             });
 
@@ -483,7 +587,7 @@ export class FileScanner {
 }
 
 export function formatFileSize(bytes: number): string {
-    const units = ['B', 'KB', 'MB', 'GB'];
+    const units = ["B", "KB", "MB", "GB"];
     let size = bytes;
     let unitIndex = 0;
 

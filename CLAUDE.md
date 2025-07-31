@@ -1,52 +1,44 @@
 # DEX - Diff Context for LLMs
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Common Development Commands
 
 ### Build and Development
 ```bash
 # Install dependencies
-pnpm install
+bun install
 
 # Build the project
-pnpm run build
+bun run build
 
 # Watch mode for development
-pnpm run dev
+bun run dev
 
 # Type checking
-pnpm run typecheck
+bun run typecheck
 ```
 
 ### Testing
 ```bash
 # Run all tests
-npm test
+bun test
 
 # Watch mode for tests
-npm run test:watch
+bun run test:watch
 
 # Test UI
-npm run test:ui
+bun run test:ui
 ```
 
 ### Code Quality
 ```bash
-# Run ESLint
-npm run lint
-
-# Fix linting issues
-npm run lint:fix
-
 # Format code with Prettier
-npm run format
+bun run format
 ```
 
 ### Publishing
 ```bash
 # This runs build, tests, and lint before publishing
-npm publish
+bun publish
 ```
 
 ## Project Architecture
@@ -94,10 +86,10 @@ npm publish
 ## Development Workflow
 
 1. Make changes in `src/`
-2. Run `pnpm run dev` to watch and compile
-3. Test CLI locally with `node ./dist/cli.js` or `pnpm link`
+2. Run `bun run dev` to watch and compile
+3. Test CLI locally with `node ./dist/cli.js` or `bun link`
 4. Write tests in `test/` using Vitest
-5. Ensure `pnpm run typecheck` and `pnpm run lint` pass before committing
+5. Ensure `bun run typecheck` and `bun run lint` pass before committing
 
 ## Testing Guidelines
 
@@ -131,17 +123,6 @@ When generating or modifying code for dex, adhere to these principles to ensure 
 - **Documentation:** Add JSDoc comments to all public functions and classes. Inline comments for complex logic, explaining how it supports context levels or integrations.
 - **Security Considerations:** Sanitize user inputs (e.g., paths in CLI flags) to prevent injection. When adding integrations like GitHub issue fetching, handle API tokens securely via environment variables.
 
-## Future Enhancements (Not Yet Implemented)
-
-Prioritize these in phases as per the project roadmap. When implementing, extend existing patterns (e.g., strategy for new formatters).
-
-- **AST-based Extraction using Tree-Sitter:** Integrate in `src/core/parser.ts` for accurate function/class/symbol extraction. Start with TS/JS queries in `languages/typescript.ts`; ensure fallback to regex for unsupported languages. Test for precision in full/extended contexts.
-- **GitHub Issue Integration:** Add to `integrations/github.ts` using @octokit/core. Fetch and summarize issues in `context.ts`, merging into "Task Overview" sections. Handle auth via GH_TOKEN env var.
-- **AI Distiller Compression:** Expand `integrations/aid.ts` to subprocess calls for distilling full dumps (--compress=aid). Focus on reducing token usage while preserving key structures.
-- **Interactive Mode for Task Input:** In `cli.ts`, use readline for prompts when --interactive is flagged. Store inputs temporarily and fuse with extracts.
-- **Symbol Mapping and Dependency Analysis:** Inspired by CodeContext, add --map=symbols to generate overviews (e.g., import graphs) via tree-sitter. Integrate into extended/bootstrap modes for better agent onboarding.
-- **Custom Templates:** Allow user-defined templates via config files or flags; extend formatter factory to load them dynamically.
-- **Git Hooks Integration:** Provide example scripts in `examples/` for pre-commit reviews, invoking dex to generate contexts automatically.
 
 ## Architectural Guardrails
 

@@ -1,8 +1,0 @@
-onlyBuiltDependencies:
-  - tree-sitter
-  - tree-sitter-javascript
-  - tree-sitter-python
-  - tree-sitter-typescript
-
-overrides:
-  dex: link:../../Library/pnpm/global/5/node_modules/dex
