@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  dex: link:../../Library/pnpm/global/5/node_modules/dex
+
 importers:
 
   .:
@@ -35,6 +38,9 @@ importers:
       cosmiconfig:
         specifier: ^9.0.0
         version: 9.0.0(typescript@5.8.3)
+      dex:
+        specifier: link:../../Library/pnpm/global/5/node_modules/dex
+        version: link:../../Library/pnpm/global/5/node_modules/dex
       diff:
         specifier: ^5.2.0
         version: 5.2.0

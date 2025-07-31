@@ -1,6 +1,6 @@
 {
   "name": "dex",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publishConfig": {
     "access": "public"
   },
@@ -50,6 +50,7 @@
     "clipboardy": "^4.0.0",
     "commander": "^12.1.0",
     "cosmiconfig": "^9.0.0",
+    "dex": "link:../../Library/pnpm/global/5/node_modules/dex",
     "diff": "^5.2.0",
     "globby": "^14.1.0",
     "ink": "3.2.0",
