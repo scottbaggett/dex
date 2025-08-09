@@ -3,7 +3,7 @@ import {
     type ParsedFile,
     type ParserOptions,
 } from "./parser";
-import type { DistillDepth, ExtractedAPI } from "../../types";
+import type { ExtractedAPI } from "../../types";
 
 // Optional Tree-sitter imports with graceful fallback
 let Parser: any = null;
@@ -104,7 +104,7 @@ export class TreeSitterParser extends BaseParser {
         };
     }
 
-    extract(parsedFile: ParsedFile, depth: DistillDepth): ExtractedAPI {
+    extract(parsedFile: ParsedFile): ExtractedAPI {
         const { content, path, language, ast } = parsedFile;
 
         if (!ast) {
@@ -116,7 +116,7 @@ export class TreeSitterParser extends BaseParser {
         return {
             file: path,
             imports: extracted.imports,
-            exports: this.filterByDepth(extracted.exports, depth),
+            exports: extracted.exports,
         };
     }
 
@@ -969,29 +969,6 @@ export class TreeSitterParser extends BaseParser {
             : fullText;
     }
 
-    private filterByDepth(
-        exports: TreeSitterExport[],
-        depth: DistillDepth,
-    ): TreeSitterExport[] {
-        switch (depth) {
-            case "minimal":
-                return exports.filter((e) => e.visibility === "public");
-            case "public":
-                return exports.filter((e) => e.visibility === "public");
-            case "extended":
-                return exports.filter(
-                    (e) =>
-                        e.visibility === "public" ||
-                        (e.visibility === "private" &&
-                            this.isKeyPrivateMethod(e.name)),
-                );
-            case "full":
-                return exports;
-            default:
-                return exports.filter((e) => e.visibility === "public");
-        }
-    }
-
     private isKeyPrivateMethod(name: string): boolean {
         const keyPatterns = [
             /^_init/,
@@ -1013,21 +990,6 @@ export class TreeSitterParser extends BaseParser {
         return this.isTreeSitterAvailable
             ? Array.from(this.languageMap.keys())
             : [];
-    }
-
-    static getAutoDepth(
-        fileSize: number,
-        tokenBudget: number = 100000,
-    ): DistillDepth {
-        const estimatedTokens = fileSize / 4;
-
-        if (estimatedTokens < tokenBudget * 0.1) {
-            return "extended";
-        } else if (estimatedTokens < tokenBudget * 0.3) {
-            return "public";
-        } else {
-            return "minimal";
-        }
     }
 
     static override detectLanguage(filePath: string): string | null {

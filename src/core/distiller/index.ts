@@ -352,10 +352,7 @@ export class Distiller {
                 const parsed = await this.parser.parse(file.content, language);
                 parsed.path = file.path;
 
-                // Auto-detect depth if needed
-                const depth =
-                    this.options.depth || HybridParser.getAutoDepth(file.size);
-                const extracted = this.parser.extract(parsed, depth);
+                const extracted = this.parser.extract(parsed);
 
                 apis.push(extracted);
 
@@ -403,7 +400,7 @@ export class Distiller {
         };
     }
 
-    private async getFilesToProcess(targetPath: string): Promise<string[]> {
+    async getFilesToProcess(targetPath: string): Promise<string[]> {
         const stats = await fs.stat(targetPath);
 
         if (stats.isFile()) {
@@ -468,6 +465,11 @@ export class Distiller {
         result: CompressionResult | DistillationResult | any,
         originalPath?: string,
     ): string {
+        // Handle null/undefined result
+        if (!result) {
+            return "# Distillation Result\n\nNo content was distilled.";
+        }
+
         if ("files" in result) {
             // Compression result - XML format
             return this.formatCompression(result as CompressionResult);
@@ -505,12 +507,7 @@ export class Distiller {
         originalPath?: string,
     ): string {
         // Use AID-style formatter for better output
-        if (this.options.useAidStyle !== false) {
-            return this.aidFormatter.formatDistillation(
-                result,
-                originalPath || "",
-            );
-        }
+        return this.aidFormatter.formatDistillation(result, originalPath || "");
 
         // Original format for backward compatibility
         let output = "# Distilled Context\n\n";

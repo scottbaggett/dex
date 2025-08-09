@@ -94,7 +94,7 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
 
         const distillerOptions: DistillerOptions = {
             path: resolvedPath,
-            depth: "full",
+
             compressFirst: false,
             excludePatterns: [...configExcludes, ...cliExcludes],
             includeComments: false,
@@ -103,7 +103,7 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
             parallel: true,
         };
 
-        console.log(chalk.cyan("🌳 Generating API tree..."));
+        console.log(chalk.cyan("🪾 Generating API tree..."));
 
         // Create distiller and extract APIs
         const distiller = new Distiller(distillerOptions);
@@ -715,15 +715,15 @@ async function handleOutput(
             format: options.format === "json" ? "json" : "markdown",
         });
 
-        const relativePath = outputManager.getRelativePath({
+        const fullPath = await outputManager.getFilePath({
             command: "tree",
             context: folderName,
             format: options.format === "json" ? "json" : "markdown",
         });
 
         console.log(
-            chalk.cyan("💾 API tree saved to: ") + chalk.green(relativePath),
+            chalk.cyan("💾 API tree saved to: ") + chalk.green(fullPath),
         );
-        console.log(chalk.dim(`\nFor agents: cat ${relativePath}`));
+        console.log(chalk.dim(`\nFor agents: cat "${fullPath}"`));
     }
 }

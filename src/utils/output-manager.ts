@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import { join } from "path";
+import simpleGit from "simple-git";
 import type { OutputFormat } from "../types";
 
 export interface OutputOptions {
@@ -9,10 +10,29 @@ export interface OutputOptions {
 }
 
 export class OutputManager {
-    private dexDir: string;
+    private workingDir: string;
+    private projectRoot: string | null = null;
 
     constructor(workingDir: string = process.cwd()) {
-        this.dexDir = join(workingDir, ".dex");
+        this.workingDir = workingDir;
+    }
+
+    /**
+     * Get the project root using git, with caching
+     */
+    private async getProjectRoot(): Promise<string> {
+        if (this.projectRoot) return this.projectRoot;
+
+        try {
+            const git = simpleGit(this.workingDir);
+            const root = await git.revparse(["--show-toplevel"]);
+            this.projectRoot = root.trim();
+            return this.projectRoot;
+        } catch {
+            // Not in a git repository, use working directory
+            this.projectRoot = this.workingDir;
+            return this.projectRoot;
+        }
     }
 
     /**
@@ -33,9 +53,10 @@ export class OutputManager {
     /**
      * Get full file path
      */
-    getFilePath(options: OutputOptions): string {
+    async getFilePath(options: OutputOptions): Promise<string> {
+        const projectRoot = await this.getProjectRoot();
         const filename = this.generateFilename(options);
-        return join(this.dexDir, filename);
+        return join(projectRoot, ".dex", filename);
     }
 
     /**
@@ -45,7 +66,7 @@ export class OutputManager {
         // Ensure .dex directory exists
         await this.ensureDexDir();
 
-        const filePath = this.getFilePath(options);
+        const filePath = await this.getFilePath(options);
         await fs.writeFile(filePath, content, "utf-8");
 
         return filePath;
@@ -54,14 +75,16 @@ export class OutputManager {
     /**
      * Get relative path for display
      */
-    getRelativePath(options: OutputOptions): string {
+    async getRelativePath(options: OutputOptions): Promise<string> {
         const filename = this.generateFilename(options);
         return `.dex/${filename}`;
     }
 
     private async ensureDexDir(): Promise<void> {
         try {
-            await fs.mkdir(this.dexDir, { recursive: true });
+            const projectRoot = await this.getProjectRoot();
+            const dexDir = join(projectRoot, ".dex");
+            await fs.mkdir(dexDir, { recursive: true });
         } catch {
             // Directory might already exist
         }
@@ -79,14 +102,6 @@ export class OutputManager {
     }
 
     private getExtension(format: OutputFormat): string {
-        switch (format) {
-            case "json":
-                return "json";
-            case "markdown":
-                return "md";
-            case "xml":
-            default:
-                return "xml";
-        }
+        return "txt";
     }
 }

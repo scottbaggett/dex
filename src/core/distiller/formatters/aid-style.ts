@@ -7,6 +7,11 @@ export class AidStyleFormatter {
     ): string {
         let output = "";
 
+        // Handle null/undefined result or missing apis
+        if (!result || !result.apis || !Array.isArray(result.apis)) {
+            return "# Distillation Result\n\nNo APIs were extracted from the codebase.";
+        }
+
         // Group files by directory for better organization
         const filesByDir = this.groupFilesByDirectory(result.apis);
 

@@ -13,7 +13,7 @@ Context extraction and codebase analysis tool. Generate precise, token-efficient
 dex HEAD~5..HEAD --format markdown
 
 # Distill - compress entire codebase
-dex distill . --ai-action audit
+dex distill .
 
 # Visual API tree of your codebase structure
 dex tree src/ --show-types --show-params
@@ -32,7 +32,7 @@ dex distill . --ai-action audit
 
 DEX transforms how you work with AI agents by solving the context engineering problem:
 
-- **🎯 Precision Over Volume**: Extract exactly what matters, not everything
+- **🎯 Surgical Precision**: Extract exactly what matters, not everything
 - **📊 Token Efficiency**: 90% reduction in token usage through smart compression
 - **🌳 Visual Understanding**: Beautiful API trees and codebase structure visualization
 - **⚡ Multi-Format**: Output optimized for any AI agent or workflow
@@ -258,41 +258,6 @@ dex --since HEAD~10                  # Only recent changes
 
 Create `.dexrc` in your project root:
 
-```yaml
-# AI Settings
-ai:
-  provider: anthropic
-  model: claude-3-sonnet
-  bootstrap:
-    maxFiles: 25
-    prompt: "Select core architecture files for understanding this codebase"
-
-# Default Options
-defaults:
-  format: xml
-  clipboard: false
-
-# File Filtering
-filters:
-  ignorePaths:
-    - node_modules
-    - dist
-    - .git
-    - coverage
-  includeTypes:
-    - ts
-    - js
-    - py
-    - go
-
-# Distiller Settings
-distiller:
-  defaultOutput: save
-  saveDirectory: .dex
-  excludePatterns:
-    - "*.test.*"
-    - "__tests__"
-```
 
 ### Global Configuration
 
@@ -309,35 +274,19 @@ DEX automatically saves outputs to `.dex/` with descriptive filenames:
 
 ```
 .dex/
-├── dex.extract.current.xml          # Current changes
-├── dex.extract.staged.xml            # Staged changes
-├── dex.bootstrap.xml                 # Bootstrap context
-├── dex.distill.src.md               # Distilled codebase
-├── dex.tree.src.md                  # API tree visualization
-└── dex.combine.auth-api.xml         # Combined files
+├── dex.extract.current.txt          # Current changes
+├── dex.extract.staged.txt           # Staged changes
+├── dex.distill.src.txt              # Distilled codebase
+├── dex.tree.src.txt                 # API tree visualization
+└── dex.combine.auth-api.txt         # Combined files
 ```
 
 ## Real-World Workflows
 
-### 🚀 New Agent Onboarding
-
-```bash
-# 1. Bootstrap with core files
-dex bootstrap --export markdown > onboarding.md
-
-# 2. Create baseline snapshot
-dex snapshot create "agent-baseline"
-
-# 3. Generate task-specific context as needed
-dex generate "understand the authentication flow"
-```
 
 ### 🔧 Feature Development
 
 ```bash
-# 1. Start tracking work
-dex session start "user-profiles"
-
 # 2. Analyze existing code
 dex tree src/users/ --show-types
 
@@ -395,8 +344,6 @@ $ dex session end
 ### 🛡️ Security Audit
 
 ```bash
-# 1. Distill codebase with security focus
-dex distill . --ai-action security
 
 # 2. Focus on authentication components
 dex -p "src/auth/**" --prompt-template security

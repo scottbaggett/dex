@@ -474,7 +474,7 @@ async function combineCommand(filePaths: string[], options: any) {
                 format: options.outputFormat || "xml",
             });
 
-            const relativePath = outputManager.getRelativePath({
+            const fullPath = await outputManager.getFilePath({
                 command: "combine",
                 context: contextString,
                 format: options.outputFormat || "xml",
@@ -489,13 +489,13 @@ async function combineCommand(filePaths: string[], options: any) {
 
             spinner.succeed(
                 chalk.green("Saved to ") +
-                    chalk.white(relativePath) +
+                    chalk.white(fullPath) +
                     chalk.dim(" • ") +
                     chalk.white(tokenStr),
             );
 
             // Show agent instruction
-            console.log(chalk.dim(`\nFor agents: cat ${relativePath}`));
+            console.log(chalk.dim(`\nFor agents: cat "${fullPath}"`));
         }
     } catch (error) {
         spinner.fail(

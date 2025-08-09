@@ -1,4 +1,4 @@
-import type { DistillDepth, ExtractedAPI } from "../../types";
+import type { ExtractedAPI } from "../../types";
 
 export interface ParsedFile {
     path: string;
@@ -21,7 +21,7 @@ export abstract class Parser {
 
     abstract initialize(): Promise<void>;
     abstract parse(content: string, language: string): Promise<ParsedFile>;
-    abstract extract(parsedFile: ParsedFile, depth: DistillDepth): ExtractedAPI;
+    abstract extract(parsedFile: ParsedFile): ExtractedAPI;
     abstract isLanguageSupported(language: string): boolean;
     abstract getSupportedLanguages(): string[];
 

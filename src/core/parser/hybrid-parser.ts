@@ -5,7 +5,7 @@ import {
     type ParsedFile,
     type ParserOptions,
 } from "./parser";
-import type { DistillDepth, ExtractedAPI } from "../../types";
+import type { ExtractedAPI } from "../../types";
 
 /**
  * Hybrid parser that uses Tree-sitter for supported languages and falls back to regex for others
@@ -55,25 +55,25 @@ export class HybridParser extends BaseParser {
         return await this.regexParser.parse(content, language);
     }
 
-    extract(parsedFile: ParsedFile, depth: DistillDepth): ExtractedAPI {
+    extract(parsedFile: ParsedFile): ExtractedAPI {
         const { language, ast } = parsedFile;
 
         // If we have an AST (Tree-sitter), use Tree-sitter extraction
         if (ast && this.treeSitterParser.isLanguageSupported(language)) {
             try {
-                return this.treeSitterParser.extract(parsedFile, depth);
+                return this.treeSitterParser.extract(parsedFile);
             } catch (error) {
                 console.warn(
                     `Tree-sitter extraction failed for ${language}, falling back to regex:`,
                     error,
                 );
                 // Fall back to regex extraction
-                return this.regexParser.extract(parsedFile, depth);
+                return this.regexParser.extract(parsedFile);
             }
         }
 
         // Use regex extraction for unsupported languages or when AST is not available
-        return this.regexParser.extract(parsedFile, depth);
+        return this.regexParser.extract(parsedFile);
     }
 
     isLanguageSupported(language: string): boolean {
@@ -97,13 +97,6 @@ export class HybridParser extends BaseParser {
 
     getRegexSupportedLanguages(): string[] {
         return this.regexParser.getSupportedLanguages();
-    }
-
-    static getAutoDepth(
-        fileSize: number,
-        tokenBudget: number = 100000,
-    ): DistillDepth {
-        return TreeSitterParser.getAutoDepth(fileSize, tokenBudget);
     }
 
     static override detectLanguage(filePath: string): string | null {

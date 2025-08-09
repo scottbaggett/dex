@@ -46,6 +46,10 @@ program
     .option("-a, --all", "Include both staged and unstaged changes")
 
     .option("--full <pattern>", "Include full files matching pattern")
+    .option(
+        "--diff-only",
+        "Force diff view for all files (disable Smart Context)",
+    )
     .option("-p, --path <pattern>", "Filter by file path pattern")
     .option("-t, --type <types>", "Filter by file types (comma-separated)")
     .addOption(
@@ -439,6 +443,33 @@ async function extractCommand(range: string, options: Record<string, any>) {
             process.exit(1);
         }
 
+        // Check if the range argument looks like a path instead of a git range
+        if (
+            range &&
+            (range.includes("./") ||
+                range.includes("../") ||
+                range.endsWith("/") ||
+                range === "." ||
+                range === ".." ||
+                range.startsWith("./"))
+        ) {
+            spinner.fail(
+                chalk.red(
+                    "It looks like you're trying to analyze files in a directory.",
+                ),
+            );
+            console.log(
+                chalk.yellow("\nTo analyze files in a directory, use:"),
+            );
+            console.log(chalk.green(`  dex distill ${range}`));
+            console.log(
+                chalk.yellow("\nTo extract git changes, use a git range like:"),
+            );
+            console.log(chalk.green("  dex HEAD~1..HEAD"));
+            console.log(chalk.green("  dex --staged"));
+            process.exit(1);
+        }
+
         // Validate options
         if (options.staged && options.all) {
             spinner.fail(
@@ -486,6 +517,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
             staged: options.staged,
             all: options.all,
             full: options.full,
+            diffOnly: options.diffOnly,
             includeUntracked: options.includeUntracked,
             untrackedPattern: options.untrackedPattern,
             path: options.path,
@@ -843,7 +875,7 @@ async function extractCommand(range: string, options: Record<string, any>) {
                 format: dexOptions.format || "txt",
             });
 
-            const relativePath = outputManager.getRelativePath({
+            const fullPath = await outputManager.getFilePath({
                 command: "extract",
                 context: contextString,
                 format: dexOptions.format || "txt",
@@ -858,13 +890,13 @@ async function extractCommand(range: string, options: Record<string, any>) {
 
             spinner.succeed(
                 chalk.green("Saved to ") +
-                    chalk.white(relativePath) +
+                    chalk.white(fullPath) +
                     chalk.dim(" • ") +
                     chalk.white(tokenStr),
             );
 
             // Show agent instruction
-            console.log(chalk.dim(`\nFor agents: cat ${relativePath}`));
+            console.log(chalk.dim(`\nFor agents: cat "${fullPath}"`));
         }
     } catch (error) {
         spinner.fail(

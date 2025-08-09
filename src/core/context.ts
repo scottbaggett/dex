@@ -141,6 +141,11 @@ export class ContextEngine {
         const fullFiles = new Map<string, string>();
         const smartContextInfo: string[] = [];
 
+        // Skip Smart Context if --diff-only flag is used
+        if (options.diffOnly) {
+            return fullFiles; // Return empty map to force diff view for all files
+        }
+
         // Smart Context: Automatically decide diff vs full file for each change
         for (const change of changes) {
             if (change.status === "deleted") continue;
@@ -194,10 +199,12 @@ export class ContextEngine {
             }
         }
 
-        // Show Smart Context feedback if any full files were included
+        // Show user-friendly feedback for full file inclusions
         if (smartContextInfo.length > 0) {
-            console.log("\nSmart Context:");
-            smartContextInfo.forEach((info) => console.log(info));
+            console.log(
+                `\nIncluding full content for ${smartContextInfo.length} heavily modified files (>40% changed)`,
+            );
+            console.log("Use --diff-only to force diff view for all files");
         }
 
         return fullFiles;

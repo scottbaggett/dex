@@ -13,6 +13,7 @@ export interface DexOptions {
 
     // Full file options
     full?: string; // Pattern for files to show in full
+    diffOnly?: boolean; // Force diff view for all files (disable Smart Context)
 
     // Untracked files
     includeUntracked?: boolean;
@@ -179,11 +180,9 @@ export interface SnapshotOptions {
 }
 
 // Distiller types
-export type DistillDepth = "minimal" | "public" | "extended" | "full";
 
 export interface DistillerOptions {
     path?: string;
-    depth?: DistillDepth;
     compressFirst?: boolean;
     excludePatterns?: string[];
     includeComments?: boolean;
@@ -195,8 +194,7 @@ export interface DistillerOptions {
     since?: string;
     staged?: boolean;
     parallel?: boolean;
-    cacheDir?: string;
-    useAidStyle?: boolean;
+    dryRun?: boolean;
 }
 
 export interface CompressionResult {

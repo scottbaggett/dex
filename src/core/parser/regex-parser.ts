@@ -3,7 +3,7 @@ import {
     type ParsedFile,
     type ParserOptions,
 } from "./parser";
-import type { DistillDepth, ExtractedAPI } from "../../types";
+import type { ExtractedAPI } from "../../types";
 
 interface EnhancedExport {
     name: string;
@@ -63,7 +63,7 @@ export class RegexParser extends BaseParser {
         };
     }
 
-    extract(parsedFile: ParsedFile, depth: DistillDepth): ExtractedAPI {
+    extract(parsedFile: ParsedFile): ExtractedAPI {
         const { content, path, language } = parsedFile;
         const enhanced = this.extractEnhanced(content, language);
 
@@ -81,7 +81,7 @@ export class RegexParser extends BaseParser {
         return {
             file: path,
             imports: enhanced.imports,
-            exports: this.filterByDepth(exports, depth),
+            exports: exports,
         };
     }
 
@@ -515,26 +515,6 @@ export class RegexParser extends BaseParser {
         return members;
     }
 
-    private filterByDepth(exports: any[], depth: DistillDepth): any[] {
-        switch (depth) {
-            case "minimal":
-                return exports.filter((e) => e.visibility === "public");
-            case "public":
-                return exports.filter((e) => e.visibility === "public");
-            case "extended":
-                return exports.filter(
-                    (e) =>
-                        e.visibility === "public" ||
-                        (e.visibility === "private" &&
-                            this.isKeyPrivateMethod(e.name)),
-                );
-            case "full":
-                return exports;
-            default:
-                return exports.filter((e) => e.visibility === "public");
-        }
-    }
-
     private isKeyPrivateMethod(name: string): boolean {
         const keyPatterns = [
             /^_init/,
@@ -555,21 +535,6 @@ export class RegexParser extends BaseParser {
 
     getSupportedLanguages(): string[] {
         return ["typescript", "javascript", "python"];
-    }
-
-    static getAutoDepth(
-        fileSize: number,
-        tokenBudget: number = 100000,
-    ): DistillDepth {
-        const estimatedTokens = fileSize / 4;
-
-        if (estimatedTokens < tokenBudget * 0.1) {
-            return "extended";
-        } else if (estimatedTokens < tokenBudget * 0.3) {
-            return "public";
-        } else {
-            return "minimal";
-        }
     }
 
     static detectLanguage(filePath: string): string | null {
