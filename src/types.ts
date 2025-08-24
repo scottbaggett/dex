@@ -44,10 +44,7 @@ export interface DexOptions {
     // Display options
     noMetadata?: boolean;
 
-    // Prompt options
-    prompt?: string; // Custom prompt text
-    promptTemplate?: string; // Prompt template name (security, performance, etc.)
-    noPrompt?: boolean; // Disable prompt generation
+    // Prompt options removed
 }
 
 export interface GitChange {
@@ -189,8 +186,6 @@ export interface DistillerOptions {
     includeDocstrings?: boolean;
     format?: "compressed" | "distilled" | "both";
     output?: string;
-    aiAction?: "audit" | "refactor" | "document" | "analyze";
-    promptTemplate?: string;
     since?: string;
     staged?: boolean;
     parallel?: boolean;

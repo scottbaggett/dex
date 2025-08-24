@@ -62,8 +62,6 @@ Key options:
 - --untracked-pattern <glob>: Pattern for untracked files
 - --optimize <flags...>: aid, symbols
 - --no-metadata: Omit metadata block
-- --prompt <text>: Add a custom analysis prompt
-- --prompt-template <id>: Use a named prompt template
 - --select: Interactive file selection (TTY)
 - --sort-by <opt>: name | updated | size | status
 - --sort-order <ord>: asc | desc
@@ -91,8 +89,6 @@ Key options:
 - --with-comments: Include code comments
 - --no-docstrings: Exclude docstrings
 - --dry-run: List files to be processed only
-- --ai-action <action>: audit | refactor | document | analyze (prepends an AI prompt)
-- --prompt-template <file>: Path to a custom prompt template
 - --since <ref>: Only process files changed since git ref
 - --staged: Only process staged files
 - --select: Interactive file picker (inherits from global, TTY)
@@ -111,9 +107,6 @@ Key options:
 - --output-format <fmt>: xml | markdown | json (default: xml)
 - -s, --staged: Use all staged files (full contents)
 - -c, --copy: Copy to clipboard
-- --prompt <text>: Attach a custom prompt
-- --prompt-template <id>: Attach a named prompt
-- --no-prompt: Disable prompt generation
 - --no-metadata: Omit metadata block
 - -o, --output <file>: Write to file instead of saving to `.dex/`
 - --include <csv>: Include patterns, e.g. "*.ts,*.js"
@@ -147,7 +140,7 @@ Key options:
 
 ```bash
 dex config validate           # Validate current config
-dex init                      # Scaffold .dex/ with config and example prompts
+dex init                      # Scaffold .dex/ with config
 ```
 
 Configuration is auto‑loaded from, in order:
@@ -155,17 +148,7 @@ Configuration is auto‑loaded from, in order:
 - `.dexrc{,.json,.yaml,.yml,.js,.cjs}`
 - `dex.config.{js,cjs}` or `package.json` ("dex" key)
 
-### 🧠 Prompt templates
-
-```bash
-dex prompts list                      # List available templates
-dex prompts show security             # Show details and preview
-dex prompts init "My Review"          # Scaffold a custom template (YAML)
-
-# Use a template during extraction/combination
-dex --prompt-template security
-dex combine src/ --prompt-template performance
-```
+ 
 
 ## Installation
 

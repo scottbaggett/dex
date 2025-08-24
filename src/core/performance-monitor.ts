@@ -264,10 +264,10 @@ export class PerformanceMonitor {
                     "AI provider response is slow - consider switching providers",
                 );
                 suggestions.push(
-                    "Use more specific prompts to reduce analysis complexity",
+                    "Narrow the analysis scope to reduce complexity",
                 );
                 suggestions.push(
-                    "Enable caching to avoid re-analyzing similar prompts",
+                    "Enable caching to avoid re-analyzing similar contexts",
                 );
                 if (duration > 60000) {
                     suggestions.push(
@@ -366,7 +366,7 @@ export class PerformanceMonitor {
             recommendations.push(
                 "Large repository detected - consider using chunked analysis",
             );
-            recommendations.push("Use more specific prompts to reduce scope");
+            recommendations.push("Narrow the analysis scope for better performance");
         }
 
         return recommendations;

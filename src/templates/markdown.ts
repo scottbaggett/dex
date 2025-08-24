@@ -5,7 +5,7 @@ import type {
     TaskContext,
     Metadata,
 } from "../types";
-import { PromptGenerator } from "../core/prompts";
+// Prompt features removed
 
 export class MarkdownFormatter extends Formatter {
     format({ context, options }: FormatterOptions): string {
@@ -35,12 +35,8 @@ export class MarkdownFormatter extends Formatter {
         // Impact analysis (placeholder for future AST analysis)
         // TODO: Add when AST analysis is implemented
 
-        // Add AI prompt only if explicitly requested
-        if (options.prompt || options.promptTemplate) {
-            sections.push("## AI Analysis Request");
-            sections.push(PromptGenerator.generate(context, options));
-        }
-
+        // AI prompt features removed
+        
         return sections.join("\n\n");
     }
 
@@ -108,10 +104,7 @@ export class MarkdownFormatter extends Formatter {
             lines.push(`- **Labels:** ${task.labels.join(", ")}`);
         }
 
-        // AI prompt section
-        lines.push(
-            "- **AI Prompt:** Review these changes for correctness, best practices, and potential issues.",
-        );
+        // Removed AI prompt bullet
 
         return lines.join("\n");
     }

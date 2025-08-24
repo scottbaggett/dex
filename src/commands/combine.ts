@@ -38,12 +38,7 @@ export function createCombineCommand(): Command {
             "Combine all staged files (shows full file content, not just diffs)",
         )
         .option("-c, --copy", "Copy output to clipboard")
-        .option("--prompt <text>", "Custom AI analysis prompt")
-        .option(
-            "--prompt-template <name>",
-            "Use prompt template: security, performance, refactor, feature, bugfix, migration, api, testing",
-        )
-        .option("--no-prompt", "Disable AI prompt generation")
+        // Prompt options removed
         .option("--no-metadata", "Exclude metadata from output")
         .option("-o, --output <file>", "Write output to file instead of stdout")
         .option(
@@ -374,9 +369,6 @@ async function combineCommand(filePaths: string[], options: any) {
         const dexOptions: DexOptions = {
             format: options.outputFormat as OutputFormat,
             noMetadata: options.noMetadata,
-            prompt: options.prompt,
-            promptTemplate: options.promptTemplate,
-            noPrompt: options.noPrompt,
             clipboard: options.clipboard,
         };
 

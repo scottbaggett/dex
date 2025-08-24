@@ -41,7 +41,7 @@ export async function initCommand(): Promise<void> {
 
     const dexDir = join(process.cwd(), ".dex");
     const configPath = join(dexDir, "config.yml");
-    const promptsDir = join(dexDir, "prompts");
+    // Prompts directory removed
 
     // Check if .dex directory already exists
     if (existsSync(dexDir)) {
@@ -92,62 +92,12 @@ export async function initCommand(): Promise<void> {
         const configWithComments = `# Dex Configuration
 # For more information, see: https://github.com/scottbaggett/dex
 
-${configContent}
-# Custom prompt templates can be added in the prompts/ directory
-# Example:
-# prompts:
-#   my-review:
-#     name: My Custom Review
-#     extends: base-review
-#     instructions: |
-#       Custom review instructions here
-`;
+${configContent}`;
 
         writeFileSync(configPath, configWithComments);
         spinner.succeed(chalk.green("Created .dex/config.yml"));
 
-        // Create prompts directory
-        if (!existsSync(promptsDir)) {
-            mkdirSync(promptsDir, { recursive: true });
-        }
-        spinner.succeed(chalk.green("Created .dex/prompts/ directory"));
-
-        // Copy built-in prompts as examples
-        const builtinPromptsDir = join(
-            dirname(dirname(__dirname)),
-            "dist",
-            "prompts",
-        );
-        let promptFiles: string[] = [];
-
-        if (existsSync(builtinPromptsDir)) {
-            promptFiles = readdirSync(builtinPromptsDir).filter((f) =>
-                f.endsWith(".yml"),
-            );
-
-            for (const file of promptFiles) {
-                const sourcePath = join(builtinPromptsDir, file);
-                const destPath = join(promptsDir, file);
-
-                // Read the prompt and add a header comment
-                let content = readFileSync(sourcePath, "utf-8");
-                content = `# This is a copy of the built-in ${file.replace(".yml", "")} prompt template.\n# Feel free to modify it to suit your needs!\n# To use: dex --prompt-template ${file.replace(".yml", "")}\n\n${content}`;
-
-                writeFileSync(destPath, content);
-            }
-
-            spinner.succeed(
-                chalk.green(
-                    `Copied ${promptFiles.length} example prompt templates to .dex/prompts/`,
-                ),
-            );
-        } else {
-            spinner.warn(
-                chalk.yellow(
-                    'Built-in prompts not found. Run "npm run build" first if developing locally.',
-                ),
-            );
-        }
+        // Prompts directory and built-in templates removed
 
         // Create .dexignore file
         const dexignorePath = join(dexDir, ".dexignore");
@@ -208,31 +158,14 @@ coverage/
             chalk.white("├── .dexignore        ") +
                 chalk.white("# Ignore patterns"),
         );
-        console.log(
-            chalk.white("└── prompts/          ") +
-                chalk.white("# Custom prompt templates"),
-        );
-
-        if (promptFiles?.length) {
-            for (let i = 0; i < promptFiles.length; i++) {
-                const isLast = i === promptFiles.length - 1;
-                console.log(
-                    chalk.white(
-                        `    ${isLast ? "└" : "├"}── ${promptFiles[i]}`,
-                    ),
-                );
-            }
-        }
+        // No prompts directory
 
         console.log(chalk.white("─".repeat(40)));
 
         console.log(chalk.cyan("\n✨ Dex has been initialized!"));
         console.log(chalk.white("\nNext steps:"));
         console.log(chalk.white("  1. Review and customize .dex/config.yml"));
-        console.log(
-            chalk.white("  2. Explore prompt templates in .dex/prompts/"),
-        );
-        console.log(chalk.white('  3. Run "dex" to extract your code changes'));
+        console.log(chalk.white('  2. Run "dex" to extract your code changes'));
         console.log(
             chalk.white(
                 "\nTip: Add .dex/ to your .gitignore if you want to keep it local",

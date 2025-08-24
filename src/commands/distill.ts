@@ -46,11 +46,7 @@ export function createDistillCommand(): Command {
             "--dry-run",
             "Show what files would be processed without running distillation",
         )
-        .option(
-            "--ai-action <action>",
-            "Generate AI prompt (audit, refactor, document, analyze)",
-        )
-        .option("--prompt-template <file>", "Path to custom prompt template")
+        // AI prompt features removed
         .option("--since <ref>", "Only process files changed since git ref")
         .option("--staged", "Only process staged files")
         .action((...args: any[]) => {
@@ -114,8 +110,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             since: options.since,
             staged: options.staged,
             parallel: options.parallel !== false,
-            aiAction: options.aiAction,
-            promptTemplate: options.promptTemplate,
+            // AI prompt features removed
             dryRun: options.dryRun,
         };
 
@@ -262,12 +257,8 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
         // Format result
         const formatted = distiller.formatResult(result, resolvedPath);
 
-        // Add AI prompt if requested
-        let output = formatted;
-        if (options.aiAction) {
-            output =
-                generateAIPrompt(options.aiAction, formatted) + "\n\n" + output;
-        }
+        // No AI prompt injection
+        const output = formatted;
 
         // Handle output based on explicit options first, then fall back to config
         if (options.clipboard) {
@@ -425,56 +416,4 @@ function collectPatterns(value: string, previous: string[]): string[] {
     return previous.concat([value]);
 }
 
-function generateAIPrompt(action: string, _context: string): string {
-    const prompts: Record<string, string> = {
-        audit: `# Security Audit Request
-
-Please perform a comprehensive security audit of the following codebase. Focus on:
-
-1. **Authentication & Authorization**: Identify any weaknesses in access control
-2. **Input Validation**: Find potential injection vulnerabilities
-3. **Data Protection**: Check for exposed sensitive data or weak encryption
-4. **Dependencies**: Identify outdated or vulnerable dependencies
-5. **Best Practices**: Note any deviations from security best practices
-
-Provide specific, actionable recommendations for each finding.`,
-
-        refactor: `# Code Refactoring Analysis
-
-Please analyze the following codebase for refactoring opportunities. Focus on:
-
-1. **Code Duplication**: Identify repeated patterns that could be abstracted
-2. **Complexity**: Find overly complex functions/classes that should be simplified
-3. **Design Patterns**: Suggest appropriate patterns to improve architecture
-4. **Performance**: Identify potential performance bottlenecks
-5. **Maintainability**: Recommend changes to improve code readability and maintenance
-
-Provide specific refactoring suggestions with code examples where applicable.`,
-
-        document: `# Documentation Generation
-
-Please generate comprehensive documentation for the following codebase:
-
-1. **Overview**: Provide a high-level description of the project's purpose
-2. **Architecture**: Explain the overall system architecture and key components
-3. **API Reference**: Document all public APIs with examples
-4. **Usage Guide**: Create practical examples for common use cases
-5. **Configuration**: Document all configuration options
-
-Format the documentation in Markdown with clear sections and code examples.`,
-
-        analyze: `# Codebase Analysis
-
-Please provide a comprehensive analysis of the following codebase:
-
-1. **Architecture Overview**: Describe the high-level structure and design patterns
-2. **Key Components**: Identify and explain the main modules/classes
-3. **Dependencies**: Map out the dependency relationships
-4. **Strengths**: Highlight well-designed aspects of the code
-5. **Improvement Areas**: Suggest areas that could be enhanced
-
-Provide insights that would help a new developer quickly understand the codebase.`,
-    };
-
-    return prompts[action] || prompts.analyze || "";
-}
+// AI prompt features removed

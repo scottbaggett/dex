@@ -1,6 +1,5 @@
 import { cosmiconfigSync } from "cosmiconfig";
 import type { DexOptions } from "../types";
-import type { PromptsConfig } from "../types/prompts";
 
 export interface DexConfig {
     defaults?: Partial<DexOptions>;
@@ -11,7 +10,7 @@ export interface DexConfig {
     tasks?: {
         defaultSource?: string;
     };
-    prompts?: PromptsConfig["prompts"];
+    // Prompt configuration removed
     distiller?: {
         defaultOutput?: "save" | "clipboard" | "stdout";
         saveDirectory?: string;

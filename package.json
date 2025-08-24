@@ -32,17 +32,16 @@
         "bin"
     ],
     "scripts": {
-        "build": "tsc && node scripts/copy-prompts.js",
+        "build": "tsc",
         "dev": "tsc --watch",
-        "dev:interactive": "node dist/cli.js --select",
-        "test": "vitest run",
-        "test:watch": "vitest --watch",
-        "test:ui": "vitest --ui",
+        "dev:interactive": "bun dist/cli.js --select",
+        "test": "bun test",
+        "test:watch": "bun test --watch",
         "lint": "eslint src",
         "lint:fix": "eslint src --fix",
         "format": "prettier --write \"src/**/*.ts\"",
         "typecheck": "tsc --noEmit",
-        "prepublishOnly": "npm run build && npm run test run && npm run lint"
+        "prepublishOnly": "bun run build && bun run test && bun run lint"
     },
     "dependencies": {
         "chalk": "^5.3.0",

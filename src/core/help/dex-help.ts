@@ -61,8 +61,7 @@ export class DexHelpFormatter extends Help {
         lines.push(
             "      --filter-by <opt>      all|staged|unstaged|untracked",
         );
-        lines.push("      --task <src>           description / file / URL");
-        lines.push("      --ai-action <type>     refactor|security|perf|...\n");
+        lines.push("      --task <src>           description / file / URL\n");
 
         // Sub commands
         lines.push(chalk.yellow("COMMANDS"));

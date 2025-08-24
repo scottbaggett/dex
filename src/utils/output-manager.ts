@@ -102,6 +102,17 @@ export class OutputManager {
     }
 
     private getExtension(format: OutputFormat): string {
-        return "txt";
+        // Map logical output formats to file extensions. Default to txt.
+        switch (format) {
+            case "markdown":
+                return "md";
+            case "json":
+                return "json";
+            case "xml":
+                return "xml";
+            case "txt":
+            default:
+                return "txt";
+        }
     }
 }

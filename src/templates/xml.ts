@@ -5,7 +5,7 @@ import type {
     TaskContext,
     Metadata,
 } from "../types";
-import { PromptGenerator } from "../core/prompts";
+// Prompt features removed
 
 export class XmlFormatter extends Formatter {
     format({ context, options }: FormatterOptions): string {
@@ -36,14 +36,7 @@ export class XmlFormatter extends Formatter {
             sections.push(this.formatChanges(context, options));
         }
 
-        // Add AI prompt only if explicitly requested
-        if (options.prompt || options.promptTemplate) {
-            sections.push("  <ai_analysis_request>");
-            sections.push(
-                this.escapeXml(PromptGenerator.generate(context, options)),
-            );
-            sections.push("  </ai_analysis_request>");
-        }
+        // AI prompt features removed
 
         sections.push("</code_context>");
 
