@@ -13,14 +13,14 @@ Context extraction and codebase analysis for AI workflows. Generate precise, tok
   <code>bun add -g dex</code>
   ·
   <code>dex --help</code>
-  
+
 </p>
 
 ## Quick Start
 
 ```bash
 # Install (recommended)
-bun add -g dex
+bun add -g @scottbaggett/dex
 
 # Or run without installing
 bunx dex --help
@@ -35,7 +35,7 @@ dex -s --format markdown --clipboard
 
 ## Core Commands
 
-### 🔍 Extract changes (default command)
+### `Extract changes` (default command)
 Extracts Git changes and formats context for LLMs.
 
 ```bash
@@ -70,30 +70,36 @@ Key options:
 Outputs are saved to `.dex/` by default unless `--clipboard`, `--stdout` (where available), or an explicit `--output` is used.
 
 ### 🗜️ Distill codebases
-Compress and distill entire directories into token‑efficient, agent‑friendly context.
+Extract clean API signatures from entire codebases, removing implementation details for token-efficient LLM context.
 
 ```bash
 dex distill .                          # Distill current project
-dex distill packages/api               # Distill a subdir
-dex distill . --dry-run                # Show what would be processed
-dex distill . --stdout                 # Print distilled output
+dex distill packages/api               # Distill a specific directory
+dex distill src/index.ts               # Distill a single file
+dex distill . --depth all              # Include private/protected members
+dex distill . --include "*.ts"         # Only TypeScript files
+dex distill . --stdout                 # Print to stdout
 ```
 
 Key options:
 - -f, --format <type>: compressed | distilled | both (default: distilled)
 - -o, --output <file>: Write to a specific file
+- -c, --clipboard: Copy output to clipboard
 - --stdout: Print to stdout
-- --exclude <pattern...>: Exclude patterns (repeatable)
-- --no-compress: Skip compression phase
-- --no-parallel: Disable parallel processing
+- --include <pattern>: Include file patterns (e.g., "*.ts", "src/**/*.js")
+- --exclude <pattern>: Exclude file patterns (repeatable)
+- --exclude-names <pattern>: Exclude specific export names (e.g., "*Test*", "_*")
+- --depth <level>: API surface depth - public | protected | all (default: public)
+- --include-private: Include private members
 - --with-comments: Include code comments
 - --no-docstrings: Exclude docstrings
-- --dry-run: List files to be processed only
+- --compact: Compact output mode
+- --no-compress: Skip compression phase
+- --no-parallel: Disable parallel processing
 - --since <ref>: Only process files changed since git ref
 - --staged: Only process staged files
-- --select: Interactive file picker (inherits from global, TTY)
 
-### 📋 Combine files and folders
+### `Combine` files and folders
 Create a single, LLM‑friendly document from many files.
 
 ```bash
@@ -103,7 +109,7 @@ dex combine --select                   # Pick files interactively (TTY)
 dex combine -s -c                      # Use staged files; copy to clipboard
 ```
 
-Key options:
+**Key options:**
 - --output-format <fmt>: xml | markdown | json (default: xml)
 - -s, --staged: Use all staged files (full contents)
 - -c, --copy: Copy to clipboard
@@ -136,7 +142,7 @@ Key options:
 - --show-params: Show function parameters
 - --group-by <method>: file | type | none (default: file)
 
-### ⚙️ Config utilities
+### Config utilities
 
 ```bash
 dex config validate           # Validate current config
@@ -148,11 +154,10 @@ Configuration is auto‑loaded from, in order:
 - `.dexrc{,.json,.yaml,.yml,.js,.cjs}`
 - `dex.config.{js,cjs}` or `package.json` ("dex" key)
 
- 
 
 ## Installation
 
-- Bun (recommended): `bun add -g dex` or run via `bunx dex`
+- Bun (recommended): `bun add -g @scottbaggett/dex` or run via `bunx dex`
 - npm: `npm install -g dex`
 - pnpm: `pnpm add -g dex`
 
@@ -177,4 +182,4 @@ DEX saves outputs to `.dex/` with descriptive, timestamped filenames. Use `--cli
 
 ## License
 
-MIT — see LICENSE
+MIT — see [LICENSE](LICENSE)

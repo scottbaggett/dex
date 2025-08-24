@@ -31,6 +31,7 @@ export function createDistillCommand(): Command {
         )
 
         .option("-o, --output <file>", "Write output to specific file")
+        .option("-c, --clipboard", "Copy output to clipboard")
         .option("--stdout", "Print output to stdout")
         .option(
             "--exclude <patterns...>",
@@ -42,6 +43,25 @@ export function createDistillCommand(): Command {
         .option("--no-parallel", "Disable parallel processing")
         .option("--with-comments", "Include code comments")
         .option("--no-docstrings", "Exclude docstrings")
+        .option(
+            "--depth <level>",
+            "API surface depth (public, protected, all)",
+            "public"
+        )
+        .option("--include-private", "Include private members")
+        .option(
+            "--include-patterns <patterns...>",
+            "Include only matching names",
+            collectPatterns,
+            []
+        )
+        .option(
+            "--exclude-names <patterns...>",
+            "Exclude matching names",
+            collectPatterns,
+            []
+        )
+        .option("--compact", "Compact output mode")
         .option(
             "--dry-run",
             "Show what files would be processed without running distillation",
@@ -110,6 +130,11 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             since: options.since,
             staged: options.staged,
             parallel: options.parallel !== false,
+            depth: options.depth || "public",
+            includePrivate: options.includePrivate || false,
+            includePatterns: options.includePatterns || [],
+            excludeNames: options.excludeNames || [],
+            compact: options.compact || false,
             // AI prompt features removed
             dryRun: options.dryRun,
         };
@@ -241,13 +266,6 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                   isStdout ? undefined : progress,
               );
 
-        if (process.env.DEBUG) {
-            console.log(
-                "Distillation result type:",
-                result ? typeof result : "undefined",
-            );
-            console.log("Result keys:", result ? Object.keys(result) : "none");
-        }
 
         // Check if result is valid
         if (!result) {

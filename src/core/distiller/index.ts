@@ -7,19 +7,19 @@ import type {
     ProjectStructure,
     DependencyMap,
 } from "../../types";
-import { HybridParser } from "../parser/hybrid-parser";
+import { getLanguageRegistry, ProcessingOptions } from "../languages";
+import { getFormatterRegistry } from "../formatters";
 import { Parser } from "../parser/parser";
 import { promises as fs } from "fs";
-import { join, relative } from "path";
+import { join, relative, dirname, basename } from "path";
 import { globby } from "globby";
 import { createHash } from "crypto";
-import { AidStyleFormatter } from "./formatters/aid-style";
 import { DistillerProgress } from "./progress";
 
 export class Distiller {
-    private parser: HybridParser;
+    private registry = getLanguageRegistry();
+    private formatters = getFormatterRegistry();
     private options: DistillerOptions;
-    private aidFormatter: AidStyleFormatter;
     private progress?: DistillerProgress;
     private defaultExcludes = [
         "node_modules/**",
@@ -37,6 +37,10 @@ export class Distiller {
         "*.min.js",
         "*.min.css",
         "*.map",
+        "**/*.spec.ts",
+        "**/*.spec.js",
+        "**/*.test.ts",
+        "**/*.test.js",
     ];
 
     constructor(options: DistillerOptions = {}) {
@@ -50,12 +54,7 @@ export class Distiller {
             ...options,
         } as DistillerOptions;
 
-        this.parser = new HybridParser({
-            includeComments: this.options.includeComments || false,
-            includeDocstrings: this.options.includeDocstrings !== false,
-        });
-
-        this.aidFormatter = new AidStyleFormatter();
+        // Registry is auto-initialized on import
     }
 
     async distill(
@@ -68,8 +67,8 @@ export class Distiller {
     > {
         this.progress = progress;
 
-        // Initialize parser
-        await this.parser.initialize();
+        // Initialize language modules
+        await this.registry.initializeAll();
 
         // Phase 1: Compression (if enabled)
         let compressionResult: CompressionResult | undefined;
@@ -89,9 +88,7 @@ export class Distiller {
         ) {
             const filesToDistill = compressionResult
                 ? compressionResult.files.filter((f) =>
-                      this.parser.isLanguageSupported(
-                          Parser.detectLanguage(f.path) || "",
-                      ),
+                      this.registry.isFileSupported(f.path),
                   )
                 : await this.getFilesToProcess(targetPath);
 
@@ -100,9 +97,11 @@ export class Distiller {
                 this.progress.start(filesToDistill.length);
             }
 
+            const stats = await fs.stat(targetPath);
+            const basePath = stats.isFile() ? dirname(targetPath) : targetPath;
             distillationResult = await this.distillFiles(
                 filesToDistill,
-                targetPath,
+                basePath,
             );
         }
 
@@ -130,8 +129,8 @@ export class Distiller {
     > {
         this.progress = progress;
 
-        // Initialize parser
-        await this.parser.initialize();
+        // Initialize language modules
+        await this.registry.initializeAll();
 
         // Phase 1: Compression (if enabled)
         let compressionResult: CompressionResult | undefined;
@@ -154,9 +153,7 @@ export class Distiller {
         ) {
             const filesToDistill = compressionResult
                 ? compressionResult.files.filter((f) =>
-                      this.parser.isLanguageSupported(
-                          Parser.detectLanguage(f.path) || "",
-                      ),
+                      this.registry.isFileSupported(f.path),
                   )
                 : selectedFiles;
 
@@ -186,7 +183,9 @@ export class Distiller {
 
     private async compress(targetPath: string): Promise<CompressionResult> {
         const files = await this.getFilesToProcess(targetPath);
-        return this.compressFiles(files, targetPath);
+        const stats = await fs.stat(targetPath);
+        const basePath = stats.isFile() ? dirname(targetPath) : targetPath;
+        return this.compressFiles(files, basePath);
     }
 
     private async compressSelectedFiles(
@@ -198,7 +197,7 @@ export class Distiller {
 
     private async compressFiles(
         files: string[],
-        _basePath: string,
+        basePath: string,
     ): Promise<CompressionResult> {
         const compressedFiles: CompressedFile[] = [];
         let totalSize = 0;
@@ -218,7 +217,7 @@ export class Distiller {
             for (let i = 0; i < files.length; i += batchSize) {
                 const batch = files.slice(i, i + batchSize);
                 const results = await Promise.all(
-                    batch.map((file) => this.compressFile(file)),
+                    batch.map((file) => this.compressFile(join(basePath, file), file)),
                 );
                 compressedFiles.push(...results);
                 totalSize += results.reduce((sum, f) => sum + f.size, 0);
@@ -249,7 +248,7 @@ export class Distiller {
         } else {
             // Sequential processing
             for (const file of files) {
-                const compressed = await this.compressFile(file);
+                const compressed = await this.compressFile(join(basePath, file), file);
                 compressedFiles.push(compressed);
                 totalSize += compressed.size;
             }
@@ -266,17 +265,17 @@ export class Distiller {
         };
     }
 
-    private async compressFile(filePath: string): Promise<CompressedFile> {
-        const content = await fs.readFile(filePath, "utf-8");
-        const stats = await fs.stat(filePath);
+    private async compressFile(fullPath: string, relativePath?: string): Promise<CompressedFile> {
+        const content = await fs.readFile(fullPath, "utf-8");
+        const stats = await fs.stat(fullPath);
         const hash = createHash("sha256")
             .update(content)
             .digest("hex")
             .substring(0, 8);
-        const language = Parser.detectLanguage(filePath) || undefined;
+        const language = Parser.detectLanguage(fullPath) || undefined;
 
         return {
-            path: filePath,
+            path: relativePath || fullPath,
             size: stats.size,
             hash,
             content,
@@ -310,7 +309,7 @@ export class Distiller {
         const filesToProcess =
             typeof files[0] === "string"
                 ? await Promise.all(
-                      (files as string[]).map((f) => this.compressFile(f)),
+                      (files as string[]).map((f) => this.compressFile(join(basePath, f), f)),
                   )
                 : (files as CompressedFile[]);
 
@@ -320,7 +319,7 @@ export class Distiller {
 
         for (const file of filesToProcess) {
             const language = file.language || Parser.detectLanguage(file.path);
-            if (!language || !this.parser.isLanguageSupported(language)) {
+            if (!language || !this.registry.isFileSupported(file.path)) {
                 processedCount++;
                 // Update progress even for unsupported files
                 if (this.progress) {
@@ -334,11 +333,11 @@ export class Distiller {
             }
 
             // Update structure
-            const dir = join(basePath, file.path)
+            const dir = file.path
                 .split("/")
                 .slice(0, -1)
                 .join("/");
-            directoriesSet.add(dir);
+            if (dir) directoriesSet.add(dir);
             structure.fileCount++;
             structure.languages[language] =
                 (structure.languages[language] || 0) + 1;
@@ -348,11 +347,37 @@ export class Distiller {
             cumulativeOriginalSize += file.size;
 
             try {
-                // Parse and extract
-                const parsed = await this.parser.parse(file.content, language);
-                parsed.path = file.path;
-
-                const extracted = this.parser.extract(parsed);
+                // Process with language registry
+                const processingOptions: ProcessingOptions = {
+                    includePrivate: this.options.includePrivate || this.options.depth === 'all',
+                    includeComments: this.options.includeComments,
+                    includeDocstrings: this.options.includeDocstrings,
+                    includeImports: true,
+                    depth: this.options.depth as 'public' | 'protected' | 'all' | undefined,
+                    compact: this.options.compact || this.options.format === 'compressed',
+                    includePatterns: undefined,  // Not used for name filtering at processor level
+                    excludePatterns: this.options.excludeNames  // Filter export names
+                };
+                
+                const result = await this.registry.processFile(file.path, file.content, processingOptions);
+                
+                // Convert to ExtractedAPI format
+                const extracted: ExtractedAPI = {
+                    file: file.path,
+                    imports: result.imports.map(i => i.source),
+                    exports: result.exports.map(e => ({
+                        name: e.name,
+                        type: this.mapExportKind(e.kind),
+                        signature: e.signature,
+                        visibility: e.visibility || 'public',
+                        location: { startLine: e.line || 0, endLine: e.line || 0 },
+                        members: e.members?.map(m => ({
+                            name: m.name,
+                            signature: m.signature,
+                            type: (m.kind === 'constructor' || m.kind === 'getter' || m.kind === 'setter') ? 'method' : m.kind as 'property' | 'method'
+                        }))
+                    }))
+                };
 
                 apis.push(extracted);
 
@@ -363,7 +388,10 @@ export class Distiller {
                 cumulativeDistilledSize += distilledBytes;
 
                 // Extract dependencies (imports/exports)
-                dependencies[file.path] = this.extractDependencies(parsed);
+                dependencies[file.path] = {
+                    imports: result.imports.map(i => i.source),
+                    exports: result.exports.map(e => e.name)
+                };
             } catch (error) {
                 // Silently continue with other files
                 if (process.env.DEBUG) {
@@ -404,11 +432,14 @@ export class Distiller {
         const stats = await fs.stat(targetPath);
 
         if (stats.isFile()) {
-            return [targetPath];
+            // Return just the filename for single files
+            return [basename(targetPath)];
         }
 
         // Get all files using globby
-        const patterns = ["**/*"];
+        const patterns = this.options.includePatterns && this.options.includePatterns.length > 0 
+            ? this.options.includePatterns 
+            : ["**/*"];
         const ignore = [
             ...this.defaultExcludes,
             ...(this.options.excludePatterns || []),
@@ -428,9 +459,8 @@ export class Distiller {
             // For now, return all files
         }
 
-        return files.map((f: string) =>
-            relative(process.cwd(), join(targetPath, f)),
-        );
+        // Return paths relative to the target directory
+        return files.map((f: string) => f);
     }
 
     private serializeExtractedAPI(api: ExtractedAPI): string {
@@ -457,6 +487,26 @@ export class Distiller {
             exports: parsed.exports?.map((e: any) => e.name) || [],
         };
     }
+    
+    private mapExportKind(kind: string): "function" | "class" | "interface" | "const" | "type" | "enum" {
+        // Map language-specific kinds to ExtractedAPI types
+        switch (kind) {
+            case 'function':
+            case 'class':
+            case 'interface':
+            case 'type':
+            case 'enum':
+                return kind as any;
+            case 'const':
+            case 'let':
+            case 'var':
+            case 'namespace':
+            case 'module':
+                return 'const';
+            default:
+                return 'const';
+        }
+    }
 
     /**
      * Format the distillation result based on output format
@@ -469,6 +519,7 @@ export class Distiller {
         if (!result) {
             return "# Distillation Result\n\nNo content was distilled.";
         }
+
 
         if ("files" in result) {
             // Compression result - XML format
@@ -488,26 +539,29 @@ export class Distiller {
     }
 
     private formatCompression(result: CompressionResult): string {
-        let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-        xml += "<context>\n";
-        xml += `  <metadata generated="${result.metadata.timestamp}" files="${result.metadata.totalFiles}" size="${result.metadata.totalSize}"/>\n`;
-
-        for (const file of result.files) {
-            xml += `  <file path="${file.path}" size="${file.size}" hash="${file.hash}"${file.language ? ` language="${file.language}"` : ""}>\n`;
-            xml += this.escapeXml(file.content);
-            xml += "\n  </file>\n";
-        }
-
-        xml += "</context>";
-        return xml;
+        // Use formatter registry
+        const formatter = this.formatters.getDefault();
+        return formatter.formatCompression(result, {
+            includeMetadata: true,
+            compact: this.options.compact
+        });
     }
 
     private formatDistillation(
         result: DistillationResult,
         originalPath?: string,
     ): string {
-        // Use AID-style formatter for better output
-        return this.aidFormatter.formatDistillation(result, originalPath || "");
+        
+        // Use formatter registry
+        const formatter = this.formatters.getDefault();
+        return formatter.formatDistillation(result, {
+            includeImports: this.options.includeImports !== false,
+            includePrivate: this.options.includePrivate,
+            includeDocstrings: this.options.includeDocstrings,
+            includeComments: this.options.includeComments,
+            includeMetadata: true,
+            compact: this.options.compact
+        });
 
         // Original format for backward compatibility
         let output = "# Distilled Context\n\n";

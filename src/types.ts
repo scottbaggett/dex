@@ -184,12 +184,18 @@ export interface DistillerOptions {
     excludePatterns?: string[];
     includeComments?: boolean;
     includeDocstrings?: boolean;
+    includeImports?: boolean;
     format?: "compressed" | "distilled" | "both";
     output?: string;
     since?: string;
     staged?: boolean;
     parallel?: boolean;
     dryRun?: boolean;
+    depth?: "public" | "protected" | "all";
+    includePrivate?: boolean;
+    includePatterns?: string[];
+    excludeNames?: string[];
+    compact?: boolean;
 }
 
 export interface CompressionResult {
@@ -229,7 +235,7 @@ export interface ExtractedAPI {
         type: "function" | "class" | "interface" | "const" | "type" | "enum";
         signature: string;
         docstring?: string;
-        visibility: "public" | "private";
+        visibility: "public" | "private" | "protected";
         location: {
             startLine: number;
             endLine: number;

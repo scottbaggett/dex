@@ -4,6 +4,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { DexHelpFormatter } from "./core/help/dex-help";
 import { createExtractCommand } from "./commands/extract";
+import { createDistillCommand } from "./commands/distill";
 
 const packageJson = JSON.parse(
     readFileSync(join(__dirname, "..", "package.json"), "utf-8"),
@@ -30,6 +31,9 @@ program
 
 // Add extract command
 program.addCommand(createExtractCommand());
+
+// Add distill command
+program.addCommand(createDistillCommand());
 
 // Backward compatibility: allow unknown options and handle them as extract command
 program.allowUnknownOption().action(async (options, command) => {
@@ -137,15 +141,10 @@ program
         await initCommand();
     });
 
-// Import snapshot command at the top level
-import { createDistillCommand } from "./commands/distill";
+// Import other commands at the top level
 import { createCombineCommand } from "./commands/combine";
-
 import { createConfigCommand } from "./commands/config";
 import { createTreeCommand } from "./commands/tree";
-
-// Add distill command
-program.addCommand(createDistillCommand());
 
 // Add combine command
 program.addCommand(createCombineCommand());
