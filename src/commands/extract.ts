@@ -498,12 +498,6 @@ export async function executeExtract(
                 command: "extract",
                 context: contextString,
                 format: dexOptions.format || "txt",
-            }, {
-                range: range,
-                options: dexOptions,
-                extractionMethod: context.metadata.extraction?.method,
-                filesChanged: context.scope.filesChanged,
-                tokenSavings: context.tokenSavings
             });
 
             const fullPath = await outputManager.getFilePath({
