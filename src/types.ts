@@ -180,22 +180,18 @@ export interface SnapshotOptions {
 
 export interface DistillerOptions {
     path?: string;
-    compressFirst?: boolean;
     excludePatterns?: string[];
     includeComments?: boolean;
     includeDocstrings?: boolean;
     includeImports?: boolean;
-    format?: "compressed" | "distilled" | "both";
+    format?: "txt" | "markdown" | "json" | string;
     output?: string;
     since?: string;
     staged?: boolean;
     parallel?: boolean;
     dryRun?: boolean;
-    depth?: "public" | "protected" | "all";
     includePrivate?: boolean;
     includePatterns?: string[];
-    excludeNames?: string[];
-    compact?: boolean;
 }
 
 export interface CompressionResult {

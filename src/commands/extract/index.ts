@@ -2,15 +2,15 @@ import { Command, Option } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import clipboardy from "clipboardy";
-import { ContextEngine } from "@/core/context";
-import { GitExtractor } from "@/core/git";
+import { ContextEngine } from "../../core/context";
+import { GitExtractor } from "../../core/git";
 import { MarkdownFormatter } from "./formatters/markdown";
 import { JsonFormatter } from "./formatters/json";
 import { XmlFormatter } from "./formatters/xml";
-import type { DexOptions, OutputFormat } from "@/types";
-import { OutputManager } from "@/utils/output-manager";
+import type { DexOptions, OutputFormat } from "../../types";
+import { OutputManager } from "../../utils/output-manager";
 import * as readline from "readline";
-import { mergeWithConfig } from "@/core/config";
+import { mergeWithConfig } from "../../core/config";
 
 interface ExtractCommandOptions {
     staged?: boolean;
@@ -270,7 +270,7 @@ export async function executeExtract(
                 spinner.fail(
                     chalk.red("Interactive mode requires a TTY terminal"),
                 );
-                const { FileSelector } = await import("@/utils/file-selector");
+                const { FileSelector } = await import("../../utils/file-selector");
                 const fileSelector = new FileSelector();
                 fileSelector.showTTYError();
                 process.exit(1);
@@ -279,7 +279,7 @@ export async function executeExtract(
             spinner.text = chalk.gray("Scanning files for selection...");
 
             try {
-                const { FileSelector } = await import("@/utils/file-selector");
+                const { FileSelector } = await import("../../utils/file-selector");
                 const fileSelector = new FileSelector();
 
                 // Collect all files in the repository (similar to combine command)

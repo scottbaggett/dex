@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { Distiller } from "../../core/distiller";
-import type { DistillerOptions } from "../../types";
+import type { DistillerOptions, OutputFormat } from "../../types";
 import { promises as fs } from "fs";
 import { resolve, basename } from "path";
 import * as path from "path";
@@ -12,12 +12,15 @@ import { OutputManager } from "../../utils/output-manager";
 import { FileSelector } from "../../utils/file-selector";
 import { formatFileSize } from "../../utils/format";
 
+/**
+ *  Dex Distill
+ */
 export function createDistillCommand(): Command {
     const command = new Command("distill");
 
     command
         .description(
-            "Compress and distill entire codebases into token-efficient formats (defaults to saving in .dex/)",
+            "Distill entire codebases into token-efficient formats (defaults to saving in .dex/)",
         )
         .argument(
             "[path]",
@@ -26,42 +29,29 @@ export function createDistillCommand(): Command {
 
         .option(
             "-f, --format <type>",
-            "Processing format (compressed, distilled, both)",
-            "distilled",
+            "Output format (txt, markdown, json)",
+            "txt",
         )
 
         .option("-o, --output <file>", "Write output to specific file")
         .option("-c, --clipboard", "Copy output to clipboard")
         .option("--stdout", "Print output to stdout")
+        .option("--comments <value>", "Include comments (0 or 1)", "0")
+        .option("--docstrings <value>", "Include docstrings (0 or 1)", "1")
+        .option("--private <value>", "Include private members (0 or 1)", "0")
         .option(
             "--exclude <patterns...>",
             "Exclude file patterns",
             collectPatterns,
             [],
         )
-        .option("--no-compress", "Skip compression phase")
+        .option(
+            "--include <patterns...>",
+            "Include file patterns",
+            collectPatterns,
+            [],
+        )
         .option("--no-parallel", "Disable parallel processing")
-        .option("--with-comments", "Include code comments")
-        .option("--no-docstrings", "Exclude docstrings")
-        .option(
-            "--depth <level>",
-            "API surface depth (public, protected, all)",
-            "public"
-        )
-        .option("--include-private", "Include private members")
-        .option(
-            "--include-patterns <patterns...>",
-            "Include only matching names",
-            collectPatterns,
-            []
-        )
-        .option(
-            "--exclude-names <patterns...>",
-            "Exclude matching names",
-            collectPatterns,
-            []
-        )
-        .option("--compact", "Compact output mode")
         .option(
             "--dry-run",
             "Show what files would be processed without running distillation",
@@ -120,21 +110,16 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
 
         const distillerOptions: DistillerOptions = {
             path: resolvedPath,
-
-            compressFirst: options.compress !== false,
             excludePatterns: [...configExcludes, ...cliExcludes],
-            includeComments: options.withComments || false,
-            includeDocstrings: options.docstrings !== false,
-            format: options.format || "distilled",
+            includeComments: options.comments === "1",
+            includeDocstrings: options.docstrings !== "0",
+            format: options.format || "txt",
             output: options.output,
             since: options.since,
             staged: options.staged,
             parallel: options.parallel !== false,
-            depth: options.depth || "public",
-            includePrivate: options.includePrivate || false,
-            includePatterns: options.includePatterns || [],
-            excludeNames: options.excludeNames || [],
-            compact: options.compact || false,
+            includePrivate: options.private === "1",
+            includePatterns: options.include || [],
             // AI prompt features removed
             dryRun: options.dryRun,
         };
@@ -248,7 +233,6 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
         if (process.env.DEBUG) {
             console.log("Starting distillation with options:", {
                 format: distillerOptions.format,
-                compressFirst: distillerOptions.compressFirst,
                 filesToProcess: filesToProcess
                     ? filesToProcess.length
                     : "all files",
@@ -266,7 +250,6 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                   isStdout ? undefined : progress,
               );
 
-
         // Check if result is valid
         if (!result) {
             throw new Error("Distillation failed to produce a result");
@@ -283,23 +266,9 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             await clipboardy.write(output);
 
             // Complete progress
-            let originalTokens = 0;
-            let distilledTokens = 0;
-            let fileCount = 0;
-
-            if (result && "distillation" in result && result.distillation) {
-                originalTokens =
-                    result.distillation.metadata.originalTokens || 0;
-                distilledTokens =
-                    result.distillation.metadata.distilledTokens || 0;
-                fileCount = result.distillation.structure?.fileCount || 0;
-            } else if (result && "apis" in result && result.metadata) {
-                originalTokens = result.metadata.originalTokens || 0;
-                distilledTokens = result.metadata.distilledTokens || 0;
-                fileCount = result.structure?.fileCount || 0;
-            } else if (result && "files" in result && result.metadata) {
-                fileCount = result.metadata.totalFiles || 0;
-            }
+            const originalTokens = result.metadata.originalTokens || 0;
+            const distilledTokens = result.metadata.distilledTokens || 0;
+            const fileCount = result.structure?.fileCount || 0;
 
             progress.complete({
                 originalTokens,
@@ -312,23 +281,9 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             await fs.writeFile(options.output, output, "utf-8");
 
             // Complete progress
-            let originalTokens = 0;
-            let distilledTokens = 0;
-            let fileCount = 0;
-
-            if (result && "distillation" in result && result.distillation) {
-                originalTokens =
-                    result.distillation.metadata.originalTokens || 0;
-                distilledTokens =
-                    result.distillation.metadata.distilledTokens || 0;
-                fileCount = result.distillation.structure?.fileCount || 0;
-            } else if (result && "apis" in result && result.metadata) {
-                originalTokens = result.metadata.originalTokens || 0;
-                distilledTokens = result.metadata.distilledTokens || 0;
-                fileCount = result.structure?.fileCount || 0;
-            } else if (result && "files" in result && result.metadata) {
-                fileCount = result.metadata.totalFiles || 0;
-            }
+            const originalTokens = result.metadata.originalTokens || 0;
+            const distilledTokens = result.metadata.distilledTokens || 0;
+            const fileCount = result.structure?.fileCount || 0;
 
             progress.complete({
                 originalTokens,
@@ -348,23 +303,9 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             await clipboardy.write(output);
 
             // Complete progress
-            let originalTokens = 0;
-            let distilledTokens = 0;
-            let fileCount = 0;
-
-            if (result && "distillation" in result && result.distillation) {
-                originalTokens =
-                    result.distillation.metadata.originalTokens || 0;
-                distilledTokens =
-                    result.distillation.metadata.distilledTokens || 0;
-                fileCount = result.distillation.structure?.fileCount || 0;
-            } else if (result && "apis" in result && result.metadata) {
-                originalTokens = result.metadata.originalTokens || 0;
-                distilledTokens = result.metadata.distilledTokens || 0;
-                fileCount = result.structure?.fileCount || 0;
-            } else if (result && "files" in result && result.metadata) {
-                fileCount = result.metadata.totalFiles || 0;
-            }
+            const originalTokens = result.metadata.originalTokens || 0;
+            const distilledTokens = result.metadata.distilledTokens || 0;
+            const fileCount = result.structure?.fileCount || 0;
 
             progress.complete({
                 originalTokens,
@@ -378,36 +319,25 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             const outputManager = new OutputManager();
             const folderName = basename(resolvedPath);
 
+            // Use the format option directly - OutputManager handles the extension conversion
+            const fileFormat = options.format || "txt"; // Default to .txt
+
             await outputManager.saveOutput(output, {
                 command: "distill",
                 context: folderName,
-                format: "markdown", // distill outputs markdown format
+                format: fileFormat as OutputFormat,
             });
 
             const fullPath = await outputManager.getFilePath({
                 command: "distill",
                 context: folderName,
-                format: "markdown",
+                format: fileFormat as OutputFormat,
             });
 
             // Complete progress with cool output
-            let originalTokens = 0;
-            let distilledTokens = 0;
-            let fileCount = 0;
-
-            if (result && "distillation" in result && result.distillation) {
-                originalTokens =
-                    result.distillation.metadata.originalTokens || 0;
-                distilledTokens =
-                    result.distillation.metadata.distilledTokens || 0;
-                fileCount = result.distillation.structure?.fileCount || 0;
-            } else if (result && "apis" in result && result.metadata) {
-                originalTokens = result.metadata.originalTokens || 0;
-                distilledTokens = result.metadata.distilledTokens || 0;
-                fileCount = result.structure?.fileCount || 0;
-            } else if (result && "files" in result && result.metadata) {
-                fileCount = result.metadata.totalFiles || 0;
-            }
+            const originalTokens = result.metadata.originalTokens || 0;
+            const distilledTokens = result.metadata.distilledTokens || 0;
+            const fileCount = result.structure?.fileCount || 0;
 
             progress.complete({
                 originalTokens,

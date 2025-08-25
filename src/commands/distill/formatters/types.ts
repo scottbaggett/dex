@@ -13,7 +13,6 @@ export interface FormatterOptions {
     includeMetadata?: boolean;
     
     // Output style
-    compact?: boolean;
     preserveStructure?: boolean;
     groupByType?: boolean;
     

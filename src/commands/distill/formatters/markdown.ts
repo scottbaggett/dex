@@ -1,5 +1,5 @@
 import { Formatter, FormatterOptions } from "./types";
-import { DistillationResult, CompressionResult } from "@/types";
+import { DistillationResult, CompressionResult } from "../../../types";
 
 /**
  * Markdown formatter
@@ -13,53 +13,30 @@ export class MarkdownFormatter implements Formatter {
         result: DistillationResult,
         options: FormatterOptions = {},
     ): string {
-        let output = "# Distilled Context\n\n";
-
-        // Add metadata if requested
-        if (options.includeMetadata !== false) {
-            output += "## Summary\n";
-            output += `- Files analyzed: ${result.structure.fileCount}\n`;
-            output += `- Original tokens: ${result.metadata.originalTokens.toLocaleString()}\n`;
-            output += `- Distilled tokens: ${result.metadata.distilledTokens.toLocaleString()}\n`;
-            output += `- Compression ratio: ${(result.metadata.compressionRatio * 100).toFixed(1)}%\n\n`;
-
-            // Languages breakdown
-            output += "## Languages\n";
-            for (const [lang, count] of Object.entries(
-                result.structure.languages,
-            )) {
-                output += `- ${lang}: ${count} files\n`;
-            }
-            output += "\n";
-        }
-
-        // APIs by file
-        output += "## Extracted APIs\n\n";
+        let output = "";
+        
         for (const api of result.apis) {
-            output += `### ${api.file}\n\n`;
-
-            // Imports
+            output += `## ${api.file}\n\n`;
+            
+            const lang = this.getLanguageForFile(api.file);
+            output += `\`\`\`${lang}\n`;
+            
+            // Add imports
             if (options.includeImports !== false && api.imports.length > 0) {
-                output += "**Imports:**\n```\n";
                 for (const imp of api.imports) {
                     output += `import '${imp}'\n`;
                 }
-                output += "```\n\n";
             }
-
-            // Exports
+            
+            // Add exports
             for (const exp of api.exports) {
                 if (exp.visibility === "private" && !options.includePrivate) {
                     continue;
                 }
-
-                if (options.includeDocstrings && exp.docstring) {
-                    output += "```\n" + exp.docstring + "\n```\n";
-                }
-
-                const lang = this.getLanguageForFile(api.file);
-                output += `\`\`\`${lang}\n${exp.signature}\n\`\`\`\n\n`;
+                output += `${exp.signature}\n`;
             }
+            
+            output += `\`\`\`\n\n`;
         }
 
         return output.trim();

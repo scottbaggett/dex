@@ -45,11 +45,9 @@ export class Distiller {
 
     constructor(options: DistillerOptions = {}) {
         this.options = {
-            depth: "public",
-            compressFirst: true,
             includeDocstrings: true,
             includeComments: false,
-            format: "distilled",
+            format: "txt",
             parallel: true,
             ...options,
         } as DistillerOptions;
@@ -60,125 +58,52 @@ export class Distiller {
     async distill(
         targetPath: string,
         progress?: DistillerProgress,
-    ): Promise<
-        | CompressionResult
-        | DistillationResult
-        | { compression: CompressionResult; distillation: DistillationResult }
-    > {
+    ): Promise<DistillationResult> {
         this.progress = progress;
 
         // Initialize language modules
         await this.registry.initializeAll();
 
-        // Phase 1: Compression (if enabled)
-        let compressionResult: CompressionResult | undefined;
-        if (
-            this.options.compressFirst !== false ||
-            this.options.format === "compressed" ||
-            this.options.format === "both"
-        ) {
-            compressionResult = await this.compress(targetPath);
+        // Get files to process
+        const filesToDistill = await this.getFilesToProcess(targetPath);
+
+        if (this.progress) {
+            this.progress.start(filesToDistill.length);
         }
 
-        // Phase 2: Distillation (if format requires it)
-        let distillationResult: DistillationResult | undefined;
-        if (
-            this.options.format === "distilled" ||
-            this.options.format === "both"
-        ) {
-            const filesToDistill = compressionResult
-                ? compressionResult.files.filter((f) =>
-                      this.registry.isFileSupported(f.path),
-                  )
-                : await this.getFilesToProcess(targetPath);
+        const stats = await fs.stat(targetPath);
+        const basePath = stats.isFile() ? dirname(targetPath) : targetPath;
+        
+        // Distill the files
+        const distillationResult = await this.distillFiles(
+            filesToDistill,
+            basePath,
+        );
 
-            // Don't restart progress if already running from compression phase
-            if (!compressionResult && this.progress) {
-                this.progress.start(filesToDistill.length);
-            }
-
-            const stats = await fs.stat(targetPath);
-            const basePath = stats.isFile() ? dirname(targetPath) : targetPath;
-            distillationResult = await this.distillFiles(
-                filesToDistill,
-                basePath,
-            );
-        }
-
-        // Return based on format option
-        if (this.options.format === "compressed") {
-            return compressionResult!;
-        } else if (this.options.format === "distilled") {
-            return distillationResult!;
-        } else {
-            return {
-                compression: compressionResult!,
-                distillation: distillationResult!,
-            };
-        }
+        return distillationResult;
     }
 
     async distillSelectedFiles(
         selectedFiles: string[],
         basePath: string,
         progress?: DistillerProgress,
-    ): Promise<
-        | CompressionResult
-        | DistillationResult
-        | { compression: CompressionResult; distillation: DistillationResult }
-    > {
+    ): Promise<DistillationResult> {
         this.progress = progress;
 
         // Initialize language modules
         await this.registry.initializeAll();
 
-        // Phase 1: Compression (if enabled)
-        let compressionResult: CompressionResult | undefined;
-        if (
-            this.options.compressFirst !== false ||
-            this.options.format === "compressed" ||
-            this.options.format === "both"
-        ) {
-            compressionResult = await this.compressSelectedFiles(
-                selectedFiles,
-                basePath,
-            );
+        if (this.progress) {
+            this.progress.start(selectedFiles.length);
         }
 
-        // Phase 2: Distillation (if format requires it)
-        let distillationResult: DistillationResult | undefined;
-        if (
-            this.options.format === "distilled" ||
-            this.options.format === "both"
-        ) {
-            const filesToDistill = compressionResult
-                ? compressionResult.files.filter((f) =>
-                      this.registry.isFileSupported(f.path),
-                  )
-                : selectedFiles;
+        // Distill the selected files
+        const distillationResult = await this.distillFiles(
+            selectedFiles,
+            basePath,
+        );
 
-            // Don't restart progress if already running from compression phase
-            if (!compressionResult && this.progress) {
-                this.progress.start(filesToDistill.length);
-            }
-
-            distillationResult = await this.distillFiles(
-                filesToDistill,
-                basePath,
-            );
-        }
-
-        // Return based on format option
-        if (this.options.format === "compressed") {
-            return compressionResult!;
-        } else if (this.options.format === "distilled") {
-            return distillationResult!;
-        } else {
-            return {
-                compression: compressionResult!,
-                distillation: distillationResult!,
-            };
-        }
+        return distillationResult;
     }
 
     private async compress(targetPath: string): Promise<CompressionResult> {
@@ -349,14 +274,13 @@ export class Distiller {
             try {
                 // Process with language registry
                 const processingOptions: ProcessingOptions = {
-                    includePrivate: this.options.includePrivate || this.options.depth === 'all',
+                    includePrivate: this.options.includePrivate,
                     includeComments: this.options.includeComments,
                     includeDocstrings: this.options.includeDocstrings,
                     includeImports: true,
-                    depth: this.options.depth as 'public' | 'protected' | 'all' | undefined,
-                    compact: this.options.compact || this.options.format === 'compressed',
+                    depth: this.options.includePrivate ? 'all' : 'public',
                     includePatterns: undefined,  // Not used for name filtering at processor level
-                    excludePatterns: this.options.excludeNames  // Filter export names
+                    excludePatterns: undefined  // Not used for name filtering at processor level
                 };
                 
                 const result = await this.registry.processFile(file.path, file.content, processingOptions);
@@ -440,8 +364,23 @@ export class Distiller {
         const patterns = this.options.includePatterns && this.options.includePatterns.length > 0 
             ? this.options.includePatterns 
             : ["**/*"];
+        
+        // If include patterns are specified, filter out default excludes that conflict
+        let effectiveExcludes = [...this.defaultExcludes];
+        if (this.options.includePatterns && this.options.includePatterns.length > 0) {
+            // Remove test file excludes if user is explicitly including test files
+            const hasTestPattern = this.options.includePatterns.some(p => 
+                p.includes('.test.') || p.includes('.spec.') || p.includes('test') || p.includes('spec')
+            );
+            if (hasTestPattern) {
+                effectiveExcludes = effectiveExcludes.filter(e => 
+                    !e.includes('.test.') && !e.includes('.spec.')
+                );
+            }
+        }
+        
         const ignore = [
-            ...this.defaultExcludes,
+            ...effectiveExcludes,
             ...(this.options.excludePatterns || []),
         ];
 
@@ -452,6 +391,12 @@ export class Distiller {
             onlyFiles: true,
             dot: true,
         });
+        
+        if (process.env.DEBUG) {
+            console.error('DEBUG: Include patterns:', patterns);
+            console.error('DEBUG: Exclude patterns:', ignore);
+            console.error('DEBUG: Found files:', files.length);
+        }
 
         // Apply additional filters if needed
         if (this.options.since || this.options.staged) {
@@ -512,7 +457,7 @@ export class Distiller {
      * Format the distillation result based on output format
      */
     formatResult(
-        result: CompressionResult | DistillationResult | any,
+        result: DistillationResult,
         originalPath?: string,
     ): string {
         // Handle null/undefined result
@@ -520,30 +465,25 @@ export class Distiller {
             return "# Distillation Result\n\nNo content was distilled.";
         }
 
-
-        if ("files" in result) {
-            // Compression result - XML format
-            return this.formatCompression(result as CompressionResult);
-        } else if ("apis" in result) {
-            // Distillation result - structured format
-            return this.formatDistillation(
-                result as DistillationResult,
-                originalPath,
-            );
-        } else if ("compression" in result && "distillation" in result) {
-            // Both results
-            return `${this.formatCompression(result.compression)}\n\n---\n\n${this.formatDistillation(result.distillation, originalPath)}`;
+        // Use the appropriate formatter based on format option
+        const format = this.options.format || "txt";
+        let formatter = this.formatters.get(format);
+        
+        // Fall back to structured formatter for txt
+        if (!formatter && format === "txt") {
+            formatter = this.formatters.get("structured");
+        }
+        
+        if (!formatter) {
+            throw new Error(`Formatter '${format}' not found`);
         }
 
-        return JSON.stringify(result, null, 2);
-    }
-
-    private formatCompression(result: CompressionResult): string {
-        // Use formatter registry
-        const formatter = this.formatters.getDefault();
-        return formatter.formatCompression(result, {
-            includeMetadata: true,
-            compact: this.options.compact
+        return formatter.formatDistillation(result, {
+            includeImports: this.options.includeImports !== false,
+            includePrivate: this.options.includePrivate,
+            includeDocstrings: this.options.includeDocstrings,
+            includeComments: this.options.includeComments,
+            includeMetadata: true
         });
     }
 
@@ -559,8 +499,7 @@ export class Distiller {
             includePrivate: this.options.includePrivate,
             includeDocstrings: this.options.includeDocstrings,
             includeComments: this.options.includeComments,
-            includeMetadata: true,
-            compact: this.options.compact
+            includeMetadata: true
         });
 
         // Original format for backward compatibility

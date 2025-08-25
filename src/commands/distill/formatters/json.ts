@@ -1,5 +1,5 @@
 import { Formatter, FormatterOptions } from "./types";
-import { DistillationResult, CompressionResult } from "@/types";
+import { DistillationResult, CompressionResult } from "../../../types";
 
 /**
  * JSON formatter
@@ -53,7 +53,7 @@ export class JsonFormatter implements Formatter {
                     exportItem.docstring = exp.docstring;
                 }
 
-                if (exp.members && exp.members.length > 0 && !options.compact) {
+                if (exp.members && exp.members.length > 0) {
                     exportItem.members = exp.members;
                 }
 

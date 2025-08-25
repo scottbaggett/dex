@@ -1,5 +1,5 @@
 import { Formatter, FormatterOptions } from "./types";
-import { DistillationResult, CompressionResult, ExtractedAPI } from "@/types";
+import { DistillationResult, CompressionResult, ExtractedAPI } from "../../../types";
 
 /**
  * Structured code formatter
@@ -97,7 +97,6 @@ export class StructuredFormatter implements Formatter {
             for (const imp of api.imports) {
                 output += `import '${imp}'\n`;
             }
-            output += "\n";
         }
 
         // Group exports by type
@@ -126,6 +125,15 @@ export class StructuredFormatter implements Formatter {
                     output += this.formatExport(exp, options);
                 }
             }
+            
+            // Handle any items with undefined or unknown types
+            for (const [type, items] of grouped.entries()) {
+                if (!order.includes(type) && items && items.length > 0) {
+                    for (const exp of items) {
+                        output += this.formatExport(exp, options);
+                    }
+                }
+            }
         } else {
             // Output in original order
             for (const exp of exports) {
@@ -138,7 +146,7 @@ export class StructuredFormatter implements Formatter {
     }
 
     private formatExport(exp: any, options: FormatterOptions): string {
-        let output = "\n";
+        let output = "";
 
         // Add docstring if available and requested
         if (options.includeDocstrings && exp.docstring) {
@@ -177,10 +185,6 @@ export class StructuredFormatter implements Formatter {
     }
 
     private formatInterface(exp: any, options: FormatterOptions): string {
-        if (options.compact) {
-            return `export interface ${exp.name} {}\n`;
-        }
-
         let output = `export interface ${exp.name}`;
 
         // Add extends if in signature
@@ -191,7 +195,7 @@ export class StructuredFormatter implements Formatter {
 
         output += " {\n";
 
-        if (exp.members && !options.compact) {
+        if (exp.members) {
             for (const member of exp.members) {
                 output += `    ${member.signature};\n`;
             }
@@ -202,10 +206,6 @@ export class StructuredFormatter implements Formatter {
     }
 
     private formatClass(exp: any, options: FormatterOptions): string {
-        if (options.compact) {
-            return `export class ${exp.name} {}\n`;
-        }
-
         let output = `export class ${exp.name}`;
 
         // Add extends/implements
@@ -223,7 +223,7 @@ export class StructuredFormatter implements Formatter {
 
         output += " {\n";
 
-        if (exp.members && !options.compact) {
+        if (exp.members) {
             // Constructor first
             const constructor = exp.members.find(
                 (m: any) => m.name === "constructor",
@@ -291,10 +291,6 @@ export class StructuredFormatter implements Formatter {
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
             signature = signature.substring(7).trim();
-        }
-
-        if (options.compact) {
-            return `export enum ${exp.name} {}\n`;
         }
 
         // For enums, use the full signature if available

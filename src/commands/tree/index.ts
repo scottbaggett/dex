@@ -90,8 +90,6 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
 
         const distillerOptions: DistillerOptions = {
             path: resolvedPath,
-
-            compressFirst: false,
             excludePatterns: [...configExcludes, ...cliExcludes],
             includeComments: false,
             includeDocstrings: true,
