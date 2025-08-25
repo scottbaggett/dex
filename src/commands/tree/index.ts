@@ -1,16 +1,12 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { Distiller } from "../core/distiller";
-import type {
-    DistillerOptions,
-    ExtractedAPI,
-    ProjectStructure,
-} from "../types";
+import { Distiller } from "../../core/distiller";
+import type { DistillerOptions, ExtractedAPI, ProjectStructure } from "../../types";
 import { promises as fs } from "fs";
 import { resolve, basename, relative } from "path";
 import clipboardy from "clipboardy";
-import { loadConfig } from "../core/config";
-import { OutputManager } from "../utils/output-manager";
+import { loadConfig } from "../../core/config";
+import { OutputManager } from "../../utils/output-manager";
 
 export interface TreeOptions {
     depth?: string;

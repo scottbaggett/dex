@@ -37,3 +37,8 @@ export class FormattersRegistry implements FormatterRegistry {
 
 // Singleton instance
 export const formattersRegistry = new FormattersRegistry();
+
+// Export function for compatibility
+export function getFormatterRegistry(): FormattersRegistry {
+    return formattersRegistry;
+}

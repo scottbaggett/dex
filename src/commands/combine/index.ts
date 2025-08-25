@@ -4,20 +4,20 @@ import ora from "ora";
 import clipboardy from "clipboardy";
 import { readFileSync, statSync } from "fs";
 import { resolve, relative, join } from "path";
-import { XmlFormatter } from "../templates/xml";
-import { MarkdownFormatter } from "../templates/markdown";
-import { JsonFormatter } from "../templates/json";
+import { XmlFormatter } from "../extract/formatters/xml";
+import { MarkdownFormatter } from "../extract/formatters/markdown";
+import { JsonFormatter } from "../extract/formatters/json";
 import type {
     ExtractedContext,
     GitChange,
     DexOptions,
     OutputFormat,
     Formatter,
-} from "../types";
-import { formatFileSize } from "../utils/file-scanner";
-import { FileSelector } from "../utils/file-selector";
-import { OutputManager } from "../utils/output-manager";
-import { GitExtractor } from "../core/git";
+} from "../../types";
+import { formatFileSize } from "../../utils/file-scanner";
+import { FileSelector } from "../../utils/file-selector";
+import { OutputManager } from "../../utils/output-manager";
+import { GitExtractor } from "../../core/git";
 
 export function createCombineCommand(): Command {
     const combine = new Command("combine")

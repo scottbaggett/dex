@@ -1,10 +1,10 @@
-import { Formatter } from "../core/formatter";
+import { Formatter } from "../../../core/formatter";
 import type {
     FormatterOptions,
     ExtractedContext,
     TaskContext,
     Metadata,
-} from "../types";
+} from "../../../types";
 // Prompt features removed
 
 export class XmlFormatter extends Formatter {

@@ -1,16 +1,16 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { Distiller } from "../core/distiller";
-import type { DistillerOptions } from "../types";
+import { Distiller } from "../../core/distiller";
+import type { DistillerOptions } from "../../types";
 import { promises as fs } from "fs";
 import { resolve, basename } from "path";
 import * as path from "path";
 import clipboardy from "clipboardy";
-import { DistillerProgress } from "../core/distiller/progress";
-import { loadConfig } from "../core/config";
-import { OutputManager } from "../utils/output-manager";
-import { FileSelector } from "../utils/file-selector";
-import { formatFileSize } from "../utils/format";
+import { DistillerProgress } from "../../core/distiller/progress";
+import { loadConfig } from "../../core/config";
+import { OutputManager } from "../../utils/output-manager";
+import { FileSelector } from "../../utils/file-selector";
+import { formatFileSize } from "../../utils/format";
 
 export function createDistillCommand(): Command {
     const command = new Command("distill");

@@ -8,7 +8,7 @@ import type {
     DependencyMap,
 } from "../../types";
 import { getLanguageRegistry, ProcessingOptions } from "../languages";
-import { getFormatterRegistry } from "../formatters";
+import { getFormatterRegistry } from "../../commands/distill/formatters";
 import { Parser } from "../parser/parser";
 import { promises as fs } from "fs";
 import { join, relative, dirname, basename } from "path";

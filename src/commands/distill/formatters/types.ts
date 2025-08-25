@@ -2,7 +2,7 @@
  * Formatter types and interfaces
  */
 
-import { DistillationResult, CompressionResult } from '../../types';
+import { DistillationResult, CompressionResult } from '../../../types';
 
 export interface FormatterOptions {
     // Control what to include

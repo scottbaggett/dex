@@ -1,5 +1,5 @@
-import { Formatter } from "../core/formatter";
-import type { FormatterOptions, TaskContext, ExtractedContext } from "../types";
+import { Formatter } from "../../../core/formatter";
+import type { FormatterOptions, TaskContext, ExtractedContext } from "../../../types";
 
 interface JsonOutput {
     task?: TaskContext;
