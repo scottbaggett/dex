@@ -50,6 +50,7 @@
         "cosmiconfig": "^9.0.0",
         "diff": "^5.2.0",
         "globby": "^14.1.0",
+        "gpt-tokenizer": "^3.0.1",
         "ink": "3.2.0",
         "ink-select-input": "4.2.2",
         "ink-text-input": "4.0.3",
