@@ -80,7 +80,7 @@
         "vitest": "^2.1.9"
     },
     "engines": {
-        "node": ">=16.0.0"
+        "node": ">=23.5.0"
     },
     "repository": {
         "type": "git",
