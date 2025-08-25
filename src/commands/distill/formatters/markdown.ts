@@ -1,5 +1,6 @@
 import { Formatter, FormatterOptions } from "./types";
 import { DistillationResult, CompressionResult } from "../../../types";
+import { getSyntaxLanguage } from "../../../utils/language";
 
 /**
  * Markdown formatter
@@ -18,7 +19,7 @@ export class MarkdownFormatter implements Formatter {
         for (const api of result.apis) {
             output += `## ${api.file}\n\n`;
             
-            const lang = this.getLanguageForFile(api.file);
+            const lang = getSyntaxLanguage(api.file);
             output += `\`\`\`${lang}\n`;
             
             // Add imports
@@ -70,35 +71,4 @@ export class MarkdownFormatter implements Formatter {
         return `${this.formatCompression(compression, options)}\n\n---\n\n${this.formatDistillation(distillation, options)}`;
     }
 
-    private getLanguageForFile(filePath: string): string {
-        const ext = filePath.split(".").pop()?.toLowerCase();
-        const langMap: Record<string, string> = {
-            ts: "typescript",
-            tsx: "typescript",
-            js: "javascript",
-            jsx: "javascript",
-            py: "python",
-            rb: "ruby",
-            go: "go",
-            rs: "rust",
-            java: "java",
-            cpp: "cpp",
-            c: "c",
-            cs: "csharp",
-            php: "php",
-            swift: "swift",
-            kt: "kotlin",
-            scala: "scala",
-            sh: "bash",
-            yaml: "yaml",
-            yml: "yaml",
-            json: "json",
-            xml: "xml",
-            html: "html",
-            css: "css",
-            scss: "scss",
-            sql: "sql",
-        };
-        return langMap[ext || ""] || "text";
-    }
 }

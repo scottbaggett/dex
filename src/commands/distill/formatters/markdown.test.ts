@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { MarkdownFormatter } from "./markdown";
 import { DistillationResult, CompressionResult } from "../../../types";
+import { getSyntaxLanguage } from "../../../utils/language";
 
 describe("MarkdownFormatter", () => {
     const formatter = new MarkdownFormatter();
@@ -388,7 +389,7 @@ describe("MarkdownFormatter", () => {
         });
     });
 
-    describe("getLanguageForFile", () => {
+    describe("getSyntaxLanguage", () => {
         test("detects correct language for various file extensions", () => {
             const testCases = [
                 { file: "test.ts", expected: "typescript" },
@@ -419,12 +420,9 @@ describe("MarkdownFormatter", () => {
                 { file: "test.unknown", expected: "text" },
                 { file: "test", expected: "text" }
             ];
-
-            const formatter = new MarkdownFormatter();
             
             testCases.forEach(({ file, expected }) => {
-                // @ts-ignore - accessing private method for testing
-                const result = formatter.getLanguageForFile(file);
+                const result = getSyntaxLanguage(file);
                 expect(result).toBe(expected);
             });
         });

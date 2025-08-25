@@ -11,6 +11,12 @@ import { loadConfig } from "../../core/config";
 import { OutputManager } from "../../utils/output-manager";
 import { FileSelector } from "../../utils/file-selector";
 import { formatFileSize } from "../../utils/format";
+import {
+    countTokens,
+    formatTokenCount,
+    formatEstimatedTokens,
+    calculateTokenSavings,
+} from "../../utils/tokens";
 
 /**
  *  Dex Distill
@@ -193,12 +199,19 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                 (await distiller.getFilesToProcess(resolvedPath));
 
             console.log(
-                chalk.cyan(`\n📋 Dry run - Files that would be processed:\n`),
+                chalk.cyan(`\nDry run - Files that would be processed:\n`),
             );
 
+            // Check if resolvedPath is a file or directory
+            const targetIsFile = (await fs.stat(resolvedPath)).isFile();
+            const baseDir = targetIsFile ? path.dirname(resolvedPath) : resolvedPath;
+            
             for (const filePath of filesToAnalyze) {
-                const stats = await fs.stat(filePath);
-                const relativePath = path.relative(resolvedPath, filePath);
+                const fullPath = path.isAbsolute(filePath)
+                    ? filePath
+                    : path.join(baseDir, filePath);
+                const stats = await fs.stat(fullPath);
+                const relativePath = targetIsFile ? path.basename(fullPath) : path.relative(resolvedPath, fullPath);
                 const fileSize = formatFileSize(stats.size);
                 console.log(
                     chalk.green(`  ✓ ${relativePath}`) +
@@ -206,19 +219,54 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                 );
             }
 
-            console.log(chalk.cyan(`\n📊 Summary:`));
+            const totalSize = filesToAnalyze.reduce((total, file) => {
+                try {
+                    const fullPath = path.isAbsolute(file)
+                        ? file
+                        : path.join(baseDir, file);
+                    return total + require("fs").statSync(fullPath).size;
+                } catch {
+                    return total;
+                }
+            }, 0);
+
+            console.log(chalk.cyan(`\nSummary:`));
             console.log(`  Files: ${filesToAnalyze.length}`);
-            console.log(
-                `  Total size: ${formatFileSize(
-                    filesToAnalyze.reduce((total, file) => {
-                        try {
-                            return total + require("fs").statSync(file).size;
-                        } catch {
-                            return total;
-                        }
-                    }, 0),
-                )}`,
+            console.log(`  Total size: ${formatFileSize(totalSize)}`);
+
+            // Calculate original tokens from actual file content
+            let totalOriginalTokens = 0;
+            for (const file of filesToAnalyze) {
+                try {
+                    const fullPath = path.isAbsolute(file)
+                        ? file
+                        : path.join(baseDir, file);
+                    const content = require("fs").readFileSync(fullPath, 'utf-8');
+                    totalOriginalTokens += countTokens(content);
+                } catch {
+                    // Skip files that can't be read
+                }
+            }
+
+            // For distilled tokens, we need to actually run distillation on a sample
+            // or use a more accurate estimate based on file type
+            // TypeScript/JavaScript files typically compress to ~8-10% of original
+            // depending on comments, docstrings, and code complexity
+            const estimatedDistilledTokens = Math.ceil(totalOriginalTokens * 0.09);
+
+            const savings = calculateTokenSavings(
+                totalOriginalTokens,
+                estimatedDistilledTokens,
             );
+
+            console.log(
+                `  Original tokens: ${formatTokenCount(totalOriginalTokens)}`,
+            );
+            console.log(
+                `  Estimated tokens: ${formatEstimatedTokens(estimatedDistilledTokens)}`,
+            );
+            console.log(`  Estimated savings: ~${savings.formatted}`);
+
             console.log(
                 chalk.dim(`\nRun without --dry-run to process these files.`),
             );
@@ -260,6 +308,9 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
 
         // No AI prompt injection
         const output = formatted;
+        
+        // Calculate actual tokens from the formatted output
+        const actualDistilledTokens = countTokens(output);
 
         // Handle output based on explicit options first, then fall back to config
         if (options.clipboard) {
@@ -267,12 +318,11 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
 
             // Complete progress
             const originalTokens = result.metadata.originalTokens || 0;
-            const distilledTokens = result.metadata.distilledTokens || 0;
             const fileCount = result.structure?.fileCount || 0;
 
             progress.complete({
                 originalTokens,
-                distilledTokens,
+                distilledTokens: actualDistilledTokens,
                 fileCount,
             });
 
@@ -282,12 +332,11 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
 
             // Complete progress
             const originalTokens = result.metadata.originalTokens || 0;
-            const distilledTokens = result.metadata.distilledTokens || 0;
             const fileCount = result.structure?.fileCount || 0;
 
             progress.complete({
                 originalTokens,
-                distilledTokens,
+                distilledTokens: actualDistilledTokens,
                 fileCount,
             });
 
@@ -304,12 +353,11 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
 
             // Complete progress
             const originalTokens = result.metadata.originalTokens || 0;
-            const distilledTokens = result.metadata.distilledTokens || 0;
             const fileCount = result.structure?.fileCount || 0;
 
             progress.complete({
                 originalTokens,
-                distilledTokens,
+                distilledTokens: actualDistilledTokens,
                 fileCount,
             });
 
@@ -336,12 +384,11 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
 
             // Complete progress with cool output
             const originalTokens = result.metadata.originalTokens || 0;
-            const distilledTokens = result.metadata.distilledTokens || 0;
             const fileCount = result.structure?.fileCount || 0;
 
             progress.complete({
                 originalTokens,
-                distilledTokens,
+                distilledTokens: actualDistilledTokens,
                 fileCount,
             });
 

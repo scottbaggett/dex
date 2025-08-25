@@ -115,22 +115,17 @@ export class DistillerProgress {
                 : 0;
 
         // Final success message - always show this
+        const tokenStr = result.distilledTokens >= 1000
+            ? `${(result.distilledTokens / 1000).toFixed(1)}k`
+            : `${result.distilledTokens}`;
+        
         console.log(
             chalk.cyan("✨ Distilled ") +
                 chalk.white(`${result.fileCount} files `) +
-                this.createProgressBar(100) +
-                " " +
-                chalk.green(`${compressionRatio}% compression `) +
-                chalk.gray(`(${originalKB} kB → ${distilledKB} kB) `) +
-                chalk.gray(`in ${elapsedMs}ms `) +
-                chalk.green(
-                    "💰 ~" +
-                        Math.round(
-                            (result.originalTokens - result.distilledTokens) /
-                                1000,
-                        ) +
-                        "k tokens saved ",
-                ),
+                chalk.cyan("→ ") +
+                chalk.yellow(`${tokenStr} tokens `) +
+                chalk.gray(`(${compressionRatio}% reduction) `) +
+                chalk.gray(`in ${elapsedMs}ms`),
         );
     }
 

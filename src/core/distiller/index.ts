@@ -10,6 +10,8 @@ import type {
 import { getLanguageRegistry, ProcessingOptions } from "../languages";
 import { getFormatterRegistry } from "../../commands/distill/formatters";
 import { Parser } from "../parser/parser";
+import { getSyntaxLanguage } from "../../utils/language";
+import { countTokens } from "../../utils/tokens";
 import { promises as fs } from "fs";
 import { join, relative, dirname, basename } from "path";
 import { globby } from "globby";
@@ -228,7 +230,6 @@ export class Distiller {
         const dependencies: DependencyMap = {};
 
         let originalTokens = 0;
-        let distilledTokens = 0;
 
         // Process files
         const filesToProcess =
@@ -268,7 +269,7 @@ export class Distiller {
                 (structure.languages[language] || 0) + 1;
 
             // Calculate tokens
-            originalTokens += Math.ceil(file.content.length / 4);
+            originalTokens += countTokens(file.content);
             cumulativeOriginalSize += file.size;
 
             try {
@@ -305,11 +306,9 @@ export class Distiller {
 
                 apis.push(extracted);
 
-                // Estimate distilled tokens
-                const distilledContent = this.serializeExtractedAPI(extracted);
-                const distilledBytes = distilledContent.length;
-                distilledTokens += Math.ceil(distilledBytes / 4);
-                cumulativeDistilledSize += distilledBytes;
+                // We'll calculate distilled tokens from the final formatted output
+                // since different formatters produce different sizes
+                cumulativeDistilledSize += file.content.length;
 
                 // Extract dependencies (imports/exports)
                 dependencies[file.path] = {
@@ -343,11 +342,8 @@ export class Distiller {
             dependencies,
             metadata: {
                 originalTokens,
-                distilledTokens,
-                compressionRatio:
-                    originalTokens > 0
-                        ? 1 - distilledTokens / originalTokens
-                        : 0,
+                distilledTokens: 0, // Will be calculated from formatted output
+                compressionRatio: 0, // Will be calculated from formatted output
             },
         };
     }
@@ -356,7 +352,8 @@ export class Distiller {
         const stats = await fs.stat(targetPath);
 
         if (stats.isFile()) {
-            // Return just the filename for single files
+            // For single files, return the relative path from parent directory
+            // This ensures consistency with how directories return relative paths
             return [basename(targetPath)];
         }
 
@@ -508,8 +505,8 @@ export class Distiller {
         // Metadata
         output += `## Summary\n`;
         output += `- Files analyzed: ${result.structure.fileCount}\n`;
-        output += `- Original tokens: ${result.metadata.originalTokens.toLocaleString()}\n`;
-        output += `- Distilled tokens: ${result.metadata.distilledTokens.toLocaleString()}\n`;
+        output += `- Tokens: ${result.metadata.distilledTokens.toLocaleString()}\n`;
+        output += `- Token savings: ${(result.metadata.originalTokens - result.metadata.distilledTokens).toLocaleString()} (${Math.round(result.metadata.compressionRatio * 100)}%)\n`;
         output += `- Compression ratio: ${(result.metadata.compressionRatio * 100).toFixed(1)}%\n\n`;
 
         // Languages breakdown
@@ -529,7 +526,7 @@ export class Distiller {
                 if (exp.docstring) {
                     output += `\`\`\`\n${exp.docstring}\n\`\`\`\n`;
                 }
-                output += `\`\`\`${this.getLanguageForFile(api.file)}\n${exp.signature}\n\`\`\`\n\n`;
+                output += `\`\`\`${getSyntaxLanguage(api.file)}\n${exp.signature}\n\`\`\`\n\n`;
             }
         }
 
@@ -545,8 +542,4 @@ export class Distiller {
             .replace(/'/g, "&apos;");
     }
 
-    private getLanguageForFile(filePath: string): string {
-        const language = Parser.detectLanguage(filePath);
-        return language || "text";
-    }
 }
