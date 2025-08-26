@@ -1,4 +1,4 @@
-import { LanguageModule, ProcessingOptions, ProcessResult } from './types';
+import { LanguageModule, ProcessingOptions, ProcessResult } from "./types.js";
 import * as path from 'path';
 
 /**

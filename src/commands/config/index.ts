@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { validateConfig } from "../../core/config";
+import { validateConfig } from "../../core/config.js";
 
 export function createConfigCommand(): Command {
     const command = new Command("config");

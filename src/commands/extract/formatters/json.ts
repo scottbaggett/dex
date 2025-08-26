@@ -1,5 +1,5 @@
-import { Formatter } from "../../../core/formatter";
-import type { FormatterOptions, ExtractedContext } from "../../../types";
+import { Formatter } from "../../../core/formatter.js";
+import type { FormatterOptions, ExtractedContext } from "../../../types.js";
 
 interface JsonOutput {
     scope: ExtractedContext["scope"];

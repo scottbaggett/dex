@@ -1,9 +1,9 @@
-import { Formatter } from "../../../core/formatter";
+import { Formatter } from "../../../core/formatter.js";
 import type {
     FormatterOptions,
     ExtractedContext,
     Metadata,
-} from "../../../types";
+} from "../../../types.js";
 // Prompt features removed
 
 export class XmlFormatter extends Formatter {

@@ -1,4 +1,4 @@
-import type { GitChange } from "../../../types";
+import type { GitChange } from "../../../types.js";
 
 type ChangeWithContent = GitChange & { content?: string };
 

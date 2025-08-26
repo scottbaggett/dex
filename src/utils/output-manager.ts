@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import { join } from "path";
-import simpleGit from "simple-git";
-import type { OutputFormat } from "../types";
+import { simpleGit } from "simple-git";
+import type { OutputFormat } from "../types.js";
 
 export interface OutputOptions {
     command: string;
@@ -27,7 +27,7 @@ export class OutputManager {
             const git = simpleGit(this.workingDir);
             const root = await git.revparse(["--show-toplevel"]);
             this.projectRoot = root.trim();
-            return this.projectRoot;
+            return this.projectRoot || '';
         } catch {
             // Not in a git repository, use working directory
             this.projectRoot = this.workingDir;
@@ -45,7 +45,7 @@ export class OutputManager {
         const sanitizedContext = this.sanitizeContext(context);
 
         // Get extension based on format
-        const extension = this.getExtension(format);
+        const extension = format;
 
         return `dex.${command}.${sanitizedContext}.${extension}`;
     }
@@ -98,7 +98,7 @@ export class OutputManager {
         
         // Replace problematic characters for filenames
         return context
-            .replace(/[\/\\]/g, ".") // Replace slashes with dots for path structure
+            .replace(/[/\\]/g, ".") // Replace slashes with dots for path structure
             .replace(/[<>:"|?*]/g, "") // Remove invalid filename characters
             .replace(/\s+/g, "-") // Replace spaces with dashes
             .replace(/\.+/g, ".") // Collapse multiple dots
@@ -108,18 +108,4 @@ export class OutputManager {
             || "output"; // Default if context becomes empty
     }
 
-    private getExtension(format: OutputFormat): string {
-        // Map logical output formats to file extensions. Default to txt.
-        switch (format) {
-            case "markdown":
-                return "md";
-            case "json":
-                return "json";
-            case "xml":
-                return "txt";  // XML format but saved as .txt
-            case "txt":
-            default:
-                return "txt";
-        }
-    }
 }

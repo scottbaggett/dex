@@ -2,14 +2,14 @@
  * Language module exports and registry initialization
  */
 
-export * from './types';
-export * from './registry';
-export * from './base';
+export * from "./types.js";
+export * from "./registry.js";
+export * from "./base.js";
 
 // Import language modules
-import { TypeScriptModule } from './typescript';
-import { PythonModule } from './python';
-import { registry } from './registry';
+import { TypeScriptModule } from "./typescript/index.js";
+import { PythonModule } from "./python/index.js";
+import { registry } from "./registry.js";
 
 /**
  * Initialize default language modules

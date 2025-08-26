@@ -1,4 +1,4 @@
-import { LanguageModule, ProcessResult, ProcessingOptions } from './types';
+import { LanguageModule, ProcessResult, ProcessingOptions } from "./types.js";
 
 /**
  * Base class for language modules
@@ -68,7 +68,7 @@ export abstract class BaseLanguageModule implements LanguageModule {
     /**
      * Get language capabilities - must be implemented by subclasses
      */
-    abstract getCapabilities(): import('./types').LanguageCapabilities;
+    abstract getCapabilities(): import('./types.js').LanguageCapabilities;
     
     /**
      * Get tree-sitter language if available

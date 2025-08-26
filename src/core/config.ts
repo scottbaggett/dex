@@ -1,5 +1,5 @@
 import { cosmiconfigSync } from "cosmiconfig";
-import type { DexOptions } from "../types";
+import type { DexOptions } from "../types.js";
 
 export interface DexConfig {
     defaults?: Partial<DexOptions>;

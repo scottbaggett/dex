@@ -1,4 +1,4 @@
-import type { GitChange } from "../types";
+import type { GitChange } from "../types.js";
 
 export interface FileItem extends GitChange {
     selected: boolean;

@@ -1,10 +1,10 @@
-import { GitExtractor } from "./git";
+import { GitExtractor } from "./git.js";
 import type {
     DexOptions,
     ExtractedContext,
     GitChange,
     Metadata,
-} from "../types";
+} from "../types.js";
 import { minimatch } from "minimatch";
 
 export class ContextEngine {

@@ -1,9 +1,9 @@
-import { Formatter } from "../../../core/formatter";
+import { Formatter } from "../../../core/formatter.js";
 import type {
     FormatterOptions,
     ExtractedContext,
     Metadata,
-} from "../../../types";
+} from "../../../types.js";
 
 export class MarkdownFormatter extends Formatter {
     format({ context, options }: FormatterOptions): string {

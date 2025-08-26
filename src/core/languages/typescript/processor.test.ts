@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeEach } from 'bun:test';
-import { TypeScriptProcessor } from './processor';
-import { ProcessingOptions } from '../types';
+import { TypeScriptProcessor } from "./processor.js";
+import { ProcessingOptions } from "../types.js";
 
 describe('TypeScriptProcessor', () => {
     let processor: TypeScriptProcessor;

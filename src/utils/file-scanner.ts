@@ -231,7 +231,7 @@ export class FileScanner {
 
                     this.gitignorePatterns.push(...patterns);
                 } catch (error) {
-                    // Ignore errors reading .gitignore
+                    console.error(error);
                 }
             }
 
@@ -379,6 +379,7 @@ export class FileScanner {
 
             return printableCount / sample.length > 0.7; // 70% printable characters
         } catch (error) {
+            console.error(error);
             return false;
         }
     }
@@ -453,6 +454,7 @@ export class FileScanner {
 
                 return null;
             } catch (error) {
+                console.error(error);
                 return null;
             }
         };
@@ -521,7 +523,6 @@ export class FileScanner {
                 }
 
                 if (entry.isDirectory()) {
-                    // Recursively collect from subdirectory
                     await this.collectPaths(
                         fullPath,
                         rootPath,
@@ -537,7 +538,7 @@ export class FileScanner {
                 }
             }
         } catch (error) {
-            // Skip directories we can't read
+            console.error(error);
         }
     }
 
@@ -556,7 +557,7 @@ export class FileScanner {
             const item = items[i];
 
             // Create a promise for this item
-            const promise = processor(item as any).then((result) => {
+            const promise = processor(item as T).then((result) => {
                 results[i] = result;
             });
 
@@ -579,7 +580,6 @@ export class FileScanner {
             }
         }
 
-        // Wait for all remaining promises to complete
         await Promise.all(executing);
 
         return results;

@@ -1,7 +1,7 @@
 import { test, expect, describe, beforeEach } from 'bun:test';
-import { LanguageRegistry } from './registry';
-import { TypeScriptModule } from './typescript';
-import { PythonModule } from './python';
+import { LanguageRegistry } from "./registry.js";
+import { TypeScriptModule } from "./typescript.js";
+import { PythonModule } from "./python.js";
 
 describe('LanguageRegistry', () => {
     let registry: LanguageRegistry;

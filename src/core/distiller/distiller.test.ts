@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
-import { Distiller } from './index';
-import { DistillationResult, CompressionResult } from '../../types';
+import { Distiller } from "./index.js";
+import { DistillationResult, CompressionResult } from "../../types.js";
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';

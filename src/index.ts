@@ -1,9 +1,9 @@
-export { ContextEngine } from "./core/context";
-export { GitExtractor } from "./core/git";
-export { Formatter } from "./core/formatter";
-export { MarkdownFormatter } from "./commands/extract/formatters/markdown";
-export { JsonFormatter } from "./commands/extract/formatters/json";
-export { XmlFormatter } from "./commands/extract/formatters/xml";
+export { ContextEngine } from "./core/context.js";
+export { GitExtractor } from "./core/git.js";
+export { Formatter } from "./core/formatter.js";
+export { MarkdownFormatter } from "./commands/extract/formatters/markdown.js";
+export { JsonFormatter } from "./commands/extract/formatters/json.js";
+export { XmlFormatter } from "./commands/extract/formatters/xml.js";
 
 export type {
     DexOptions,
@@ -12,4 +12,4 @@ export type {
     ExtractedContext,
     SymbolMap,
     FormatterOptions,
-} from "./types";
+} from "./types.js";

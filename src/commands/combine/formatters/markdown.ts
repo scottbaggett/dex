@@ -1,4 +1,4 @@
-import type { GitChange } from "../../../types";
+import type { GitChange } from "../../../types.js";
 
 type ChangeWithContent = GitChange & { content?: string };
 
@@ -33,7 +33,7 @@ export class MarkdownFormatter {
     
     private getFileExtension(path: string): string {
         const parts = path.split(".");
-        return parts.length > 1 ? parts[parts.length - 1] : "";
+        return parts.length > 1 ? parts[parts.length - 1] || "" : "";
     }
     
     private getLanguageFromExtension(ext: string): string {

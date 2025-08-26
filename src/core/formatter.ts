@@ -1,4 +1,4 @@
-import type { FormatterOptions } from "../types";
+import type { FormatterOptions } from "../types.js";
 
 export abstract class Formatter {
     abstract format(options: FormatterOptions): string;
