@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import { Distiller } from "../../core/distiller";
-import type { DistillerOptions, ExtractedAPI, ProjectStructure } from "../../types";
+import type {
+    DistillerOptions,
+    ExtractedAPI,
+    ProjectStructure,
+} from "../../types";
 import { promises as fs } from "fs";
 import { resolve, basename, relative } from "path";
 import clipboardy from "clipboardy";
@@ -25,9 +29,7 @@ export function createTreeCommand(): Command {
     const command = new Command("tree");
 
     command
-        .description(
-            "Generate beautiful visual trees of codebase APIs and structure",
-        )
+        .description("Generate visual trees of codebase APIs and structure")
         .argument(
             "[path]",
             "Path to directory to analyze (defaults to current directory)",
@@ -97,7 +99,7 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
             parallel: true,
         };
 
-        console.log(chalk.cyan("🪾 Generating API tree..."));
+        console.log(chalk.cyan("✨Generating Tree..."));
 
         // Create distiller and extract APIs
         const distiller = new Distiller(distillerOptions);
@@ -390,7 +392,9 @@ function renderDirectoryTree(
             }
 
             if (exp.visibility === "private") {
-                exportLine += forTerminal ? chalk.dim(" 🔒") : " [private]";
+                exportLine += forTerminal
+                    ? chalk.dim(" [private]")
+                    : " [private]";
             }
 
             lines.push(exportLine);
@@ -447,9 +451,7 @@ function generateTreeByType(
         return a.localeCompare(b);
     });
 
-    lines.push(
-        forTerminal ? chalk.bold.cyan("📋 APIs by Type") : "APIs by Type",
-    );
+    lines.push(forTerminal ? chalk.bold.cyan("APIs by Type") : "APIs by Type");
 
     for (let i = 0; i < sortedTypes.length; i++) {
         const type = sortedTypes[i] as string;
@@ -486,7 +488,9 @@ function generateTreeByType(
                 : ` ${relative(process.cwd(), exp.file)}`;
 
             if (exp.visibility === "private") {
-                exportLine += forTerminal ? chalk.dim(" 🔒") : " [private]";
+                exportLine += forTerminal
+                    ? chalk.dim(" [private]")
+                    : " [private]";
             }
 
             lines.push(exportLine);
@@ -508,7 +512,7 @@ function generateFlatTree(
 ): string {
     const lines: string[] = [];
 
-    lines.push(forTerminal ? chalk.bold.cyan("📋 All APIs") : "All APIs");
+    lines.push(forTerminal ? chalk.bold.cyan("All APIs") : "All APIs");
 
     const sortedExports = exports.sort((a, b) => {
         if (a.type !== b.type) {
@@ -549,7 +553,7 @@ function generateFlatTree(
             : ` ${relative(process.cwd(), exp.file)}`;
 
         if (exp.visibility === "private") {
-            line += forTerminal ? chalk.dim(" 🔒") : " [private]";
+            line += forTerminal ? chalk.dim(" [private]") : " [private]";
         }
 
         lines.push(line);
@@ -621,7 +625,7 @@ function generateOutline(
             }
 
             if (exp.visibility === "private") {
-                line += forTerminal ? " 🔒" : " [private]";
+                line += forTerminal ? " [private]" : " [private]";
             }
 
             lines.push(line);
@@ -640,20 +644,7 @@ function generateOutline(
 }
 
 function getTypeIcon(type: string, forTerminal: boolean = false): string {
-    if (!forTerminal) {
-        return "";
-    }
-    const icons: Record<string, string> = {
-        class: "🏛️",
-        function: "⚡",
-        interface: "📋",
-        type: "🏷️",
-        const: "🔒",
-        enum: "📋",
-        method: "⚙️",
-        property: "🔧",
-    };
-    return icons[type] || "📄";
+    return "";
 }
 
 function getTypeColor(
@@ -686,7 +677,7 @@ async function handleOutput(
 
     if (options.clipboard) {
         await clipboardy.write(content);
-        console.log(chalk.cyan("📋 API tree copied to clipboard"));
+        console.log(chalk.cyan("API tree copied to clipboard"));
     } else if (options.output) {
         await fs.writeFile(options.output, content, "utf-8");
         console.log(
@@ -697,7 +688,7 @@ async function handleOutput(
         console.log(content);
     } else if (defaultOutput === "clipboard") {
         await clipboardy.write(content);
-        console.log(chalk.cyan("📋 API tree copied to clipboard"));
+        console.log(chalk.cyan("API tree copied to clipboard"));
     } else {
         // Default: save using OutputManager
         const outputManager = new OutputManager();
@@ -706,13 +697,13 @@ async function handleOutput(
         await outputManager.saveOutput(content, {
             command: "tree",
             context: folderName,
-            format: options.format === "json" ? "json" : "markdown",
+            format: options.format === "json" ? "json" : "txt",
         });
 
         const fullPath = await outputManager.getFilePath({
             command: "tree",
             context: folderName,
-            format: options.format === "json" ? "json" : "markdown",
+            format: options.format === "json" ? "json" : "txt",
         });
 
         console.log(
