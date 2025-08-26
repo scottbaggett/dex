@@ -1,23 +1,30 @@
-import { Command, Option } from "commander";
+import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import clipboardy from "clipboardy";
 import { readFileSync, statSync } from "fs";
 import { resolve, relative, join } from "path";
-import { XmlFormatter } from "../extract/formatters/xml";
-import { MarkdownFormatter } from "../extract/formatters/markdown";
-import { JsonFormatter } from "../extract/formatters/json";
+import { XmlFormatter } from "./formatters/xml";
+import { MarkdownFormatter } from "./formatters/markdown";
+import { JsonFormatter } from "./formatters/json";
 import type {
-    ExtractedContext,
     GitChange,
     DexOptions,
     OutputFormat,
-    Formatter,
 } from "../../types";
 import { formatFileSize } from "../../utils/file-scanner";
 import { FileSelector } from "../../utils/file-selector";
 import { OutputManager } from "../../utils/output-manager";
 import { GitExtractor } from "../../core/git";
+import {
+    countTokens,
+    formatTokenCount,
+    formatEstimatedTokens,
+} from "../../utils/tokens";
+
+function collectPatterns(value: string, previous: string[]): string[] {
+    return previous.concat([value]);
+}
 
 export function createCombineCommand(): Command {
     const combine = new Command("combine")
@@ -25,51 +32,70 @@ export function createCombineCommand(): Command {
             "Combine multiple files and directories into a single, LLM-friendly document",
         )
         .argument(
-            "[files...]",
-            "List of file paths and directories to combine (optional if using --select or --staged)",
-        )
-        .addOption(
-            new Option("--output-format <format>", "Output format")
-                .default("xml")
-                .choices(["xml", "markdown", "json"]),
+            "[paths...]",
+            "Paths to files or directories to combine (defaults to current directory)",
         )
         .option(
-            "-s, --staged",
-            "Combine all staged files (shows full file content, not just diffs)",
+            "-f, --format <type>",
+            "Output format (xml, markdown, json)",
+            "xml",
         )
-        .option("-c, --copy", "Copy output to clipboard")
-        // Prompt options removed
+        .option("-o, --output <file>", "Write output to specific file")
+        .option("-c, --clipboard", "Copy output to clipboard")
+        .option("--stdout", "Print output to stdout")
+        .option("-s, --select", "Interactively select files to combine")
+        .option(
+            "--exclude <patterns...>",
+            "Exclude file patterns",
+            collectPatterns,
+            [],
+        )
+        .option(
+            "--include <patterns...>",
+            "Include file patterns",
+            collectPatterns,
+            [],
+        )
         .option("--no-metadata", "Exclude metadata from output")
-        .option("-o, --output <file>", "Write output to file instead of stdout")
+        .option("--staged", "Only process staged files")
+        .option("--since <ref>", "Only process files changed since git ref")
         .option(
-            "--include <patterns>",
-            'Include file patterns (comma-separated, e.g., "*.ts,*.js")',
-        )
-        .option(
-            "--exclude <patterns>",
-            'Exclude file patterns (comma-separated, e.g., "*.test.*,*.spec.*")',
+            "--dry-run",
+            "Show what files would be processed without running",
         )
         .option(
             "--max-files <number>",
             "Maximum number of files to process",
             "1000",
         )
-        .option("--max-depth <number>", "Maximum directory depth to scan", "10")
         .option("--no-gitignore", "Do not respect .gitignore patterns")
-        .action(async (files: string[], options: any, command: any) => {
-            // Merge parent options (including --select)
-            const parentOptions = command.parent?.opts() || {};
-            const mergedOptions = { ...parentOptions, ...options };
-            await combineCommand(files, mergedOptions);
+        .action(async (...args: any[]) => {
+            // Handle optional paths argument - if no paths provided, args[0] will be the command object
+            const paths = Array.isArray(args[0]) ? args[0] : ["."];
+            const cmdObject = args[args.length - 1]; // Commander puts the command object last
+            const localOptions = cmdObject.opts();
+            const parentOptions = cmdObject.parent?.opts() || {};
+
+            // Merge parent and local options
+            const mergedOptions = { ...parentOptions, ...localOptions };
+            await combineCommand(paths, mergedOptions);
         });
 
     return combine;
 }
 
-async function combineCommand(filePaths: string[], options: any) {
+async function combineCommand(inputPaths: string[], options: any) {
     const spinner = ora("Scanning files...").start();
 
+    // Handle stdout option - don't show spinner if outputting to stdout
+    const isStdout = options.stdout || (!options.output && !options.clipboard);
+    if (isStdout) {
+        spinner.stop();
+    }
+
     try {
+        let filePaths = inputPaths;
+
         // Handle --staged mode
         if (options.staged) {
             spinner.text = "Getting staged files...";
@@ -106,16 +132,11 @@ async function combineCommand(filePaths: string[], options: any) {
                 .filter((change) => change.status !== "deleted") // Skip deleted files
                 .map((change) => join(gitRoot, change.file));
 
-            spinner.text = chalk.gray(
-                `Found ${filePaths.length} staged files...`,
-            );
-
-            // Show staged files info
-            const filesList = stagedChanges
-                .filter((change) => change.status !== "deleted")
-                .map((c) => c.file)
-                .join(", ");
-            console.log(chalk.dim(`Staged files: ${filesList}`));
+            if (!isStdout) {
+                spinner.text = chalk.gray(
+                    `Found ${filePaths.length} staged files...`,
+                );
+            }
         }
 
         // Handle --select mode without file arguments
@@ -123,24 +144,9 @@ async function combineCommand(filePaths: string[], options: any) {
             filePaths.push(process.cwd());
         }
 
-        // If no files provided and not in select or staged mode, show error
-        if (filePaths.length === 0) {
-            spinner.fail(chalk.red("No files or directories specified"));
-            console.error(
-                chalk.red(
-                    "Usage: dex combine <files...>, dex combine --select, or dex combine --staged",
-                ),
-            );
-            process.exit(1);
-        }
-
-        // Parse options
-        const includePatterns = options.include
-            ? options.include.split(",").map((p: string) => p.trim())
-            : [];
-        const excludePatterns = options.exclude
-            ? options.exclude.split(",").map((p: string) => p.trim())
-            : [];
+        // Parse options - patterns are already arrays thanks to collectPatterns
+        const includePatterns = options.include || [];
+        const excludePatterns = options.exclude || [];
         const maxFiles = parseInt(String(options.maxFiles || "1000"), 10);
         const maxDepth = parseInt(String(options.maxDepth || "10"), 10);
         const respectGitignore = !options.noGitignore;
@@ -210,12 +216,64 @@ async function combineCommand(filePaths: string[], options: any) {
             }
         }, 0);
 
-        if (allFiles.length > 50 && !options.staged) {
+        if (allFiles.length > 50 && !options.staged && !options.dryRun) {
             spinner.warn(
                 chalk.yellow(
                     `Processing ${allFiles.length} files (${formatFileSize(totalSize)}). Consider using --select to choose specific files.`,
                 ),
             );
+        }
+
+        // Handle dry-run mode
+        if (options.dryRun) {
+            spinner.stop();
+            console.log(
+                chalk.cyan(`\nDry run - Files that would be processed:\n`),
+            );
+
+            for (const filePath of allFiles) {
+                const relativePath = relative(process.cwd(), filePath);
+                const size = statSync(filePath).size;
+                const fileSize = formatFileSize(size);
+                console.log(
+                    chalk.green(`  ✓ ${relativePath}`) +
+                        chalk.gray(` (${fileSize})`),
+                );
+            }
+
+            console.log(chalk.cyan(`\nSummary:`));
+            console.log(`  Files: ${allFiles.length}`);
+            console.log(`  Total size: ${formatFileSize(totalSize)}`);
+
+            // Read a sample of files to get accurate token count
+            let sampleTokens = 0;
+            let sampleSize = 0;
+            const maxSampleFiles = Math.min(5, allFiles.length);
+
+            for (let i = 0; i < maxSampleFiles; i++) {
+                try {
+                    const content = readFileSync(allFiles[i], "utf-8");
+                    sampleTokens += countTokens(content);
+                    sampleSize += content.length;
+                } catch {
+                    // Skip files that can't be read
+                }
+            }
+
+            // Extrapolate from sample or use fallback
+            const estimatedTokens =
+                sampleSize > 0
+                    ? Math.round((sampleTokens / sampleSize) * totalSize)
+                    : Math.ceil(totalSize / 4);
+
+            console.log(
+                `  Estimated tokens: ${formatEstimatedTokens(estimatedTokens)}`,
+            );
+
+            console.log(
+                chalk.dim(`\nRun without --dry-run to process these files.`),
+            );
+            return;
         }
 
         // Handle interactive selection if requested (skip for staged mode)
@@ -245,7 +303,7 @@ async function combineCommand(filePaths: string[], options: any) {
 
                 // Override clipboard option if user pressed 'c'
                 if (result.copyToClipboard) {
-                    options.copy = true;
+                    options.clipboard = true;
                 }
 
                 spinner.start("Processing selected files...");
@@ -265,9 +323,11 @@ async function combineCommand(filePaths: string[], options: any) {
         const processingText = options.staged
             ? "Reading staged files..."
             : "Reading files...";
-        spinner.text = chalk.gray(
-            `${processingText} (${finalFiles.length} files)`,
-        );
+        if (!isStdout) {
+            spinner.text = chalk.gray(
+                `${processingText} (${finalFiles.length} files)`,
+            );
+        }
 
         const changes: GitChange[] = [];
         const fullFiles = new Map<string, string>();
@@ -277,13 +337,14 @@ async function combineCommand(filePaths: string[], options: any) {
                 const content = readFileSync(filePath, "utf-8");
                 const relativePath = relative(process.cwd(), filePath);
 
-                // Create a GitChange-like object for each file
-                const change: GitChange = {
+                // Create a GitChange-like object for each file with content
+                const change: GitChange & { content?: string } = {
                     file: relativePath,
                     status: options.staged ? "modified" : "added", // Use 'modified' for staged files
                     additions: content.split("\n").length,
                     deletions: 0,
-                    diff: "", // No diff for combine operation
+                    diff: content, // Store content in diff field for compatibility
+                    content: content, // Also store in content field for clarity
                 };
 
                 changes.push(change);
@@ -336,101 +397,58 @@ async function combineCommand(filePaths: string[], options: any) {
             repoCommit = "local";
         }
 
-        const context: ExtractedContext = {
-            changes,
-            scope: {
-                filesChanged: changes.length,
-                functionsModified: 0, // Could be enhanced with AST analysis
-                linesAdded: totalLines,
-                linesDeleted: 0,
-            },
-            fullFiles,
-            metadata: {
-                generated: new Date().toISOString(),
-                repository: {
-                    name: repoName,
-                    branch: repoBranch,
-                    commit: repoCommit,
-                },
-                extraction: {
-                    method: extractionMethod,
-                },
-                tokens: {
-                    estimated: Math.ceil(totalChars / 4), // Rough token estimation
-                },
-                tool: {
-                    name: "dex",
-                    version: "1.0.0", // Should be read from package.json
-                },
-            },
-        };
-
-        // Create DexOptions for formatting
-        const dexOptions: DexOptions = {
-            format: options.outputFormat as OutputFormat,
-            noMetadata: options.noMetadata,
-            clipboard: options.clipboard,
-        };
-
         // Format output
-        const formatToUse = options.outputFormat || "xml";
-        spinner.text = chalk.gray(
-            `Formatting as ${chalk.cyan(formatToUse)}...`,
-        );
-        let formatter: Formatter;
+        const formatToUse = options.format || "xml";
+        if (!isStdout) {
+            spinner.text = chalk.gray(
+                `Formatting as ${chalk.cyan(formatToUse)}...`,
+            );
+        }
+        let output: string;
 
         switch (formatToUse) {
             case "xml":
-                formatter = new XmlFormatter();
+                const xmlFormatter = new XmlFormatter();
+                output = xmlFormatter.format(changes);
                 break;
             case "json":
-                formatter = new JsonFormatter();
+                const jsonFormatter = new JsonFormatter();
+                output = jsonFormatter.format(changes);
                 break;
             case "markdown":
-                formatter = new MarkdownFormatter();
+                const markdownFormatter = new MarkdownFormatter();
+                output = markdownFormatter.format(changes);
                 break;
             default:
-                throw new Error(`Invalid format: ${options.outputFormat}`);
+                throw new Error(`Invalid format: ${options.format}`);
         }
 
-        const output = formatter.format({ context, options: dexOptions });
-
         // Handle output
-        if (options.output) {
+        if (options.stdout) {
+            console.log(output);
+        } else if (options.output) {
             const { writeFileSync } = await import("fs");
             writeFileSync(options.output, output);
             const successMsg = options.staged
                 ? `Combined staged files written to: ${options.output}`
                 : `Combined files written to: ${options.output}`;
             spinner.succeed(chalk.green(successMsg));
-        } else if (options.copy || options.clipboard) {
+        } else if (options.clipboard) {
             try {
                 await clipboardy.write(output);
 
                 // Show enhanced success message with metadata
-                const tokenStr = chalk.cyan(
-                    `~${context.metadata.tokens.estimated.toLocaleString()} tokens`,
-                );
-                const filesStr = chalk.yellow(
-                    `${context.scope.filesChanged} files`,
-                );
-                const linesStr = chalk.green(
-                    `${context.scope.linesAdded} lines`,
-                );
-                const successMsg = options.staged
-                    ? "Combined staged files copied to clipboard"
-                    : "Combined files copied to clipboard";
+                const tokenCount = countTokens(output);
+                const tokenStr = tokenCount >= 1000
+                    ? `${(tokenCount / 1000).toFixed(1)}k`
+                    : `${tokenCount}`;
 
                 spinner.succeed(
-                    chalk.green(successMsg) +
-                        chalk.gray(" • ") +
-                        tokenStr +
-                        chalk.gray(" • ") +
-                        filesStr +
-                        chalk.gray(" • ") +
-                        linesStr +
-                        chalk.gray(" • ") +
-                        chalk.blue(options.outputFormat || "xml"),
+                    chalk.cyan("✨ Combined ") +
+                        chalk.white(`${changes.length} files `) +
+                        chalk.cyan("→ ") +
+                        chalk.yellow(`${tokenStr} tokens `) +
+                        chalk.gray("(copied to clipboard)"),
                 );
             } catch (error) {
                 spinner.fail(chalk.red("Failed to copy to clipboard"));
@@ -448,43 +466,43 @@ async function combineCommand(filePaths: string[], options: any) {
 
             // Generate context string for filename
             let contextString: string;
-            if (options.staged) {
+            if (options.select) {
+                contextString = "select";
+            } else if (options.staged) {
                 contextString = "staged-files";
+            } else if (filePaths.length === 1) {
+                // For single path, preserve the path structure
+                contextString = filePaths[0];
             } else {
-                const contextParts = filePaths
-                    .map((p) => p.replace(/[^a-zA-Z0-9]/g, "-"))
-                    .join("-");
-                contextString =
-                    contextParts.length > 20
-                        ? contextParts.substring(0, 20)
-                        : contextParts;
+                // For multiple paths, join them with underscores
+                contextString = filePaths.join("_");
             }
 
             await outputManager.saveOutput(output, {
                 command: "combine",
                 context: contextString,
-                format: options.outputFormat || "xml",
+                format: options.format || "xml",
             });
 
             const fullPath = await outputManager.getFilePath({
                 command: "combine",
                 context: contextString,
-                format: options.outputFormat || "xml",
+                format: options.format || "xml",
             });
 
             // Format token display
-            const tokenCount = context.metadata.tokens.estimated;
-            const tokenStr =
-                tokenCount >= 1000
-                    ? `${Math.round(tokenCount / 1000)}k tokens`
-                    : `${tokenCount} tokens`;
+            const tokenCount = countTokens(output);
+            const tokenStr = tokenCount >= 1000
+                ? `${(tokenCount / 1000).toFixed(1)}k`
+                : `${tokenCount}`;
 
             spinner.succeed(
-                chalk.green("Saved to ") +
-                    chalk.white(fullPath) +
-                    chalk.dim(" • ") +
-                    chalk.white(tokenStr),
+                chalk.cyan("✨ Combined ") +
+                    chalk.white(`${changes.length} files `) +
+                    chalk.cyan("→ ") +
+                    chalk.yellow(`${tokenStr} tokens`),
             );
+            console.log(chalk.gray(`Saved to: ${fullPath}`));
 
             // Show agent instruction
             console.log(chalk.dim(`\nFor agents: cat "${fullPath}"`));
