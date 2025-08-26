@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useApp, useInput } from "ink";
-const TextInput = require("ink-text-input").default;
-import type { GitChange } from "../types";
-import type { EnhancedGitChange } from "./index";
-import * as path from "path";
-import * as fs from "fs";
+import TextInput from "ink-text-input";
+import type { GitChange } from "../types.js";
+import type { EnhancedGitChange } from "../utils/file-selector.js";
+import path from "path";
+import fs from "fs";
 
 interface FileSelectorProps {
     changes: (GitChange | EnhancedGitChange)[];
@@ -25,6 +25,10 @@ type ViewMode = "files" | "sort" | "filter";
 
 interface FileItem extends GitChange {
     selected: boolean;
+    fileSize?: number;
+    isStaged?: boolean;
+    isUnstaged?: boolean;
+    isUntracked?: boolean;
 }
 
 interface DisplayItem {
@@ -133,7 +137,7 @@ function truncatePath(path: string, maxLength: number): string {
     while (
         i >= 0 &&
         parts[i] &&
-        result.length + parts[i].length + 4 < maxLength
+        result.length + (parts[i]?.length || 0) + 4 < maxLength
     ) {
         result = parts[i] + "/" + result;
         i--;
@@ -144,7 +148,7 @@ function truncatePath(path: string, maxLength: number): string {
         if (
             remainingSpace > 0 &&
             parts[i] &&
-            parts[i].length <= remainingSpace
+            parts[i]!.length <= remainingSpace
         ) {
             result = ".../" + parts[i] + "/" + result;
         } else {
@@ -177,6 +181,7 @@ async function calculateFileTokens(file: GitChange): Promise<number> {
         const multiplier = getTokenMultiplier(file.file);
         return Math.ceil(stats.size / multiplier);
     } catch (error) {
+        console.error(error);
         // If we can't read the file, make a conservative estimate based on file type
         const multiplier = getTokenMultiplier(file.file);
         return Math.ceil(1000 / multiplier); // Assume ~1KB file
@@ -210,8 +215,9 @@ function formatFileSize(bytes: number): string {
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const sizeLabel = sizes[i] || "B"; // Default to "B" if i is out of bounds
 
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizeLabel;
 }
 
 const FileSelector: React.FC<FileSelectorProps> = ({
@@ -254,9 +260,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                     }
                     return 0;
                 case "size":
-                    const aTokens = tokenEstimates.get(a.file) || 0;
-                    const bTokens = tokenEstimates.get(b.file) || 0;
-                    return bTokens - aTokens;
+                    return (b.fileSize || 0) - (a.fileSize || 0);
                 case "status":
                     return a.status.localeCompare(b.status);
                 default:
@@ -362,10 +366,10 @@ const FileSelector: React.FC<FileSelectorProps> = ({
             let files: FileItem[] = changes.map((change) => ({
                 ...change,
                 selected: false,
-                fileSize: (change as any).fileSize || 0,
-                isStaged: (change as any).isStaged || false,
-                isUnstaged: (change as any).isUnstaged || false,
-                isUntracked: (change as any).isUntracked || false,
+                fileSize: (change as unknown as FileItem).fileSize || 0,
+                isStaged: (change as unknown as FileItem).isStaged || false,
+                isUnstaged: (change as unknown as FileItem).isUnstaged || false,
+                isUntracked: (change as unknown as FileItem).isUntracked || false,
             }));
 
             // Calculate token estimates for all files
@@ -401,8 +405,8 @@ const FileSelector: React.FC<FileSelectorProps> = ({
             const sortedDirs = Object.keys(groupedFiles).sort((a, b) => {
                 const aFiles = groupedFiles[a];
                 const bFiles = groupedFiles[b];
-                const aMetrics = getDirectoryMetrics(aFiles);
-                const bMetrics = getDirectoryMetrics(bFiles);
+                const aMetrics = getDirectoryMetrics(aFiles || []);
+                const bMetrics = getDirectoryMetrics(bFiles || []);
 
                 switch (sortBy) {
                     case "name":
@@ -431,30 +435,30 @@ const FileSelector: React.FC<FileSelectorProps> = ({
 
             for (const dir of sortedDirs) {
                 const dirFiles = groupedFiles[dir];
-                const allSelected = dirFiles.every((f) => f.selected);
-                const someSelected = dirFiles.some((f) => f.selected);
+                const allSelected = dirFiles?.every((f) => f.selected) || false;
+                const someSelected = dirFiles?.some((f) => f.selected) || false;
 
                 // Add directory header
                 items.push({
                     path: dir === "root" ? "." : dir,
                     isHeader: true,
-                    fileCount: dirFiles.length,
+                    fileCount: dirFiles?.length || 0,
                     selected: allSelected,
                     mixed: someSelected && !allSelected,
                     files: dirFiles,
                 });
 
                 // Add files in this directory
-                dirFiles.forEach((file) => {
+                dirFiles?.forEach((file) => {
                     items.push({
                         ...file,
                         path: file.file,
                         selected: file.selected,
                         tokenEstimate: estimates.get(file.file) || 0,
-                        fileSize: (file as any).fileSize || 0,
-                        isStaged: (file as any).isStaged || false,
-                        isUnstaged: (file as any).isUnstaged || false,
-                        isUntracked: (file as any).isUntracked || false,
+                        fileSize: (file as unknown as FileItem).fileSize || 0,
+                        isStaged: (file as unknown as FileItem).isStaged || false,
+                        isUnstaged: (file as unknown as FileItem).isUnstaged || false,
+                        isUntracked: (file as unknown as FileItem).isUntracked || false,
                     });
                 });
             }
@@ -505,6 +509,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                             const multiplier = getTokenMultiplier(file.path);
                             return Math.ceil(stats.size / multiplier);
                         } catch (error) {
+                            console.error(error);
                             // If we can't read the file, make a conservative estimate based on file type
                             const multiplier = getTokenMultiplier(file.path);
                             return Math.ceil(1000 / multiplier); // Assume ~1KB file
@@ -613,7 +618,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                         "size",
                         "status",
                     ];
-                    setSortBy(sortOptions[menuCursor]);
+                    setSortBy(sortOptions[menuCursor] || "name");
                 } else if (viewMode === "filter") {
                     const filterOptions: FilterBy[] = [
                         "all",
@@ -624,7 +629,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                         "added",
                         "deleted",
                     ];
-                    setFilterBy(filterOptions[menuCursor]);
+                    setFilterBy(filterOptions[menuCursor] || "all");
                 }
                 setViewMode("files");
                 return;
@@ -646,11 +651,6 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                 .filter((item) => !item.isHeader && item.selected)
                 .map((item) => {
                     const {
-                        selected,
-                        isHeader,
-                        fileCount,
-                        mixed,
-                        files,
                         ...change
                     } = item;
                     return change as GitChange;
@@ -666,11 +666,6 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                 .filter((item) => !item.isHeader && item.selected)
                 .map((item) => {
                     const {
-                        selected,
-                        isHeader,
-                        fileCount,
-                        mixed,
-                        files,
                         ...change
                     } = item;
                     return change as GitChange;
@@ -700,10 +695,10 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                 (index) => index > cursor,
             );
             if (currentHeaderIndex !== -1) {
-                setCursor(headerIndices[currentHeaderIndex]);
+                setCursor(headerIndices[currentHeaderIndex] || 0);
             } else if (headerIndices.length > 0) {
                 // Wrap to first directory
-                setCursor(headerIndices[0]);
+                setCursor(headerIndices[0] || 0);
             }
             return;
         }
@@ -719,10 +714,10 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                 (index) => index < cursor,
             );
             if (currentHeaderIndex !== -1) {
-                setCursor(reversedIndices[currentHeaderIndex]);
+                setCursor(reversedIndices[currentHeaderIndex] || 0);
             } else if (headerIndices.length > 0) {
                 // Wrap to last directory
-                setCursor(headerIndices[headerIndices.length - 1]);
+                setCursor(headerIndices[headerIndices.length - 1] || 0);
             }
             return;
         }
@@ -730,10 +725,10 @@ const FileSelector: React.FC<FileSelectorProps> = ({
         if (input === " ") {
             const currentItem = displayItems[cursor];
 
-            if (currentItem.isHeader) {
+            if (currentItem?.isHeader) {
                 // Find all files in this directory from current displayItems
                 const directoryPath =
-                    currentItem.path === "." ? "root" : currentItem.path;
+                    currentItem.path === "." ? "root" : currentItem.path || "";
                 const filesInDirectory = displayItems.filter(
                     (item) =>
                         !item.isHeader &&
@@ -760,7 +755,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                     });
                     return updateDirectoryStates(updated);
                 });
-            } else if (!currentItem.isHeader) {
+            } else if (!currentItem?.isHeader) {
                 // Toggle single file
                 setDisplayItems((prev) => {
                     const updated = prev.map((item, index) => {
@@ -899,7 +894,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                     {searchQuery ? (
                         <Box paddingX={1}>
                             <Text color="yellow">Searching: </Text>
-                            <Text color="cyan">"{searchQuery}"</Text>
+                            <Text color="cyan">&quot;{searchQuery}&quot;</Text>
                             <Text color="gray"> (press X to clear)</Text>
                         </Box>
                     ) : null}
@@ -923,24 +918,19 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                             )}
                         </Text>
                         <Text color="gray" bold>
-                            {" "}
-                            S{" "}
+                            {" S "}
                         </Text>
                         <Text color="gray" bold>
-                            {" "}
-                            +/-{" "}
+                            {" +/- "}
                         </Text>
                         <Text color="gray" bold>
-                            {" "}
-                            Size{" "}
+                            {" Size "}
                         </Text>
                         <Text color="gray" bold>
-                            {" "}
-                            Last{" "}
+                            {" Last "}
                         </Text>
                         <Text color="gray" bold>
-                            {" "}
-                            Tokens
+                            {" Tokens"}
                         </Text>
                     </Box>
 
@@ -985,7 +975,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                                     // Calculate total size in bytes
                                     const totalSizeBytes = dirFiles.reduce(
                                         (sum, f) =>
-                                            sum + ((f as any).fileSize || 0),
+                                            sum + ((f as unknown as FileItem).fileSize || 0),
                                         0,
                                     );
                                     const sizeDisplay =
@@ -996,7 +986,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                                     // Count file statuses
                                     const statusCounts = dirFiles.reduce(
                                         (acc, f) => {
-                                            const enhanced = f as any;
+                                            const enhanced = f as unknown as FileItem;
                                             if (enhanced.isStaged) acc.staged++;
                                             else if (enhanced.isUnstaged)
                                                 acc.unstaged++;
@@ -1120,14 +1110,14 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                                     const tokenDisplay = formatTokens(tokens);
 
                                     // Calculate actual file size
-                                    const fileSize = (item as any).fileSize;
+                                    const fileSize = (item as unknown as FileItem).fileSize;
                                     const sizeDisplay = fileSize
                                         ? formatFileSize(fileSize)
                                         : "?";
 
                                     // Add status indicators
                                     let statusIndicator = "";
-                                    const enhanced = item as any;
+                                    const enhanced = item as unknown as FileItem;
                                     if (enhanced.isStaged)
                                         statusIndicator = "●";
                                     else if (enhanced.isUnstaged)
