@@ -23,6 +23,8 @@ export class Distiller {
     private formatters = getFormatterRegistry();
     private options: DistillerOptions;
     private progress?: DistillerProgress;
+
+    // TODO: Implement proper shared excludes from config.
     private defaultExcludes = [
         "node_modules/**",
         ".git/**",
@@ -77,7 +79,7 @@ export class Distiller {
 
         const stats = await fs.stat(targetPath);
         const basePath = stats.isFile() ? dirname(targetPath) : targetPath;
-        
+
         // Distill the files
         const distillationResult = await this.distillFiles(
             filesToDistill,
@@ -146,7 +148,9 @@ export class Distiller {
             for (let i = 0; i < files.length; i += batchSize) {
                 const batch = files.slice(i, i + batchSize);
                 const results = await Promise.all(
-                    batch.map((file) => this.compressFile(join(basePath, file), file)),
+                    batch.map((file) =>
+                        this.compressFile(join(basePath, file), file),
+                    ),
                 );
                 compressedFiles.push(...results);
                 totalSize += results.reduce((sum, f) => sum + f.size, 0);
@@ -177,7 +181,10 @@ export class Distiller {
         } else {
             // Sequential processing
             for (const file of files) {
-                const compressed = await this.compressFile(join(basePath, file), file);
+                const compressed = await this.compressFile(
+                    join(basePath, file),
+                    file,
+                );
                 compressedFiles.push(compressed);
                 totalSize += compressed.size;
             }
@@ -194,7 +201,10 @@ export class Distiller {
         };
     }
 
-    private async compressFile(fullPath: string, relativePath?: string): Promise<CompressedFile> {
+    private async compressFile(
+        fullPath: string,
+        relativePath?: string,
+    ): Promise<CompressedFile> {
         const content = await fs.readFile(fullPath, "utf-8");
         const stats = await fs.stat(fullPath);
         const hash = createHash("sha256")
@@ -237,7 +247,9 @@ export class Distiller {
         const filesToProcess =
             typeof files[0] === "string"
                 ? await Promise.all(
-                      (files as string[]).map((f) => this.compressFile(join(basePath, f), f)),
+                      (files as string[]).map((f) =>
+                          this.compressFile(join(basePath, f), f),
+                      ),
                   )
                 : (files as CompressedFile[]);
 
@@ -261,10 +273,7 @@ export class Distiller {
             }
 
             // Update structure
-            const dir = file.path
-                .split("/")
-                .slice(0, -1)
-                .join("/");
+            const dir = file.path.split("/").slice(0, -1).join("/");
             if (dir) directoriesSet.add(dir);
             structure.fileCount++;
             structure.languages[language] =
@@ -281,13 +290,17 @@ export class Distiller {
                     includeComments: this.options.includeComments,
                     includeDocstrings: this.options.includeDocstrings,
                     includeImports: true,
-                    depth: this.options.includePrivate ? 'all' : 'public',
-                    includePatterns: undefined,  // Not used for name filtering at processor level
-                    excludePatterns: undefined  // Not used for name filtering at processor level
+                    depth: this.options.includePrivate ? "all" : "public",
+                    includePatterns: undefined, // Not used for name filtering at processor level
+                    excludePatterns: undefined, // Not used for name filtering at processor level
                 };
-                
-                const result = await this.registry.processFile(file.path, file.content, processingOptions);
-                
+
+                const result = await this.registry.processFile(
+                    file.path,
+                    file.content,
+                    processingOptions,
+                );
+
                 // Convert to ExtractedAPI format
                 const extracted: ExtractedAPI = {
                     file: file.path,
@@ -296,14 +309,22 @@ export class Distiller {
                         name: e.name,
                         type: this.mapExportKind(e.kind),
                         signature: e.signature,
-                        visibility: e.visibility || 'public',
-                        location: { startLine: e.line || 0, endLine: e.line || 0 },
+                        visibility: e.visibility || "public",
+                        location: {
+                            startLine: e.line || 0,
+                            endLine: e.line || 0,
+                        },
                         members: e.members?.map((m: any) => ({
                             name: m.name,
                             signature: m.signature,
-                            type: (m.kind === 'constructor' || m.kind === 'getter' || m.kind === 'setter') ? 'method' : m.kind as 'property' | 'method'
-                        }))
-                    }))
+                            type:
+                                m.kind === "constructor" ||
+                                m.kind === "getter" ||
+                                m.kind === "setter"
+                                    ? "method"
+                                    : (m.kind as "property" | "method"),
+                        })),
+                    })),
                 };
 
                 apis.push(extracted);
@@ -315,7 +336,7 @@ export class Distiller {
                 // Extract dependencies (imports/exports)
                 dependencies[file.path] = {
                     imports: result.imports.map((i: any) => i.source),
-                    exports: result.exports.map((e: any) => e.name)
+                    exports: result.exports.map((e: any) => e.name),
                 };
             } catch (error) {
                 // Silently continue with other files
@@ -360,24 +381,33 @@ export class Distiller {
         }
 
         // Get all files using globby
-        const patterns = this.options.includePatterns && this.options.includePatterns.length > 0 
-            ? this.options.includePatterns 
-            : ["**/*"];
-        
+        const patterns =
+            this.options.includePatterns &&
+            this.options.includePatterns.length > 0
+                ? this.options.includePatterns
+                : ["**/*"];
+
         // If include patterns are specified, filter out default excludes that conflict
         let effectiveExcludes = [...this.defaultExcludes];
-        if (this.options.includePatterns && this.options.includePatterns.length > 0) {
+        if (
+            this.options.includePatterns &&
+            this.options.includePatterns.length > 0
+        ) {
             // Remove test file excludes if user is explicitly including test files
-            const hasTestPattern = this.options.includePatterns.some(p => 
-                p.includes('.test.') || p.includes('.spec.') || p.includes('test') || p.includes('spec')
+            const hasTestPattern = this.options.includePatterns.some(
+                (p) =>
+                    p.includes(".test.") ||
+                    p.includes(".spec.") ||
+                    p.includes("test") ||
+                    p.includes("spec"),
             );
             if (hasTestPattern) {
-                effectiveExcludes = effectiveExcludes.filter(e => 
-                    !e.includes('.test.') && !e.includes('.spec.')
+                effectiveExcludes = effectiveExcludes.filter(
+                    (e) => !e.includes(".test.") && !e.includes(".spec."),
                 );
             }
         }
-        
+
         const ignore = [
             ...effectiveExcludes,
             ...(this.options.excludePatterns || []),
@@ -390,11 +420,11 @@ export class Distiller {
             onlyFiles: true,
             dot: true,
         });
-        
+
         if (process.env.DEBUG) {
-            console.error('DEBUG: Include patterns:', patterns);
-            console.error('DEBUG: Exclude patterns:', ignore);
-            console.error('DEBUG: Found files:', files.length);
+            console.error("DEBUG: Include patterns:", patterns);
+            console.error("DEBUG: Exclude patterns:", ignore);
+            console.error("DEBUG: Found files:", files.length);
         }
 
         // Apply additional filters if needed
@@ -431,34 +461,33 @@ export class Distiller {
             exports: parsed.exports?.map((e: any) => e.name) || [],
         };
     }
-    
-    private mapExportKind(kind: string): "function" | "class" | "interface" | "const" | "type" | "enum" {
+
+    private mapExportKind(
+        kind: string,
+    ): "function" | "class" | "interface" | "const" | "type" | "enum" {
         // Map language-specific kinds to ExtractedAPI types
         switch (kind) {
-            case 'function':
-            case 'class':
-            case 'interface':
-            case 'type':
-            case 'enum':
+            case "function":
+            case "class":
+            case "interface":
+            case "type":
+            case "enum":
                 return kind as any;
-            case 'const':
-            case 'let':
-            case 'var':
-            case 'namespace':
-            case 'module':
-                return 'const';
+            case "const":
+            case "let":
+            case "var":
+            case "namespace":
+            case "module":
+                return "const";
             default:
-                return 'const';
+                return "const";
         }
     }
 
     /**
      * Format the distillation result based on output format
      */
-    formatResult(
-        result: DistillationResult,
-        originalPath?: string,
-    ): string {
+    formatResult(result: DistillationResult, originalPath?: string): string {
         // Handle null/undefined result
         if (!result) {
             return "# Distillation Result\n\nNo content was distilled.";
@@ -467,12 +496,12 @@ export class Distiller {
         // Use the appropriate formatter based on format option
         const format = this.options.format || "txt";
         let formatter = this.formatters.get(format);
-        
+
         // Fall back to structured formatter for txt
         if (!formatter && format === "txt") {
             formatter = this.formatters.get("structured");
         }
-        
+
         if (!formatter) {
             throw new Error(`Formatter '${format}' not found`);
         }
@@ -482,7 +511,7 @@ export class Distiller {
             includePrivate: this.options.includePrivate,
             includeDocstrings: this.options.includeDocstrings,
             includeComments: this.options.includeComments,
-            includeMetadata: true
+            includeMetadata: true,
         });
     }
 
@@ -490,7 +519,6 @@ export class Distiller {
         result: DistillationResult,
         originalPath?: string,
     ): string {
-        
         // Use formatter registry
         const formatter = this.formatters.getDefault();
         return formatter.formatDistillation(result, {
@@ -498,7 +526,7 @@ export class Distiller {
             includePrivate: this.options.includePrivate,
             includeDocstrings: this.options.includeDocstrings,
             includeComments: this.options.includeComments,
-            includeMetadata: true
+            includeMetadata: true,
         });
 
         // Original format for backward compatibility
@@ -543,5 +571,4 @@ export class Distiller {
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&apos;");
     }
-
 }
