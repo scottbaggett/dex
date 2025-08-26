@@ -73,7 +73,10 @@ export function createTreeCommand(): Command {
     return command;
 }
 
-async function treeCommand(targetPath: string, options: any): Promise<void> {
+export async function treeCommand(
+    targetPath: string,
+    options: any,
+): Promise<void> {
     try {
         // Resolve path
         const resolvedPath = resolve(targetPath);
@@ -156,7 +159,7 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
     }
 }
 
-function generateTree(
+export function generateTree(
     apis: ExtractedAPI[],
     structure: ProjectStructure | undefined,
     options: TreeOptions,
