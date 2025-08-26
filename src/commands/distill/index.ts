@@ -7,7 +7,6 @@ import { resolve, basename } from "path";
 import * as path from "path";
 import clipboardy from "clipboardy";
 import { DistillerProgress } from "../../core/distiller/progress.js";
-import { loadConfig } from "../../core/config.js";
 import { OutputManager } from "../../utils/output-manager.js";
 import { FileSelector } from "../../utils/file-selector.js";
 import { formatFileSize } from "../../utils/format.js";
@@ -83,14 +82,8 @@ export function createDistillCommand(): Command {
 }
 
 async function distillCommand(targetPath: string, options: any): Promise<void> {
-    // Load config first
-    const config = loadConfig();
-
     // Determine if we should show progress
-    const defaultOutput = config.distiller?.defaultOutput || "save";
-    const isStdout =
-        options.stdout ||
-        (!options.clipboard && !options.output && defaultOutput === "stdout");
+    const isStdout = options.stdout || (!options.clipboard && !options.output);
 
     // Use progress reporter only if not outputting to stdout
     const progress = new DistillerProgress();
@@ -111,15 +104,14 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             process.exit(1);
         }
 
-        // Build distiller options with config defaults
-        const configExcludes = config.distiller?.excludePatterns || [];
+        // Build distiller options
         const cliExcludes = options.exclude || [];
 
         const distillerOptions: DistillerOptions = {
             path: resolvedPath,
-            exclude: [...configExcludes, ...cliExcludes],
+            exclude: cliExcludes,
             include: options.include || [],
-            excludePatterns: [...configExcludes, ...cliExcludes],
+            excludePatterns: cliExcludes,
             includeComments: options.comments === "1",
             includeDocstrings: options.docstrings !== "0",
             format: options.format || "txt",
@@ -151,7 +143,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                 const fileSelector = new FileSelector();
                 const { files: allFiles, errors } =
                     await fileSelector.collectFiles([resolvedPath], {
-                        excludePatterns: [...configExcludes, ...cliExcludes],
+                        excludePatterns: cliExcludes,
                         maxFiles: 10000, // Higher limit for distill
                         maxDepth: 20,
                         respectGitignore: true,
@@ -357,23 +349,8 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                     chalk.green(options.output),
             );
         } else if (isStdout) {
-            // Print to stdout if explicitly requested or configured
+            // Print to stdout if explicitly requested
             console.log(output);
-        } else if (!options.clipboard && defaultOutput === "clipboard") {
-            // Use clipboard if configured as default
-            await clipboardy.write(output);
-
-            // Complete progress
-            const originalTokens = result.metadata.originalTokens || 0;
-            const fileCount = result.structure?.fileCount || 0;
-
-            progress.complete({
-                originalTokens,
-                distilledTokens: actualDistilledTokens,
-                fileCount,
-            });
-
-            console.log(chalk.cyan("📋 Distilled output copied to clipboard"));
         } else {
             // Default: save using OutputManager
             const outputManager = new OutputManager();

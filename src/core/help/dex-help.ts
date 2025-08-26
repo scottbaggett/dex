@@ -30,27 +30,26 @@ export class DexHelpFormatter extends Help {
         // Quick Start
         lines.push(chalk.yellow("QUICK START"));
         lines.push(
-            "  dex               Extract current changes → .dex/dex.extract.current.xml",
+            "  dex               Extract current changes → .dex/dex.extract.current.txt",
         );
         lines.push(
-            "  dex -s            Extract staged changes → .dex/dex.extract.staged.xml",
+            "  dex -s            Extract staged changes → .dex/dex.extract.staged.txt",
         );
         lines.push(
-            "  dex HEAD~3        Extract last 3 commits → .dex/dex.extract.head~3.xml",
-        );
-        lines.push('  dex --task "Bug"  Add task context');
-        lines.push(
-            "  dex distill .     Distill entire repo → .dex/dex.distill.{path}.md",
+            "  dex HEAD~3        Extract last 3 commits → .dex/dex.extract.head~3.txt",
         );
         lines.push(
-            "  dex combine a/ b/ Combine files → .dex/dex.combine.{context}.xml\n",
+            "  dex distill .     Distill entire repo → .dex/dex.distill.{path}.txt",
+        );
+        lines.push(
+            "  dex combine a/ b/ Combine files → .dex/dex.combine.{context}.txt\n",
         );
 
         // Core Options (hand-picked)
         lines.push(chalk.yellow("CORE FLAGS"));
         lines.push("  -s, --staged               only staged changes");
         lines.push("  -a, --all                  staged + unstaged");
-        lines.push("  -f, --format <fmt>         markdown|json|xml");
+        lines.push("  -f, --format <fmt>         md|json|txt");
         lines.push("  -c, --clipboard            copy to clipboard");
         lines.push(
             "      --full <pattern>       include full files matching pattern",
@@ -67,7 +66,7 @@ export class DexHelpFormatter extends Help {
         lines.push(chalk.yellow("COMMANDS"));
         lines.push("  combine     Combine multiple files into one document");
         lines.push("  distill     Compress entire codebase");
-        lines.push("  tree        Visual tree fo your codebase");
+        lines.push("  tree        Visual tree for your codebase\n");
 
         // Output info
         lines.push(chalk.yellow("OUTPUT"));

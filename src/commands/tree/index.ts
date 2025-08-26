@@ -9,7 +9,6 @@ import type {
 import { promises as fs } from "fs";
 import { resolve, basename, relative } from "path";
 import clipboardy from "clipboardy";
-import { loadConfig } from "../../core/config.js";
 import { OutputManager } from "../../utils/output-manager.js";
 
 export interface TreeOptions {
@@ -66,10 +65,6 @@ export function createTreeCommand(): Command {
 
 async function treeCommand(targetPath: string, options: any): Promise<void> {
     try {
-        // Load config
-        const config = loadConfig();
-        const treeConfig = config.tree || {};
-
         // Resolve path
         const resolvedPath = resolve(targetPath);
 
@@ -82,22 +77,20 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
         }
 
         // Build distiller options
-        const configExcludes = config.distiller?.excludePatterns || [];
         const cliExcludes = Array.isArray(options.exclude)
             ? options.exclude
             : [];
 
         const distillerOptions: DistillerOptions = {
             path: resolvedPath,
-            exclude: [...configExcludes, ...cliExcludes],
+            exclude: cliExcludes,
             include: [],
-            excludePatterns: [...configExcludes, ...cliExcludes],
+            excludePatterns: cliExcludes,
             includeComments: false,
             includeDocstrings: true,
-            includePrivate:
-                options.includePrivate ?? treeConfig.includePrivate ?? false,
+            includePrivate: options.includePrivate ?? false,
             format: "txt",
-            parallel: config.performance?.parallel ?? true,
+            parallel: true,
         };
 
         console.log(chalk.cyan("✨Generating Tree..."));
@@ -118,14 +111,13 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
         // Determine if output should be formatted for terminal (with colors/icons)
         const forTerminal = options.stdout || false;
 
-        // Merge options with config defaults
+        // Build tree options
         const treeOptions: TreeOptions = {
-            groupBy: options.groupBy ?? treeConfig.groupBy ?? "file",
-            showTypes: options.showTypes ?? treeConfig.showTypes ?? false,
-            showParams: options.showParams ?? treeConfig.showParams ?? false,
-            includePrivate:
-                options.includePrivate ?? treeConfig.includePrivate ?? false,
-            outline: options.outline ?? treeConfig.outline ?? false,
+            groupBy: options.groupBy ?? "file",
+            showTypes: options.showTypes ?? false,
+            showParams: options.showParams ?? false,
+            includePrivate: options.includePrivate ?? false,
+            outline: options.outline ?? false,
             ...options,
         };
 
@@ -672,9 +664,6 @@ async function handleOutput(
     options: TreeOptions,
     basePath: string,
 ): Promise<void> {
-    const config = loadConfig();
-    const defaultOutput = config.distiller?.defaultOutput || "save";
-
     if (options.clipboard) {
         await clipboardy.write(content);
         console.log(chalk.cyan("API tree copied to clipboard"));
@@ -684,11 +673,8 @@ async function handleOutput(
             chalk.cyan("💾 API tree written to: ") +
                 chalk.green(options.output),
         );
-    } else if (options.stdout || defaultOutput === "stdout") {
+    } else if (options.stdout) {
         console.log(content);
-    } else if (defaultOutput === "clipboard") {
-        await clipboardy.write(content);
-        console.log(chalk.cyan("API tree copied to clipboard"));
     } else {
         // Default: save using OutputManager
         const outputManager = new OutputManager();

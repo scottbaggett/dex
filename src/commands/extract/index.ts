@@ -9,7 +9,6 @@ import { JsonFormatter } from "./formatters/json.js";
 import { XmlFormatter } from "./formatters/xml.js";
 import type { DexOptions, OutputFormat } from "../../types.js";
 import { OutputManager } from "../../utils/output-manager.js";
-import { mergeWithConfig } from "../../core/config.js";
 
 interface ExtractCommandOptions {
     staged?: boolean;
@@ -128,10 +127,7 @@ export async function executeExtract(
             noMetadata: !options.metadata,
         };
 
-        // Merge with config file defaults
-        dexOptions = mergeWithConfig(dexOptions);
-
-        // Validate format after config merge
+        // Validate format
         const validFormats = ["markdown", "json", "xml"];
         if (dexOptions.format && !validFormats.includes(dexOptions.format)) {
             spinner.fail(

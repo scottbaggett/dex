@@ -1,5 +1,4 @@
 import { createCombineCommand } from "./commands/combine/index.js";
-import { createConfigCommand } from "./commands/config/index.js";
 import { createTreeCommand } from "./commands/tree/index.js";
 import { type ExtractOptions } from "./schemas.js";
 import { Command } from "commander";
@@ -9,7 +8,6 @@ import { DexHelpFormatter } from "./core/help/dex-help.js";
 import { createExtractCommand } from "./commands/extract/index.js";
 import { createDistillCommand } from "./commands/distill/index.js";
 import { executeExtract } from "./commands/extract/index.js";
-import { initCommand } from "./commands/init/index.js";
 import { FileSelector } from "./utils/file-selector.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -55,9 +53,7 @@ program.allowUnknownOption().action(async (options, command) => {
             "extract",
             "distill",
             "combine",
-            "config",
             "tree",
-            "init",
             "help-selection",
         ];
 
@@ -132,17 +128,10 @@ program.allowUnknownOption().action(async (options, command) => {
     }
 });
 
-program
-    .command("init")
-    .description("Initialize dex configuration")
-    .action(async () => {        
-        await initCommand();
-    });
 
 
 
 program.addCommand(createCombineCommand());
-program.addCommand(createConfigCommand());
 program.addCommand(createTreeCommand());
 
 
