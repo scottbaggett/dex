@@ -15,20 +15,24 @@ export class MarkdownFormatter implements DistillFormatter {
         options: DistillFormatterOptions = {},
     ): string {
         let output = "";
-        
+
         for (const api of result.apis) {
             output += `## ${api.file}\n\n`;
-            
+
             const lang = getSyntaxLanguage(api.file);
             output += `\`\`\`${lang}\n`;
-            
+
             // Add imports
-            if (options.includeImports !== false && api.imports && api.imports.length > 0) {
+            if (
+                options.includeImports !== false &&
+                api.imports &&
+                api.imports.length > 0
+            ) {
                 for (const imp of api.imports) {
                     output += `import '${imp}'\n`;
                 }
             }
-            
+
             // Add exports
             for (const exp of api.exports) {
                 if (exp.visibility === "private" && !options.includePrivate) {
@@ -36,7 +40,7 @@ export class MarkdownFormatter implements DistillFormatter {
                 }
                 output += `${exp.signature}\n`;
             }
-            
+
             output += `\`\`\`\n\n`;
         }
 
@@ -55,7 +59,7 @@ export class MarkdownFormatter implements DistillFormatter {
         }
 
         for (const file of result.files) {
-            const lang = file.language || "text";
+            const lang = file.language || "txt";
             output += `## ${file.path}\n\n`;
             output += `\`\`\`${lang}\n${file.content}\n\`\`\`\n\n`;
         }
@@ -70,5 +74,4 @@ export class MarkdownFormatter implements DistillFormatter {
     ): string {
         return `${this.formatCompression(compression, options)}\n\n---\n\n${this.formatDistillation(distillation, options)}`;
     }
-
 }

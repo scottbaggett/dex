@@ -23,21 +23,21 @@ describe("MarkdownFormatter", () => {
                                 {
                                     name: "constructor",
                                     type: "method",
-                                    signature: "constructor()"
+                                    signature: "constructor()",
                                 },
                                 {
                                     name: "_privateMethod",
                                     type: "method",
-                                    signature: "_privateMethod(): void"
-                                }
-                            ]
+                                    signature: "_privateMethod(): void",
+                                },
+                            ],
                         },
                         {
                             name: "_privateFunction",
                             type: "function",
                             signature: "_privateFunction(): void",
                             visibility: "private",
-                            location: { startLine: 25, endLine: 30 }
+                            location: { startLine: 25, endLine: 30 },
                         },
                         {
                             name: "publicFunction",
@@ -45,9 +45,9 @@ describe("MarkdownFormatter", () => {
                             signature: "publicFunction(): string",
                             visibility: "public",
                             location: { startLine: 35, endLine: 40 },
-                            docstring: "This is a public function"
-                        }
-                    ]
+                            docstring: "This is a public function",
+                        },
+                    ],
                 },
                 {
                     file: "utils.js",
@@ -58,30 +58,30 @@ describe("MarkdownFormatter", () => {
                             type: "function",
                             signature: "function helper()",
                             visibility: "public",
-                            location: { startLine: 1, endLine: 5 }
-                        }
-                    ]
-                }
+                            location: { startLine: 1, endLine: 5 },
+                        },
+                    ],
+                },
             ],
             structure: {
                 directories: ["src", "src/utils"],
                 fileCount: 2,
                 languages: {
                     typescript: 1,
-                    javascript: 1
-                }
+                    javascript: 1,
+                },
             },
             dependencies: {},
             metadata: {
                 originalTokens: 1000,
                 distilledTokens: 200,
-                compressionRatio: 0.8
-            }
+                compressionRatio: 0.8,
+            },
         };
 
         test("formats basic distillation result", () => {
             const result = formatter.formatDistillation(mockDistillationResult);
-            
+
             expect(result).toContain("## test.ts");
             expect(result).toContain("## utils.js");
             expect(result).toContain("```typescript");
@@ -91,36 +91,48 @@ describe("MarkdownFormatter", () => {
         });
 
         test("includes imports when includeImports is true", () => {
-            const result = formatter.formatDistillation(mockDistillationResult, {
-                includeImports: true
-            });
-            
+            const result = formatter.formatDistillation(
+                mockDistillationResult,
+                {
+                    includeImports: true,
+                },
+            );
+
             expect(result).toContain("import 'react'");
             expect(result).toContain("import 'lodash'");
         });
 
         test("excludes imports when includeImports is false", () => {
-            const result = formatter.formatDistillation(mockDistillationResult, {
-                includeImports: false
-            });
-            
+            const result = formatter.formatDistillation(
+                mockDistillationResult,
+                {
+                    includeImports: false,
+                },
+            );
+
             expect(result).not.toContain("import 'react'");
             expect(result).not.toContain("import 'lodash'");
         });
 
         test("includes private members when includePrivate is true", () => {
-            const result = formatter.formatDistillation(mockDistillationResult, {
-                includePrivate: true
-            });
-            
+            const result = formatter.formatDistillation(
+                mockDistillationResult,
+                {
+                    includePrivate: true,
+                },
+            );
+
             expect(result).toContain("_privateFunction(): void");
         });
 
         test("excludes private members when includePrivate is false", () => {
-            const result = formatter.formatDistillation(mockDistillationResult, {
-                includePrivate: false
-            });
-            
+            const result = formatter.formatDistillation(
+                mockDistillationResult,
+                {
+                    includePrivate: false,
+                },
+            );
+
             expect(result).not.toContain("_privateFunction(): void");
         });
 
@@ -130,35 +142,34 @@ describe("MarkdownFormatter", () => {
                 structure: {
                     directories: [],
                     fileCount: 0,
-                    languages: {}
+                    languages: {},
                 },
                 dependencies: {},
                 metadata: {
                     originalTokens: 0,
                     distilledTokens: 0,
-                    compressionRatio: 0
-                }
+                    compressionRatio: 0,
+                },
             };
-            
+
             const result = formatter.formatDistillation(emptyResult);
             expect(result).toBe("");
         });
 
         test("handles multiple files with correct language detection", () => {
             const result = formatter.formatDistillation(mockDistillationResult);
-            
+
             // Check that TypeScript file uses typescript language
             const tsSection = result.substring(
                 result.indexOf("## test.ts"),
-                result.indexOf("## utils.js")
+                result.indexOf("## utils.js"),
             );
             expect(tsSection).toContain("```typescript");
-            
+
             // Check that JavaScript file uses javascript language
             const jsSection = result.substring(result.indexOf("## utils.js"));
             expect(jsSection).toContain("```javascript");
         });
-
 
         test("outputs signatures with comments when present", () => {
             const resultWithComments: DistillationResult = {
@@ -171,17 +182,18 @@ describe("MarkdownFormatter", () => {
                             {
                                 name: "testFunc",
                                 type: "function",
-                                signature: "// This is a comment\nfunction testFunc()",
+                                signature:
+                                    "// This is a comment\nfunction testFunc()",
                                 visibility: "public",
-                                location: { startLine: 1, endLine: 2 }
-                            }
-                        ]
-                    }
-                ]
+                                location: { startLine: 1, endLine: 2 },
+                            },
+                        ],
+                    },
+                ],
             };
-            
+
             const result = formatter.formatDistillation(resultWithComments);
-            
+
             // Formatter outputs signatures as-is - comment filtering happens at processor level
             expect(result).toContain("// This is a comment");
             expect(result).toContain("function testFunc()");
@@ -200,15 +212,15 @@ describe("MarkdownFormatter", () => {
                                 type: "function",
                                 signature: "function testFunc()",
                                 visibility: "public",
-                                location: { startLine: 1, endLine: 2 }
-                            }
-                        ]
-                    }
-                ]
+                                location: { startLine: 1, endLine: 2 },
+                            },
+                        ],
+                    },
+                ],
             };
-            
+
             const result = formatter.formatDistillation(resultWithoutComments);
-            
+
             expect(result).toContain("function testFunc()");
             expect(result).not.toContain("// This is a comment");
         });
@@ -227,17 +239,18 @@ describe("MarkdownFormatter", () => {
                                 signature: "function documented()",
                                 visibility: "public",
                                 location: { startLine: 1, endLine: 5 },
-                                docstring: "This function does something important"
-                            }
-                        ]
-                    }
-                ]
+                                docstring:
+                                    "This function does something important",
+                            },
+                        ],
+                    },
+                ],
             };
-            
+
             const result = formatter.formatDistillation(resultWithDocstrings, {
-                includeDocstrings: true
+                includeDocstrings: true,
             });
-            
+
             // Markdown formatter doesn't show docstrings separately - they're in the signature
             expect(result).toContain("function documented()");
             // Docstrings are included in the code signature if present
@@ -257,17 +270,18 @@ describe("MarkdownFormatter", () => {
                                 signature: "function documented()",
                                 visibility: "public",
                                 location: { startLine: 1, endLine: 5 },
-                                docstring: "This function does something important"
-                            }
-                        ]
-                    }
-                ]
+                                docstring:
+                                    "This function does something important",
+                            },
+                        ],
+                    },
+                ],
             };
-            
+
             const result = formatter.formatDistillation(resultWithDocstrings, {
-                includeDocstrings: false
+                includeDocstrings: false,
             });
-            
+
             expect(result).toContain("function documented()");
             // Markdown formatter doesn't show docstrings separately anyway
         });
@@ -281,27 +295,27 @@ describe("MarkdownFormatter", () => {
                     size: 1024,
                     hash: "abc123",
                     content: "const x = 1;",
-                    language: "typescript"
+                    language: "typescript",
                 },
                 {
                     path: "utils.js",
                     size: 512,
                     hash: "def456",
                     content: "function helper() {}",
-                    language: "javascript"
-                }
+                    language: "javascript",
+                },
             ],
             metadata: {
                 totalFiles: 2,
                 totalSize: 1536,
                 excludedCount: 0,
-                timestamp: "2023-01-01T00:00:00Z"
-            }
+                timestamp: "2023-01-01T00:00:00Z",
+            },
         };
 
         test("formats compression result", () => {
             const result = formatter.formatCompression(mockCompressionResult);
-            
+
             expect(result).toContain("# Compressed Files");
             expect(result).toContain("## test.ts");
             expect(result).toContain("## utils.js");
@@ -313,18 +327,18 @@ describe("MarkdownFormatter", () => {
 
         test("includes metadata when includeMetadata is true", () => {
             const result = formatter.formatCompression(mockCompressionResult, {
-                includeMetadata: true
+                includeMetadata: true,
             });
-            
+
             expect(result).toContain("**Total Files:** 2");
             expect(result).toContain("**Total Size:** 1,536 bytes");
         });
 
         test("excludes metadata when includeMetadata is false", () => {
             const result = formatter.formatCompression(mockCompressionResult, {
-                includeMetadata: false
+                includeMetadata: false,
             });
-            
+
             expect(result).not.toContain("**Total Files:**");
             expect(result).not.toContain("**Total Size:**");
         });
@@ -339,15 +353,15 @@ describe("MarkdownFormatter", () => {
                         size: 1024,
                         hash: "abc123",
                         content: "const x = 1;",
-                        language: "typescript"
-                    }
+                        language: "typescript",
+                    },
                 ],
                 metadata: {
                     totalFiles: 1,
                     totalSize: 1024,
                     excludedCount: 0,
-                    timestamp: "2023-01-01T00:00:00Z"
-                }
+                    timestamp: "2023-01-01T00:00:00Z",
+                },
             };
 
             const distillation: DistillationResult = {
@@ -361,26 +375,26 @@ describe("MarkdownFormatter", () => {
                                 type: "const",
                                 signature: "const x: number",
                                 visibility: "public",
-                                location: { startLine: 1, endLine: 1 }
-                            }
-                        ]
-                    }
+                                location: { startLine: 1, endLine: 1 },
+                            },
+                        ],
+                    },
                 ],
                 structure: {
                     directories: [],
                     fileCount: 1,
-                    languages: { typescript: 1 }
+                    languages: { typescript: 1 },
                 },
                 dependencies: {},
                 metadata: {
                     originalTokens: 100,
                     distilledTokens: 20,
-                    compressionRatio: 0.8
-                }
+                    compressionRatio: 0.8,
+                },
             };
 
             const result = formatter.formatCombined(compression, distillation);
-            
+
             expect(result).toContain("# Compressed Files");
             expect(result).toContain("---");
             expect(result).toContain("## test.ts");
@@ -417,10 +431,10 @@ describe("MarkdownFormatter", () => {
                 { file: "test.css", expected: "css" },
                 { file: "test.scss", expected: "scss" },
                 { file: "test.sql", expected: "sql" },
-                { file: "test.unknown", expected: "text" },
-                { file: "test", expected: "text" }
+                { file: "test.unknown", expected: "txt" },
+                { file: "test", expected: "txt" },
             ];
-            
+
             testCases.forEach(({ file, expected }) => {
                 const result = getSyntaxLanguage(file);
                 expect(result).toBe(expected);

@@ -6,10 +6,18 @@ import { promises as fs, statSync } from "fs";
 import { resolve, basename } from "path";
 import * as path from "path";
 import clipboardy from "clipboardy";
-import { DistillerProgress } from "../../core/distiller/progress.js";
+import { ProgressBar } from "../../utils/progress.js";
 import { OutputManager } from "../../utils/output-manager.js";
 import { FileSelector } from "../../utils/file-selector.js";
 import { formatFileSize } from "../../utils/format.js";
+import {
+    pathNotFound,
+    distillSaved,
+    distillWritten,
+    copiedToClipboard,
+    agentInstructions,
+    genericError,
+} from "../../utils/messages.js";
 import {
     countTokens,
     formatTokenCount,
@@ -32,16 +40,12 @@ export function createDistillCommand(): Command {
             "Path to directory or file to distill (defaults to current directory)",
         )
 
-        .option(
-            "-f, --format <type>",
-            "Output format (txt, markdown, json)",
-            "txt",
-        )
+        .option("-f, --format <type>", "Output format (text, md, json)", "txt")
 
         .option("-o, --output <file>", "Write output to specific file")
         .option("-c, --clipboard", "Copy output to clipboard")
         .option("--stdout", "Print output to stdout")
-        .option("-s, --select", "Interactively select files to distill")
+        .option("--select", "Interactively select files to distill")
         .option("--comments <value>", "Include comments (0 or 1)", "0")
         .option("--docstrings <value>", "Include docstrings (0 or 1)", "1")
         .option("--private <value>", "Include private members (0 or 1)", "0")
@@ -71,8 +75,6 @@ export function createDistillCommand(): Command {
             const cmdObject = args[args.length - 1]; // Commander puts the command object last
             const localOptions = cmdObject.opts();
             const parentOptions = cmdObject.parent?.opts() || {};
-
-            // Merge parent and local options
             const options = { ...parentOptions, ...localOptions };
 
             return distillCommand(targetPath, options);
@@ -83,10 +85,15 @@ export function createDistillCommand(): Command {
 
 async function distillCommand(targetPath: string, options: any): Promise<void> {
     // Determine if we should show progress
-    const isStdout = options.stdout || (!options.clipboard && !options.output);
+    const isStdout = options.stdout;
 
     // Use progress reporter only if not outputting to stdout
-    const progress = new DistillerProgress();
+    const progress = new ProgressBar({
+        label: "Distilling",
+        showTokens: true,
+        showSize: true,
+        unit: "files",
+    });
     if (isStdout) {
         // Disable progress for stdout output
         progress.isSpinning = true; // Prevent it from starting
@@ -240,10 +247,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                     const fullPath = path.isAbsolute(file)
                         ? file
                         : path.join(baseDir, file);
-                    const content = await fs.readFile(
-                        fullPath,
-                        "utf-8",
-                    );
+                    const content = await fs.readFile(fullPath, "utf-8");
                     totalOriginalTokens += countTokens(content);
                 } catch {
                     // Skip files that can't be read
@@ -324,7 +328,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             const originalTokens = result.metadata.originalTokens || 0;
             const fileCount = result.structure?.fileCount || 0;
 
-            progress.complete({
+            progress.completeDistill({
                 originalTokens,
                 distilledTokens: actualDistilledTokens,
                 fileCount,
@@ -338,7 +342,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             const originalTokens = result.metadata.originalTokens || 0;
             const fileCount = result.structure?.fileCount || 0;
 
-            progress.complete({
+            progress.completeDistill({
                 originalTokens,
                 distilledTokens: actualDistilledTokens,
                 fileCount,
@@ -357,7 +361,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             const folderName = basename(resolvedPath);
 
             // Use the format option directly - OutputManager handles the extension conversion
-            const fileFormat = options.format || "txt"; // Default to .txt
+            const fileFormat = options.format || "txt";
 
             await outputManager.saveOutput(output, {
                 command: "distill",
@@ -375,17 +379,14 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             const originalTokens = result.metadata.originalTokens || 0;
             const fileCount = result.structure?.fileCount || 0;
 
-            progress.complete({
+            progress.completeDistill({
                 originalTokens,
                 distilledTokens: actualDistilledTokens,
                 fileCount,
             });
 
-            console.log(
-                chalk.cyan("Distilled output saved to: ") +
-                    chalk.green(fullPath),
-            );
-            console.log(chalk.dim(`\nFor agents: cat "${fullPath}"`));
+            console.log(distillSaved(fullPath));
+            console.log("\n" + agentInstructions(fullPath));
         }
     } catch (error) {
         progress.fail(error instanceof Error ? error.message : String(error));

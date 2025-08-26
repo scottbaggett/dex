@@ -10,6 +10,16 @@ import { promises as fs } from "fs";
 import { resolve, basename, relative } from "path";
 import clipboardy from "clipboardy";
 import { OutputManager } from "../../utils/output-manager.js";
+import { ProgressBar } from "../../utils/progress.js";
+import {
+    pathNotFound,
+    treeSaved,
+    treeWritten,
+    treeCopied,
+    treeNoApis,
+    agentInstructions,
+    genericError,
+} from "../../utils/messages.js";
 
 export interface TreeOptions {
     depth?: string;
@@ -72,7 +82,7 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
         try {
             await fs.access(resolvedPath);
         } catch {
-            console.error(chalk.red(`Path not found: ${targetPath}`));
+            console.error(pathNotFound(targetPath));
             process.exit(1);
         }
 
@@ -93,18 +103,23 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
             parallel: true,
         };
 
-        console.log(chalk.cyan("✨Generating Tree..."));
+        // Create progress bar
+        const progress = new ProgressBar({
+            label: "Generating tree",
+            showTokens: false,
+            showSize: true,
+            unit: "files",
+        });
 
         // Create distiller and extract APIs
         const distiller = new Distiller(distillerOptions);
-        const result = await distiller.distill(resolvedPath);
+        const result = await distiller.distill(resolvedPath, progress);
+
+        // Complete progress
+        progress.complete();
 
         if (!("apis" in result)) {
-            console.error(
-                chalk.red(
-                    "No API information extracted. Try a different depth level.",
-                ),
-            );
+            console.error(treeNoApis());
             process.exit(1);
         }
 
@@ -133,11 +148,7 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
         // Handle output
         await handleOutput(tree, options, resolvedPath);
     } catch (error) {
-        console.error(
-            chalk.red(
-                `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-            ),
-        );
+        console.error(genericError(error));
         if (process.env.DEBUG) {
             console.error(error);
         }
@@ -666,13 +677,10 @@ async function handleOutput(
 ): Promise<void> {
     if (options.clipboard) {
         await clipboardy.write(content);
-        console.log(chalk.cyan("API tree copied to clipboard"));
+        console.log(treeCopied());
     } else if (options.output) {
         await fs.writeFile(options.output, content, "utf-8");
-        console.log(
-            chalk.cyan("💾 API tree written to: ") +
-                chalk.green(options.output),
-        );
+        console.log(treeWritten(options.output));
     } else if (options.stdout) {
         console.log(content);
     } else {
@@ -692,9 +700,7 @@ async function handleOutput(
             format: "txt",
         });
 
-        console.log(
-            chalk.cyan("💾 API tree saved to: ") + chalk.green(fullPath),
-        );
-        console.log(chalk.dim(`\nFor agents: cat "${fullPath}"`));
+        console.log(treeSaved(fullPath));
+        console.log("\n" + agentInstructions(fullPath));
     }
 }

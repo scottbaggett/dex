@@ -4,12 +4,12 @@
 
 // Types are now in central /src/types.ts
 export * from "./registry.js";
-export { StructuredFormatter } from "./structured.js";
+export { TextFormatter } from "./text.js";
 export { MarkdownFormatter } from "./markdown.js";
 export { JsonFormatter } from "./json.js";
 
 import { formattersRegistry } from "./registry.js";
-import { StructuredFormatter } from "./structured.js";
+import { TextFormatter } from "./text.js";
 import { MarkdownFormatter } from "./markdown.js";
 import { JsonFormatter } from "./json.js";
 
@@ -18,12 +18,12 @@ import { JsonFormatter } from "./json.js";
  */
 export function initializeFormatters(): void {
     // Register formatters
-    formattersRegistry.register(new StructuredFormatter());
+    formattersRegistry.register(new TextFormatter());
     formattersRegistry.register(new MarkdownFormatter());
     formattersRegistry.register(new JsonFormatter());
-    
+
     // Set default
-    formattersRegistry.setDefault('structured');
+    formattersRegistry.setDefault("txt");
 }
 
 /**

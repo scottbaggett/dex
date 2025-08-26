@@ -1,3 +1,4 @@
+// TODO: Refactor 'depth' and implement proper flags from config.
 import type {
     DistillerOptions,
     CompressionResult,
@@ -10,19 +11,18 @@ import type {
 import { getLanguageRegistry, ProcessingOptions } from "../languages/index.js";
 import { getFormatterRegistry } from "../../commands/distill/formatters/index.js";
 import { detectLanguage } from "../../utils/language-detection.js";
-import { getSyntaxLanguage } from "../../utils/language.js";
 import { countTokens } from "../../utils/tokens.js";
 import { promises as fs } from "fs";
-import { join, relative, dirname, basename } from "path";
+import { join, dirname, basename } from "path";
 import { globby } from "globby";
 import { createHash } from "crypto";
-import { DistillerProgress } from "./progress.js";
+import { ProgressBar } from "../../utils/progress.js";
 
 export class Distiller {
     private registry = getLanguageRegistry();
     private formatters = getFormatterRegistry();
     private options: DistillerOptions;
-    private progress?: DistillerProgress;
+    private progress?: ProgressBar;
 
     // TODO: Implement proper shared excludes from config.
     private defaultExcludes = [
@@ -63,7 +63,7 @@ export class Distiller {
 
     async distill(
         targetPath: string,
-        progress?: DistillerProgress,
+        progress?: ProgressBar,
     ): Promise<DistillationResult> {
         this.progress = progress;
 
@@ -92,7 +92,7 @@ export class Distiller {
     async distillSelectedFiles(
         selectedFiles: string[],
         basePath: string,
-        progress?: DistillerProgress,
+        progress?: ProgressBar,
     ): Promise<DistillationResult> {
         this.progress = progress;
 
@@ -290,6 +290,7 @@ export class Distiller {
                     includeComments: this.options.includeComments,
                     includeDocstrings: this.options.includeDocstrings,
                     includeImports: true,
+                    // TODO: REPLACE DEPTH HERE
                     depth: this.options.includePrivate ? "all" : "public",
                     includePatterns: undefined, // Not used for name filtering at processor level
                     excludePatterns: undefined, // Not used for name filtering at processor level
@@ -513,62 +514,5 @@ export class Distiller {
             includeComments: this.options.includeComments,
             includeMetadata: true,
         });
-    }
-
-    private formatDistillation(
-        result: DistillationResult,
-        originalPath?: string,
-    ): string {
-        // Use formatter registry
-        const formatter = this.formatters.getDefault();
-        return formatter.formatDistillation(result, {
-            includeImports: this.options.includeImports !== false,
-            includePrivate: this.options.includePrivate,
-            includeDocstrings: this.options.includeDocstrings,
-            includeComments: this.options.includeComments,
-            includeMetadata: true,
-        });
-
-        // Original format for backward compatibility
-        let output = "# Distilled Context\n\n";
-
-        // Metadata
-        output += `## Summary\n`;
-        output += `- Files analyzed: ${result.structure.fileCount}\n`;
-        output += `- Tokens: ${result.metadata.distilledTokens.toLocaleString()}\n`;
-        output += `- Token savings: ${(result.metadata.originalTokens - result.metadata.distilledTokens).toLocaleString()} (${Math.round(result.metadata.compressionRatio * 100)}%)\n`;
-        output += `- Compression ratio: ${(result.metadata.compressionRatio * 100).toFixed(1)}%\n\n`;
-
-        // Languages breakdown
-        output += `## Languages\n`;
-        for (const [lang, count] of Object.entries(
-            result.structure.languages,
-        )) {
-            output += `- ${lang}: ${count} files\n`;
-        }
-        output += "\n";
-
-        // APIs by file
-        output += `## Extracted APIs\n\n`;
-        for (const api of result.apis) {
-            output += `### ${api.file}\n\n`;
-            for (const exp of api.exports) {
-                if (exp.docstring) {
-                    output += `\`\`\`\n${exp.docstring}\n\`\`\`\n`;
-                }
-                output += `\`\`\`${getSyntaxLanguage(api.file)}\n${exp.signature}\n\`\`\`\n\n`;
-            }
-        }
-
-        return output;
-    }
-
-    private escapeXml(str: string): string {
-        return str
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&apos;");
     }
 }

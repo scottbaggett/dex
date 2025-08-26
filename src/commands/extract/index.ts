@@ -9,6 +9,10 @@ import { JsonFormatter } from "./formatters/json.js";
 import { XmlFormatter } from "./formatters/xml.js";
 import type { DexOptions, OutputFormat } from "../../types.js";
 import { OutputManager } from "../../utils/output-manager.js";
+import {
+    agentInstructions,
+    extractSuccessMessage,
+} from "../../utils/messages.js";
 
 interface ExtractCommandOptions {
     staged?: boolean;
@@ -101,7 +105,6 @@ export async function executeExtract(
             process.exit(1);
         }
 
-
         // Use format directly
         const format = options.format;
 
@@ -138,7 +141,6 @@ export async function executeExtract(
             process.exit(1);
         }
 
-
         // Handle interactive selection if requested - do this BEFORE context extraction
         if (options.select) {
             // Check if interactive mode is possible
@@ -146,7 +148,9 @@ export async function executeExtract(
                 spinner.fail(
                     chalk.red("Interactive mode requires a TTY terminal"),
                 );
-                const { FileSelector } = await import("../../utils/file-selector.js");
+                const { FileSelector } = await import(
+                    "../../utils/file-selector.js"
+                );
                 const fileSelector = new FileSelector();
                 fileSelector.showTTYError();
                 process.exit(1);
@@ -155,7 +159,9 @@ export async function executeExtract(
             spinner.text = chalk.gray("Scanning files for selection...");
 
             try {
-                const { FileSelector } = await import("../../utils/file-selector.js");
+                const { FileSelector } = await import(
+                    "../../utils/file-selector.js"
+                );
                 const fileSelector = new FileSelector();
 
                 // Collect all files in the repository (similar to combine command)
@@ -302,7 +308,7 @@ export async function executeExtract(
             // Show skipped files if any
             if (
                 context.additionalContext?.notIncluded &&
-                typeof context.additionalContext.notIncluded === 'number' &&
+                typeof context.additionalContext.notIncluded === "number" &&
                 context.additionalContext.notIncluded > 0
             ) {
                 console.log(
@@ -390,15 +396,8 @@ export async function executeExtract(
                     ? `${Math.round(tokenCount / 1000)}k tokens`
                     : `${tokenCount} tokens`;
 
-            spinner.succeed(
-                chalk.green("Saved to ") +
-                    chalk.white(fullPath) +
-                    chalk.dim(" • ") +
-                    chalk.white(tokenStr),
-            );
-
-            // Show agent instruction
-            console.log(chalk.dim(`\nFor agents: cat "${fullPath}"`));
+            spinner.succeed(extractSuccessMessage(fullPath, tokenStr));
+            console.log(agentInstructions(fullPath));
         }
     } catch (error) {
         spinner.fail(

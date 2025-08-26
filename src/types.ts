@@ -23,7 +23,11 @@ export {
 } from "./schemas.js";
 
 // Import for use in local interfaces
-import type { ExtractedContext, DexOptions, DistillOptions } from "./schemas.js";
+import type {
+    ExtractedContext,
+    DexOptions,
+    DistillOptions,
+} from "./schemas.js";
 
 export interface SymbolMap {
     [file: string]: {
@@ -170,11 +174,11 @@ export interface DistillFormatterOptions {
     includeDocstrings?: boolean;
     includeComments?: boolean;
     includeMetadata?: boolean;
-    
+
     // Output style
     preserveStructure?: boolean;
     groupByType?: boolean;
-    
+
     // Language hints
     language?: string;
     syntaxHighlight?: boolean;
@@ -182,31 +186,31 @@ export interface DistillFormatterOptions {
 
 export interface DistillFormatter {
     name: string;
-    format: string;  // 'xml', 'markdown', 'json', 'text'
-    
+    format: string; // 'markdown', 'json', 'txt'
+
     /**
      * Format a distillation result
      */
     formatDistillation(
         result: DistillationResult,
-        options?: DistillFormatterOptions
+        options?: DistillFormatterOptions,
     ): string;
-    
+
     /**
      * Format a compression result
      */
     formatCompression(
         result: CompressionResult,
-        options?: DistillFormatterOptions
+        options?: DistillFormatterOptions,
     ): string;
-    
+
     /**
      * Format combined results
      */
     formatCombined(
         compression: CompressionResult,
         distillation: DistillationResult,
-        options?: DistillFormatterOptions
+        options?: DistillFormatterOptions,
     ): string;
 }
 

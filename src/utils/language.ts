@@ -59,5 +59,5 @@ export function getSyntaxLanguage(filePath: string): string {
         erl: "erlang",
         hrl: "erlang",
     };
-    return langMap[ext || ""] || "text";
+    return langMap[ext || ""] || "txt";
 }

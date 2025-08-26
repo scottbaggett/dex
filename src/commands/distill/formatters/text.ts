@@ -1,13 +1,17 @@
 import { DistillFormatter, DistillFormatterOptions } from "../../../types.js";
-import { DistillationResult, CompressionResult, ExtractedAPI } from "../../../types.js";
+import {
+    DistillationResult,
+    CompressionResult,
+    ExtractedAPI,
+} from "../../../types.js";
 
 /**
- * Structured code formatter
+ * Text Formatter
  * Produces clean, structured output with proper code organization
  */
-export class StructuredFormatter implements DistillFormatter {
-    name = "Structured Code Formatter";
-    format = "structured";
+export class TextFormatter implements DistillFormatter {
+    name = "Text Formatter";
+    format = "txt";
 
     formatDistillation(
         result: DistillationResult,
@@ -85,7 +89,10 @@ export class StructuredFormatter implements DistillFormatter {
         return sorted;
     }
 
-    private formatFile(api: ExtractedAPI, options: DistillFormatterOptions): string {
+    private formatFile(
+        api: ExtractedAPI,
+        options: DistillFormatterOptions,
+    ): string {
         let output = `<file path="${this.cleanPath(api.file)}">\n`;
 
         // Add imports
@@ -125,7 +132,7 @@ export class StructuredFormatter implements DistillFormatter {
                     output += this.formatExport(exp, options);
                 }
             }
-            
+
             // Handle any items with undefined or unknown types
             for (const [type, items] of grouped.entries()) {
                 if (!order.includes(type) && items && items.length > 0) {
@@ -184,7 +191,10 @@ export class StructuredFormatter implements DistillFormatter {
         return output;
     }
 
-    private formatInterface(exp: any, options: DistillFormatterOptions): string {
+    private formatInterface(
+        exp: any,
+        options: DistillFormatterOptions,
+    ): string {
         let output = `export interface ${exp.name}`;
 
         // Add extends if in signature

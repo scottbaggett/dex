@@ -1,11 +1,16 @@
 import { z } from "zod";
 
 // Output format schema
-export const OutputFormatSchema = z.enum(["md", "json", "xml", "txt", "jsonl", "jsonc"]);
+export const OutputFormatSchema = z.enum(["md", "json", "xml", "txt"]);
 export type OutputFormat = z.infer<typeof OutputFormatSchema>;
 
 // Git change status schema
-export const GitStatusSchema = z.enum(["added", "modified", "deleted", "renamed"]);
+export const GitStatusSchema = z.enum([
+    "added",
+    "modified",
+    "deleted",
+    "renamed",
+]);
 export type GitStatus = z.infer<typeof GitStatusSchema>;
 
 // Git change schema
@@ -28,56 +33,64 @@ export const ExtractOptionsSchema = z.object({
     range: z.string().optional(),
     staged: z.boolean().optional(),
     all: z.boolean().optional(),
-    
+
     // Time-based options
     timeRange: z.string().optional(),
     isTimeRange: z.boolean().optional(),
-    
+
     // Full file options
     full: z.string().optional(),
     diffOnly: z.boolean().optional(),
-    
+
     // Untracked files
     includeUntracked: z.boolean().optional(),
     untrackedPattern: z.string().optional(),
-    
+
     // Filter options
     path: z.string().optional(),
     type: z.array(z.string()).optional(),
-    
+
     // File selection options
     selectedFiles: z.array(z.string()).optional(),
-    
+
     // Output options
     format: OutputFormatSchema.optional(),
     clipboard: z.boolean().optional(),
     interactive: z.boolean().optional(),
-    
+
     // Optimization
     symbols: z.boolean().optional(),
     aid: z.boolean().optional(),
-    
+
     // Display options
     noMetadata: z.boolean().optional(),
-    
+
     // Interactive selection
     select: z.boolean().optional(),
     sortBy: z.enum(["name", "updated", "size", "status"]).optional(),
     sortOrder: z.enum(["asc", "desc"]).optional(),
-    filterBy: z.enum(["all", "staged", "unstaged", "untracked", "modified", "added", "deleted"]).optional(),
+    filterBy: z
+        .enum([
+            "all",
+            "staged",
+            "unstaged",
+            "untracked",
+            "modified",
+            "added",
+            "deleted",
+        ])
+        .optional(),
 });
 export type ExtractOptions = z.infer<typeof ExtractOptionsSchema>;
 
 export const CombineOptionsSchema = z.object({
-    format: OutputFormatSchema.optional().default("xml"),
+    format: OutputFormatSchema.optional().default("txt"),
     output: z.string().optional(),
     clipboard: z.boolean().optional(),
     stdout: z.boolean().optional(),
     select: z.boolean().optional(),
     exclude: z.array(z.string()).optional().default([]),
     include: z.array(z.string()).optional().default([]),
-    noMetadata: z.boolean().optional(),
-    metadata: z.boolean().optional(),
     staged: z.boolean().optional(),
     since: z.string().optional(),
     dryRun: z.boolean().optional(),
@@ -136,10 +149,12 @@ export const MetadataSchema = z.object({
     }),
     extraction: z.object({
         method: z.string().optional(),
-        filters: z.object({
-            path: z.string().optional(),
-            type: z.array(z.string()).optional(),
-        }).optional(),
+        filters: z
+            .object({
+                path: z.string().optional(),
+                type: z.array(z.string()).optional(),
+            })
+            .optional(),
     }),
     tokens: z.object({
         estimated: z.number(),
@@ -162,12 +177,14 @@ export const ExtractedContextSchema = z.object({
     }),
     fullFiles: z.instanceof(Map<string, string>).optional(),
     metadata: MetadataSchema,
-    tokenSavings: z.object({
-        fullFileTokens: z.number(),
-        actualTokens: z.number(),
-        saved: z.number(),
-        percentSaved: z.number(),
-    }).optional(),
+    tokenSavings: z
+        .object({
+            fullFileTokens: z.number(),
+            actualTokens: z.number(),
+            saved: z.number(),
+            percentSaved: z.number(),
+        })
+        .optional(),
     additionalContext: z.record(z.string(), z.unknown()).optional(),
 });
 export type ExtractedContext = z.infer<typeof ExtractedContextSchema>;

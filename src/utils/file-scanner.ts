@@ -18,7 +18,7 @@ export interface ScanOptions {
     maxFiles?: number;
     followSymlinks?: boolean;
 }
-
+// TODO: Update this to use global default ignore
 export class FileScanner {
     private gitignorePatterns: string[] = [];
     private defaultIgnorePatterns = [
