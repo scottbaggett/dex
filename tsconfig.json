@@ -2,16 +2,17 @@
     "compilerOptions": {
         // Environment setup & latest features
         "lib": ["ESNext", "DOM"],
-        "target": "ES2020",
-        "module": "CommonJS",
+        "target": "ESNext",
+        "module": "NodeNext",
         "moduleDetection": "force",
         "allowJs": true,
         // Output configuration
         "outDir": "dist",
         "declaration": true,
         "sourceMap": true,
+        "strict": true,
         "removeComments": true,
-        "moduleResolution": "node",
+        "moduleResolution": "NodeNext",
         "esModuleInterop": true,
         // Best practices
         "allowSyntheticDefaultImports": true,
