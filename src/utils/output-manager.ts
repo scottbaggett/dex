@@ -91,14 +91,21 @@ export class OutputManager {
     }
 
     private sanitizeContext(context: string): string {
+        // Special case for --select mode
+        if (context === "--select" || context === "select") {
+            return "select";
+        }
+        
         // Replace problematic characters for filenames
         return context
-            .replace(/[\/\\]/g, "-") // Replace slashes with dashes
+            .replace(/[\/\\]/g, ".") // Replace slashes with dots for path structure
             .replace(/[<>:"|?*]/g, "") // Remove invalid filename characters
             .replace(/\s+/g, "-") // Replace spaces with dashes
             .replace(/\.+/g, ".") // Collapse multiple dots
             .replace(/^\.+|\.+$/g, "") // Remove leading/trailing dots
-            .toLowerCase();
+            .replace(/^-+|-+$/g, "") // Remove leading/trailing dashes
+            .toLowerCase()
+            || "output"; // Default if context becomes empty
     }
 
     private getExtension(format: OutputFormat): string {
@@ -109,7 +116,7 @@ export class OutputManager {
             case "json":
                 return "json";
             case "xml":
-                return "xml";
+                return "txt";  // XML format but saved as .txt
             case "txt":
             default:
                 return "txt";
