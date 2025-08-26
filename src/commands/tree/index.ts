@@ -14,7 +14,6 @@ import { OutputManager } from "../../utils/output-manager.js";
 
 export interface TreeOptions {
     depth?: string;
-    format?: "tree" | "outline" | "json";
     output?: string;
     stdout?: boolean;
     clipboard?: boolean;
@@ -23,6 +22,7 @@ export interface TreeOptions {
     showTypes?: boolean;
     showParams?: boolean;
     groupBy?: "file" | "type" | "none";
+    outline?: boolean;
 }
 
 export function createTreeCommand(): Command {
@@ -35,11 +35,7 @@ export function createTreeCommand(): Command {
             "Path to directory to analyze (defaults to current directory)",
         )
 
-        .option(
-            "-f, --format <type>",
-            "Tree format (tree, outline, json)",
-            "tree",
-        )
+        .option("--outline", "Show as outline instead of tree structure")
         .option("-o, --output <file>", "Write output to specific file")
         .option("--stdout", "Print output to stdout")
         .option("-c, --clipboard", "Copy output to clipboard")
@@ -72,6 +68,7 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
     try {
         // Load config
         const config = loadConfig();
+        const treeConfig = config.tree || {};
 
         // Resolve path
         const resolvedPath = resolve(targetPath);
@@ -97,8 +94,10 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
             excludePatterns: [...configExcludes, ...cliExcludes],
             includeComments: false,
             includeDocstrings: true,
+            includePrivate:
+                options.includePrivate ?? treeConfig.includePrivate ?? false,
             format: "txt",
-            parallel: true,
+            parallel: config.performance?.parallel ?? true,
         };
 
         console.log(chalk.cyan("✨Generating Tree..."));
@@ -119,11 +118,22 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
         // Determine if output should be formatted for terminal (with colors/icons)
         const forTerminal = options.stdout || false;
 
+        // Merge options with config defaults
+        const treeOptions: TreeOptions = {
+            groupBy: options.groupBy ?? treeConfig.groupBy ?? "file",
+            showTypes: options.showTypes ?? treeConfig.showTypes ?? false,
+            showParams: options.showParams ?? treeConfig.showParams ?? false,
+            includePrivate:
+                options.includePrivate ?? treeConfig.includePrivate ?? false,
+            outline: options.outline ?? treeConfig.outline ?? false,
+            ...options,
+        };
+
         // Generate tree visualization
         const tree = generateTree(
             result.apis,
             result.structure,
-            options,
+            treeOptions,
             resolvedPath,
             forTerminal,
         );
@@ -150,11 +160,7 @@ function generateTree(
     basePath: string,
     forTerminal: boolean = false,
 ): string {
-    const { format, groupBy, includePrivate, showTypes, showParams } = options;
-
-    if (format === "json") {
-        return JSON.stringify({ apis, structure }, null, 2);
-    }
+    const { groupBy, includePrivate, showTypes, showParams, outline } = options;
 
     // Flatten exports from all APIs and filter based on options
     const allExports = apis.flatMap((api) =>
@@ -170,16 +176,6 @@ function generateTree(
         }
         return true;
     });
-
-    if (format === "outline") {
-        return generateOutline(
-            filteredExports,
-            basePath,
-            showTypes,
-            showParams,
-            forTerminal,
-        );
-    }
 
     // Default: tree format
     return generateTreeFormat(
@@ -230,7 +226,8 @@ function generateTreeByFile(
     const exportsByFile = new Map<string, any[]>();
 
     for (const exp of exports) {
-        const relativePath = relative(basePath, exp.file);
+        // exp.file is already a relative path from the distiller
+        const relativePath = exp.file;
         if (!exportsByFile.has(relativePath)) {
             exportsByFile.set(relativePath, []);
         }
@@ -587,7 +584,8 @@ function generateOutline(
     const exportsByFile = new Map<string, any[]>();
 
     for (const exp of exports) {
-        const relativePath = relative(basePath, exp.file);
+        // exp.file is already a relative path from the distiller
+        const relativePath = exp.file;
         if (!exportsByFile.has(relativePath)) {
             exportsByFile.set(relativePath, []);
         }
@@ -699,13 +697,13 @@ async function handleOutput(
         await outputManager.saveOutput(content, {
             command: "tree",
             context: folderName,
-            format: options.format === "json" ? "json" : "txt",
+            format: "txt",
         });
 
         const fullPath = await outputManager.getFilePath({
             command: "tree",
             context: folderName,
-            format: options.format === "json" ? "json" : "txt",
+            format: "txt",
         });
 
         console.log(
