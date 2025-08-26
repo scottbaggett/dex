@@ -29,7 +29,6 @@ import {
     genericError,
     formatTokenCount,
     interactiveCancelled,
-    notInGitRepo,
 } from "../../utils/messages.js";
 
 function collectPatterns(value: string, previous: string[]): string[] {

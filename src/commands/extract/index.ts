@@ -6,32 +6,14 @@ import { ContextEngine } from "../../core/context.js";
 import { GitExtractor } from "../../core/git.js";
 import { MarkdownFormatter } from "./formatters/markdown.js";
 import { JsonFormatter } from "./formatters/json.js";
-import { XmlFormatter } from "./formatters/xml.js";
-import type { DexOptions, OutputFormat } from "../../types.js";
+import { TextFormatter } from "./formatters/text.js";
+import type { DexOptions } from "../../types.js";
+import { ExtractOptionsSchema } from "../../schemas.js";
 import { OutputManager } from "../../utils/output-manager.js";
 import {
     agentInstructions,
     extractSuccessMessage,
 } from "../../utils/messages.js";
-
-interface ExtractCommandOptions {
-    staged?: boolean;
-    all?: boolean;
-    full?: string;
-    diffOnly?: boolean;
-    path?: string;
-    type?: string;
-    format?: OutputFormat;
-    clipboard?: boolean;
-    includeUntracked?: boolean;
-    untrackedPattern?: string;
-    optimize?: string[];
-    metadata?: boolean;
-    select?: boolean;
-    sortBy?: string;
-    sortOrder?: string;
-    filterBy?: string;
-}
 
 // Helper function to generate context string for filename
 function generateContextString(dexOptions: DexOptions, method: string): string {
@@ -56,7 +38,7 @@ function generateContextString(dexOptions: DexOptions, method: string): string {
 
 export async function executeExtract(
     range: string,
-    options: Record<string, any>,
+    rawOptions: Record<string, any>,
 ) {
     const spinner = ora("Analyzing changes...").start();
 
@@ -97,52 +79,41 @@ export async function executeExtract(
             process.exit(1);
         }
 
+        // Parse and validate options using schema
+        const parsedOptions = ExtractOptionsSchema.parse({
+            range: range,
+            ...rawOptions,
+            // Handle special cases
+            type: rawOptions.type ? rawOptions.type.split(",") : undefined,
+            aid: rawOptions.optimize?.includes("aid"),
+            symbols: rawOptions.optimize?.includes("symbols"),
+            noMetadata: !rawOptions.metadata,
+        });
+
         // Validate options
-        if (options.staged && options.all) {
+        if (parsedOptions.staged && parsedOptions.all) {
             spinner.fail(
                 chalk.red("Error: Cannot use --staged and --all together"),
             );
             process.exit(1);
         }
 
-        // Use format directly
-        const format = options.format;
-
-        // Map optimize flags
-        const aid = options.optimize?.includes("aid");
-        const symbols = options.optimize?.includes("symbols");
-
-        // Parse options
-        let dexOptions: DexOptions = {
-            range: range,
-            staged: options.staged,
-            all: options.all,
-            full: options.full,
-            diffOnly: options.diffOnly,
-            includeUntracked: options.includeUntracked,
-            untrackedPattern: options.untrackedPattern,
-            path: options.path,
-            type: options.type ? options.type.split(",") : undefined,
-            format: format as OutputFormat,
-            clipboard: options.clipboard,
-            aid,
-            symbols,
-            noMetadata: !options.metadata,
-        };
-
         // Validate format
-        const validFormats = ["markdown", "json", "xml"];
-        if (dexOptions.format && !validFormats.includes(dexOptions.format)) {
+        const validFormats = ["txt", "md", "json"];
+        if (
+            parsedOptions.format &&
+            !validFormats.includes(parsedOptions.format)
+        ) {
             spinner.fail(
                 chalk.red(
-                    `Error: Invalid format '${dexOptions.format}'. Valid formats are: markdown, json, xml`,
+                    `Error: Invalid format '${parsedOptions.format}'. Valid formats are: txt, md, json`,
                 ),
             );
             process.exit(1);
         }
 
         // Handle interactive selection if requested - do this BEFORE context extraction
-        if (options.select) {
+        if (parsedOptions.select) {
             // Check if interactive mode is possible
             if (!process.stdin.isTTY || !process.stdin.setRawMode) {
                 spinner.fail(
@@ -213,31 +184,18 @@ export async function executeExtract(
                 // Convert to GitChange objects for selection
                 const fileChanges = fileSelector.filesToGitChanges(allFiles);
                 const result = await fileSelector.selectFiles(fileChanges, {
-                    sortBy: options.sortBy as
-                        | "name"
-                        | "updated"
-                        | "size"
-                        | "status"
-                        | undefined,
-                    sortOrder: options.sortOrder as "asc" | "desc" | undefined,
-                    filterBy: options.filterBy as
-                        | "all"
-                        | "staged"
-                        | "unstaged"
-                        | "untracked"
-                        | "modified"
-                        | "added"
-                        | "deleted"
-                        | undefined,
+                    sortBy: parsedOptions.sortBy,
+                    sortOrder: parsedOptions.sortOrder,
+                    filterBy: parsedOptions.filterBy,
                 });
 
                 // Override clipboard option if user pressed 'c'
                 if (result.copyToClipboard) {
-                    dexOptions.clipboard = true;
+                    parsedOptions.clipboard = true;
                 }
 
-                // Update dexOptions to include selected files for context extraction
-                dexOptions.selectedFiles = result.files.map(
+                // Update parsedOptions to include selected files for context extraction
+                parsedOptions.selectedFiles = result.files.map(
                     (change: any) => change.file,
                 );
 
@@ -258,7 +216,7 @@ export async function executeExtract(
         spinner.text = chalk.gray("Extracting context...");
         const startTime = Date.now();
         const contextEngine = new ContextEngine(gitExtractor);
-        const context = await contextEngine.extract(dexOptions);
+        const context = await contextEngine.extract(parsedOptions);
         const extractionTime = Date.now() - startTime;
 
         if (context.changes.length === 0) {
@@ -332,34 +290,34 @@ export async function executeExtract(
 
         // Format output
         spinner.text = chalk.gray(
-            `Formatting as ${chalk.cyan(dexOptions.format || "xml")}...`,
+            `Formatting as ${chalk.cyan(parsedOptions.format || "xml")}...`,
         );
         let formatter;
-        switch (dexOptions.format || "xml") {
+        switch (parsedOptions.format || "txt") {
             case "json":
                 formatter = new JsonFormatter();
                 break;
-            case "xml":
-                formatter = new XmlFormatter();
+            case "txt":
+                formatter = new TextFormatter();
                 break;
             case "md":
                 formatter = new MarkdownFormatter();
                 break;
             default:
                 // This should never happen due to validation above
-                throw new Error(`Invalid format: ${dexOptions.format}`);
+                throw new Error(`Invalid format: ${parsedOptions.format}`);
         }
 
-        const output = formatter.format({ context, options: dexOptions });
+        const output = formatter.format({ context, options: parsedOptions });
 
         // Generate context string for filename
         const contextString = generateContextString(
-            dexOptions,
+            parsedOptions,
             context.metadata.extraction.method || "default",
         );
 
         // Handle output
-        if (dexOptions.clipboard) {
+        if (parsedOptions.clipboard) {
             await clipboardy.write(output);
 
             // Format token display
@@ -380,13 +338,13 @@ export async function executeExtract(
             await outputManager.saveOutput(output, {
                 command: "extract",
                 context: contextString,
-                format: dexOptions.format || "txt",
+                format: parsedOptions.format || "txt",
             });
 
             const fullPath = await outputManager.getFilePath({
                 command: "extract",
                 context: contextString,
-                format: dexOptions.format || "txt",
+                format: parsedOptions.format || "txt",
             });
 
             // Format token display
@@ -426,8 +384,8 @@ export function createExtractCommand(): Command {
         .option("-t, --type <types>", "Filter by file types (comma-separated)")
         .addOption(
             new Option("-f, --format <format>", "Output format")
-                .default("xml")
-                .choices(["markdown", "json", "xml"]),
+                .default("txt")
+                .choices(["txt", "md", "json"]),
         )
         .option("-c, --clipboard", "Copy output to clipboard")
         .option("-u, --include-untracked", "Include untracked files")

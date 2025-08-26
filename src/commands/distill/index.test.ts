@@ -1,3 +1,4 @@
+// @ts-expect-error - bun:test types not available in this environment
 import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
 import { execSync } from 'child_process';
 import * as fs from 'fs';

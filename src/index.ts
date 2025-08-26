@@ -3,7 +3,7 @@ export { GitExtractor } from "./core/git.js";
 export { Formatter } from "./core/formatter.js";
 export { MarkdownFormatter } from "./commands/extract/formatters/markdown.js";
 export { JsonFormatter } from "./commands/extract/formatters/json.js";
-export { XmlFormatter } from "./commands/extract/formatters/xml.js";
+export { TextFormatter } from "./commands/extract/formatters/text.js";
 
 export type {
     DexOptions,

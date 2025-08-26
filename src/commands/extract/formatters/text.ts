@@ -4,9 +4,8 @@ import type {
     ExtractedContext,
     Metadata,
 } from "../../../types.js";
-// Prompt features removed
 
-export class XmlFormatter extends Formatter {
+export class TextFormatter extends Formatter {
     format({ context, options }: FormatterOptions): string {
         const sections: string[] = [];
         // code context section
