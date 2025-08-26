@@ -1,19 +1,44 @@
-import { Formatter, FormatterOptions } from "./types";
-import { DistillationResult, CompressionResult } from "../../../types";
+import { DistillFormatter, DistillFormatterOptions, DistillationResult, CompressionResult } from "../../../types.js";
 
 /**
  * JSON formatter
  * Produces clean JSON output
  */
-export class JsonFormatter implements Formatter {
+export class JsonFormatter implements DistillFormatter {
     name = "JSON Formatter";
     format = "json";
 
     formatDistillation(
         result: DistillationResult,
-        options: FormatterOptions = {},
+        options: DistillFormatterOptions = {},
     ): string {
-        const output: any = {
+        interface DistillationOutput {
+            files: Array<{
+                path: string;
+                imports?: string[];
+                exports: Array<{
+                    name: string;
+                    type: string;
+                    signature: string;
+                    visibility: string;
+                    docstring?: string;
+                    members?: Array<{
+                        name: string;
+                        signature: string;
+                        type: string;
+                    }>;
+                }>;
+            }>;
+            metadata?: {
+                fileCount: number;
+                originalTokens: number;
+                distilledTokens: number;
+                compressionRatio: number;
+                languages: Record<string, number>;
+            };
+        }
+
+        const output: DistillationOutput = {
             files: [],
         };
 
@@ -28,12 +53,12 @@ export class JsonFormatter implements Formatter {
         }
 
         for (const api of result.apis) {
-            const file: any = {
+            const file: DistillationOutput['files'][number] = {
                 path: api.file,
                 exports: [],
             };
 
-            if (options.includeImports !== false && api.imports.length > 0) {
+            if (options.includeImports !== false && api.imports && api.imports.length > 0) {
                 file.imports = api.imports;
             }
 
@@ -42,7 +67,7 @@ export class JsonFormatter implements Formatter {
                     continue;
                 }
 
-                const exportItem: any = {
+                const exportItem: DistillationOutput['files'][number]['exports'][number] = {
                     name: exp.name,
                     type: exp.type,
                     signature: exp.signature,
@@ -68,9 +93,20 @@ export class JsonFormatter implements Formatter {
 
     formatCompression(
         result: CompressionResult,
-        options: FormatterOptions = {},
+        options: DistillFormatterOptions = {},
     ): string {
-        const output: any = {
+        interface CompressionOutput {
+            files: Array<{
+                path: string;
+                size: number;
+                hash: string;
+                language?: string;
+                content: string;
+            }>;
+            metadata?: CompressionResult['metadata'];
+        }
+
+        const output: CompressionOutput = {
             files: result.files.map((f) => ({
                 path: f.path,
                 size: f.size,
@@ -90,7 +126,7 @@ export class JsonFormatter implements Formatter {
     formatCombined(
         compression: CompressionResult,
         distillation: DistillationResult,
-        options: FormatterOptions = {},
+        options: DistillFormatterOptions = {},
     ): string {
         const output = {
             compression: JSON.parse(

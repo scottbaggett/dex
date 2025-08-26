@@ -1,5 +1,5 @@
-import { LanguageModule, ProcessResult, ProcessingOptions, LanguageCapabilities } from '../types';
-import { PythonProcessor } from './processor';
+import { LanguageModule, ProcessResult, ProcessingOptions, LanguageCapabilities } from "../types.js";
+import { PythonProcessor } from "./processor.js";
 
 /**
  * Python language module

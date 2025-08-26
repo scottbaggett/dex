@@ -1,17 +1,17 @@
-import { Formatter, FormatterOptions } from "./types";
-import { DistillationResult, CompressionResult, ExtractedAPI } from "../../../types";
+import { DistillFormatter, DistillFormatterOptions } from "../../../types.js";
+import { DistillationResult, CompressionResult, ExtractedAPI } from "../../../types.js";
 
 /**
  * Structured code formatter
  * Produces clean, structured output with proper code organization
  */
-export class StructuredFormatter implements Formatter {
+export class StructuredFormatter implements DistillFormatter {
     name = "Structured Code Formatter";
     format = "structured";
 
     formatDistillation(
         result: DistillationResult,
-        options: FormatterOptions = {},
+        options: DistillFormatterOptions = {},
     ): string {
         if (!result || !result.apis || !Array.isArray(result.apis)) {
             return "# Distillation Result\n\nNo APIs were extracted from the codebase.";
@@ -33,7 +33,7 @@ export class StructuredFormatter implements Formatter {
 
     formatCompression(
         result: CompressionResult,
-        options: FormatterOptions = {},
+        options: DistillFormatterOptions = {},
     ): string {
         let output = "";
 
@@ -51,7 +51,7 @@ export class StructuredFormatter implements Formatter {
     formatCombined(
         compression: CompressionResult,
         distillation: DistillationResult,
-        options: FormatterOptions = {},
+        options: DistillFormatterOptions = {},
     ): string {
         return `${this.formatCompression(compression, options)}\n\n---\n\n${this.formatDistillation(distillation, options)}`;
     }
@@ -85,7 +85,7 @@ export class StructuredFormatter implements Formatter {
         return sorted;
     }
 
-    private formatFile(api: ExtractedAPI, options: FormatterOptions): string {
+    private formatFile(api: ExtractedAPI, options: DistillFormatterOptions): string {
         let output = `<file path="${this.cleanPath(api.file)}">\n`;
 
         // Add imports
@@ -145,14 +145,14 @@ export class StructuredFormatter implements Formatter {
         return output;
     }
 
-    private formatExport(exp: any, options: FormatterOptions): string {
+    private formatExport(exp: any, options: DistillFormatterOptions): string {
         let output = "";
 
         // Add docstring if available and requested
         if (options.includeDocstrings && exp.docstring) {
             output += `/**\n${exp.docstring
                 .split("\n")
-                .map((l) => ` * ${l}`)
+                .map((l: string) => ` * ${l}`)
                 .join("\n")}\n */\n`;
         }
 
@@ -184,7 +184,7 @@ export class StructuredFormatter implements Formatter {
         return output;
     }
 
-    private formatInterface(exp: any, options: FormatterOptions): string {
+    private formatInterface(exp: any, options: DistillFormatterOptions): string {
         let output = `export interface ${exp.name}`;
 
         // Add extends if in signature
@@ -205,7 +205,7 @@ export class StructuredFormatter implements Formatter {
         return output;
     }
 
-    private formatClass(exp: any, options: FormatterOptions): string {
+    private formatClass(exp: any, options: DistillFormatterOptions): string {
         let output = `export class ${exp.name}`;
 
         // Add extends/implements
@@ -253,7 +253,7 @@ export class StructuredFormatter implements Formatter {
         return output;
     }
 
-    private formatFunction(exp: any, options: FormatterOptions): string {
+    private formatFunction(exp: any, options: DistillFormatterOptions): string {
         // Clean up the signature - remove duplicate 'export' if present
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
@@ -264,7 +264,7 @@ export class StructuredFormatter implements Formatter {
         return `export ${signature}\n`;
     }
 
-    private formatType(exp: any, options: FormatterOptions): string {
+    private formatType(exp: any, options: DistillFormatterOptions): string {
         // Clean up the signature
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
@@ -275,7 +275,7 @@ export class StructuredFormatter implements Formatter {
         return `export ${signature}\n`;
     }
 
-    private formatConst(exp: any, options: FormatterOptions): string {
+    private formatConst(exp: any, options: DistillFormatterOptions): string {
         // Clean up the signature
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
@@ -286,7 +286,7 @@ export class StructuredFormatter implements Formatter {
         return `export ${signature}\n`;
     }
 
-    private formatEnum(exp: any, options: FormatterOptions): string {
+    private formatEnum(exp: any, options: DistillFormatterOptions): string {
         // Clean up the signature
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {

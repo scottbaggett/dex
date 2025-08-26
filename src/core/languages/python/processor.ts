@@ -1,25 +1,13 @@
-import { ProcessResult, ProcessingOptions, ExportNode, ImportNode, SkippedItem, ExportKind, MemberNode } from '../types';
+import { ProcessResult, ProcessingOptions, ExportNode, ImportNode, SkippedItem } from "../types.js";
 
 /**
  * Python processor
  * Uses line-based parsing optimized for Python's indentation-based syntax
  */
 export class PythonProcessor {
-    private treeSitterAvailable = false;
-    private parser: any = null;
-    
     async initialize(): Promise<void> {
-        // Try to load tree-sitter-python if available
-        try {
-            const Parser = require('tree-sitter');
-            const Python = require('tree-sitter-python');
-            this.parser = new Parser();
-            this.parser.setLanguage(Python);
-            this.treeSitterAvailable = true;
-        } catch {
-            // Fall back to line-based parsing
-            this.treeSitterAvailable = false;
-        }
+        // Line-based parsing only for now
+        // Could integrate with a Python AST library in the future
     }
     
     async process(
@@ -27,8 +15,7 @@ export class PythonProcessor {
         filePath: string,
         options: ProcessingOptions
     ): Promise<ProcessResult> {
-        // For now, always use line-based parsing for Python
-        // Tree-sitter support can be added later
+        // Use line-based parsing for Python
         return this.processLineBased(source, filePath, options);
     }
     
@@ -50,8 +37,8 @@ export class PythonProcessor {
         
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            const trimmed = line.trim();
-            const indent = this.getIndentLevel(line);
+            const trimmed = line?.trim() || '';
+            const indent = this.getIndentLevel(line || '');
             
             // Handle docstrings
             if (this.isDocstringStart(trimmed)) {
@@ -68,14 +55,17 @@ export class PythonProcessor {
             }
             
             if (inDocstring) {
-                docstringBuffer.push(line);
+                docstringBuffer.push(line || '');
                 if (this.isDocstringEnd(trimmed, docstringQuotes)) {
                     inDocstring = false;
                     const docstring = docstringBuffer.join('\n');
                     
                     // Attach docstring to the last export if includeDocstrings is true
                     if (options.includeDocstrings && exports.length > 0) {
-                        exports[exports.length - 1].docstring = docstring;
+                        const lastExport = exports[exports.length - 1];
+                        if (lastExport) {
+                            lastExport.docstring = docstring;
+                        }
                     }
                     
                     docstringBuffer = [];
@@ -217,15 +207,15 @@ export class PythonProcessor {
             // import module
             const match = line.match(/import\s+(.+?)(?:\s+as\s+(.+))?$/);
             if (match) {
-                source = match[1];
-                specifiers.push(match[2] || match[1]);
+                source = match[1] || '';
+                specifiers.push(match[2] || match[1] || '');
             }
         } else if (line.startsWith('from ')) {
             // from module import ...
             const match = line.match(/from\s+(.+?)\s+import\s+(.+)$/);
             if (match) {
-                source = match[1];
-                const imports = match[2];
+                source = match[1] || '';
+                const imports = match[2] || '';
                 
                 if (imports === '*') {
                     specifiers.push('*');
@@ -235,7 +225,7 @@ export class PythonProcessor {
                         const trimmed = imp.trim();
                         if (trimmed.includes(' as ')) {
                             const [name, alias] = trimmed.split(' as ').map(s => s.trim());
-                            specifiers.push(alias || name);
+                            specifiers.push(alias || name || '');
                         } else {
                             specifiers.push(trimmed);
                         }
@@ -256,7 +246,7 @@ export class PythonProcessor {
         const name = match ? match[1] : 'Anonymous';
         const bases = match && match[2] ? match[2].split(',').map(b => b.trim()) : [];
         
-        const isPrivate = name.startsWith('_');
+        const isPrivate = name?.startsWith('_') || false;
         
         let signature = `class ${name}`;
         if (bases.length > 0 && !options.compact) {
@@ -264,7 +254,7 @@ export class PythonProcessor {
         }
         
         return {
-            name,
+            name: name || '',
             kind: 'class',
             signature,
             visibility: isPrivate ? 'private' : 'public',
@@ -285,8 +275,7 @@ export class PythonProcessor {
         const params = match && match[2] ? match[2] : '';
         const returnType = match && match[3] ? match[3].trim() : '';
         
-        const isPrivate = name.startsWith('_') && !name.startsWith('__');
-        const isSpecial = name.startsWith('__') && name.endsWith('__');
+        const isPrivate = name?.startsWith('_') || false;
         
         let signature = `${isAsync ? 'async ' : ''}def ${name}`;
         
@@ -300,7 +289,7 @@ export class PythonProcessor {
         }
         
         return {
-            name,
+            name: name || '',
             kind: 'function',
             signature,
             visibility: isPrivate ? 'private' : 'public',
@@ -314,12 +303,11 @@ export class PythonProcessor {
         const match = line.match(/^([A-Z_][A-Z0-9_]*|[a-z_][a-z0-9_]*)\s*(?::\s*[^=]+)?\s*=\s*(.+)$/);
         if (!match) return null;
         
-        const name = match[1];
-        const value = match[2];
+        const name = match[1] || '';
         
         // Only consider uppercase as constants unless it's a type alias
         const isConstant = /^[A-Z_][A-Z0-9_]*$/.test(name);
-        const isTypeAlias = line.includes(':') && line.includes('=');
+        const isTypeAlias = line?.includes(':') || false;
         
         if (!isConstant && !isTypeAlias) return null;
         
@@ -411,8 +399,7 @@ export class PythonProcessor {
     
     private shouldIncludeMember(node: ExportNode, options: ProcessingOptions): boolean {
         // For Python, check if it's a private method
-        const isPrivate = node.name.startsWith('_') && !node.name.startsWith('__');
-        const isSpecial = node.name.startsWith('__') && node.name.endsWith('__');
+        const isPrivate = node.name?.startsWith('_') || false;
         
         if (isPrivate && !options.includePrivate) {
             return false;
@@ -476,7 +463,7 @@ export class PythonProcessor {
                 regexPattern += '.*';
             } else if (char === '?') {
                 regexPattern += '.';
-            } else if ('.+^${}()|[]\\'.includes(char)) {
+            } else if (char && '^+${}()|[]\\'.includes(char)) {
                 regexPattern += '\\' + char;
             } else {
                 regexPattern += char;

@@ -1,18 +1,18 @@
-import { Formatter, FormatterOptions } from "./types";
-import { DistillationResult, CompressionResult } from "../../../types";
-import { getSyntaxLanguage } from "../../../utils/language";
+import { DistillFormatter, DistillFormatterOptions } from "../../../types.js";
+import { DistillationResult, CompressionResult } from "../../../types.js";
+import { getSyntaxLanguage } from "../../../utils/language.js";
 
 /**
  * Markdown formatter
  * Produces markdown-formatted output with code blocks
  */
-export class MarkdownFormatter implements Formatter {
+export class MarkdownFormatter implements DistillFormatter {
     name = "Markdown Formatter";
     format = "markdown";
 
     formatDistillation(
         result: DistillationResult,
-        options: FormatterOptions = {},
+        options: DistillFormatterOptions = {},
     ): string {
         let output = "";
         
@@ -23,7 +23,7 @@ export class MarkdownFormatter implements Formatter {
             output += `\`\`\`${lang}\n`;
             
             // Add imports
-            if (options.includeImports !== false && api.imports.length > 0) {
+            if (options.includeImports !== false && api.imports && api.imports.length > 0) {
                 for (const imp of api.imports) {
                     output += `import '${imp}'\n`;
                 }
@@ -45,7 +45,7 @@ export class MarkdownFormatter implements Formatter {
 
     formatCompression(
         result: CompressionResult,
-        options: FormatterOptions = {},
+        options: DistillFormatterOptions = {},
     ): string {
         let output = "# Compressed Files\n\n";
 
@@ -66,7 +66,7 @@ export class MarkdownFormatter implements Formatter {
     formatCombined(
         compression: CompressionResult,
         distillation: DistillationResult,
-        options: FormatterOptions = {},
+        options: DistillFormatterOptions = {},
     ): string {
         return `${this.formatCompression(compression, options)}\n\n---\n\n${this.formatDistillation(distillation, options)}`;
     }

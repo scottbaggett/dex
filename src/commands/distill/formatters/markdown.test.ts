@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
-import { MarkdownFormatter } from "./markdown";
-import { DistillationResult, CompressionResult } from "../../../types";
-import { getSyntaxLanguage } from "../../../utils/language";
+import { MarkdownFormatter } from "./markdown.js";
+import { DistillationResult, CompressionResult } from "../../../types.js";
+import { getSyntaxLanguage } from "../../../utils/language.js";
 
 describe("MarkdownFormatter", () => {
     const formatter = new MarkdownFormatter();

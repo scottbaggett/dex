@@ -1,5 +1,5 @@
-import { LanguageModule, ProcessResult, ProcessingOptions, LanguageCapabilities } from '../types';
-import { TypeScriptProcessor } from './processor';
+import { LanguageModule, ProcessResult, ProcessingOptions, LanguageCapabilities } from "../types.js";
+import { TypeScriptProcessor } from "./processor.js";
 
 /**
  * TypeScript/JavaScript language module

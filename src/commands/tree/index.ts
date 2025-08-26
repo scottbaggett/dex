@@ -1,16 +1,16 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { Distiller } from "../../core/distiller";
+import { Distiller } from "../../core/distiller/index.js";
 import type {
     DistillerOptions,
     ExtractedAPI,
     ProjectStructure,
-} from "../../types";
+} from "../../types.js";
 import { promises as fs } from "fs";
 import { resolve, basename, relative } from "path";
 import clipboardy from "clipboardy";
-import { loadConfig } from "../../core/config";
-import { OutputManager } from "../../utils/output-manager";
+import { loadConfig } from "../../core/config.js";
+import { OutputManager } from "../../utils/output-manager.js";
 
 export interface TreeOptions {
     depth?: string;
@@ -92,10 +92,12 @@ async function treeCommand(targetPath: string, options: any): Promise<void> {
 
         const distillerOptions: DistillerOptions = {
             path: resolvedPath,
+            exclude: [...configExcludes, ...cliExcludes],
+            include: [],
             excludePatterns: [...configExcludes, ...cliExcludes],
             includeComments: false,
             includeDocstrings: true,
-            format: "distilled",
+            format: "txt",
             parallel: true,
         };
 

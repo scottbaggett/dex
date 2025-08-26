@@ -6,17 +6,17 @@ import type {
     ExtractedAPI,
     ProjectStructure,
     DependencyMap,
-} from "../../types";
-import { getLanguageRegistry, ProcessingOptions } from "../languages";
-import { getFormatterRegistry } from "../../commands/distill/formatters";
-import { Parser } from "../parser/parser";
-import { getSyntaxLanguage } from "../../utils/language";
-import { countTokens } from "../../utils/tokens";
+} from "../../types.js";
+import { getLanguageRegistry, ProcessingOptions } from "../languages/index.js";
+import { getFormatterRegistry } from "../../commands/distill/formatters/index.js";
+import { detectLanguage } from "../../utils/language-detection.js";
+import { getSyntaxLanguage } from "../../utils/language.js";
+import { countTokens } from "../../utils/tokens.js";
 import { promises as fs } from "fs";
 import { join, relative, dirname, basename } from "path";
 import { globby } from "globby";
 import { createHash } from "crypto";
-import { DistillerProgress } from "./progress";
+import { DistillerProgress } from "./progress.js";
 
 export class Distiller {
     private registry = getLanguageRegistry();
@@ -45,12 +45,14 @@ export class Distiller {
         "**/*.test.js",
     ];
 
-    constructor(options: DistillerOptions = {}) {
+    constructor(options: Partial<DistillerOptions> = {}) {
         this.options = {
             includeDocstrings: true,
             includeComments: false,
             format: "txt",
             parallel: true,
+            exclude: [],
+            include: [],
             ...options,
         } as DistillerOptions;
 
@@ -199,7 +201,7 @@ export class Distiller {
             .update(content)
             .digest("hex")
             .substring(0, 8);
-        const language = Parser.detectLanguage(fullPath) || undefined;
+        const language = detectLanguage(fullPath) || undefined;
 
         return {
             path: relativePath || fullPath,
@@ -244,7 +246,7 @@ export class Distiller {
         let cumulativeDistilledSize = 0;
 
         for (const file of filesToProcess) {
-            const language = file.language || Parser.detectLanguage(file.path);
+            const language = file.language || detectLanguage(file.path);
             if (!language || !this.registry.isFileSupported(file.path)) {
                 processedCount++;
                 // Update progress even for unsupported files
@@ -289,14 +291,14 @@ export class Distiller {
                 // Convert to ExtractedAPI format
                 const extracted: ExtractedAPI = {
                     file: file.path,
-                    imports: result.imports.map(i => i.source),
-                    exports: result.exports.map(e => ({
+                    imports: result.imports.map((i: any) => i.source),
+                    exports: result.exports.map((e: any) => ({
                         name: e.name,
                         type: this.mapExportKind(e.kind),
                         signature: e.signature,
                         visibility: e.visibility || 'public',
                         location: { startLine: e.line || 0, endLine: e.line || 0 },
-                        members: e.members?.map(m => ({
+                        members: e.members?.map((m: any) => ({
                             name: m.name,
                             signature: m.signature,
                             type: (m.kind === 'constructor' || m.kind === 'getter' || m.kind === 'setter') ? 'method' : m.kind as 'property' | 'method'
@@ -312,8 +314,8 @@ export class Distiller {
 
                 // Extract dependencies (imports/exports)
                 dependencies[file.path] = {
-                    imports: result.imports.map(i => i.source),
-                    exports: result.exports.map(e => e.name)
+                    imports: result.imports.map((i: any) => i.source),
+                    exports: result.exports.map((e: any) => e.name)
                 };
             } catch (error) {
                 // Silently continue with other files

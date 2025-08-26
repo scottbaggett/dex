@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
-import { JsonFormatter } from "./json";
-import { DistillationResult, CompressionResult } from "../../../types";
+import { JsonFormatter } from "./json.js";
+import { DistillationResult, CompressionResult } from "../../../types.js";
 
 describe("JsonFormatter", () => {
     const formatter = new JsonFormatter();

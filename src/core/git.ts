@@ -1,5 +1,5 @@
-import simpleGit, { type SimpleGit } from "simple-git";
-import { type GitChange } from "../types";
+import { simpleGit, type SimpleGit } from "simple-git";
+import { type GitChange } from "../types.js";
 import { promises as fs } from "fs";
 import { join } from "path";
 
@@ -75,7 +75,9 @@ export class GitExtractor {
         for (const fileDiff of fileDiffs) {
             const lines = fileDiff.split("\n");
             if (lines.length === 0) continue;
-            const fileMatch = lines[0].match(/a\/(.*) b\/(.*)/);
+            const firstLine = lines[0];
+            if (!firstLine) continue;
+            const fileMatch = firstLine.match(/a\/(.*) b\/(.*)/);
             if (!fileMatch) continue;
 
             const [, oldPath, newPath] = fileMatch;
@@ -108,7 +110,7 @@ export class GitExtractor {
             }
 
             changes.push({
-                file: newPath,
+                file: newPath || "",
                 status,
                 additions,
                 deletions,
@@ -146,11 +148,12 @@ export class GitExtractor {
     async getRepositoryName(): Promise<string> {
         try {
             const remotes = await this.git.getRemotes(true);
-            if (remotes.length > 0 && remotes[0].refs.fetch) {
-                const url = remotes[0].refs.fetch;
+            const firstRemote = remotes[0];
+            if (remotes.length > 0 && firstRemote?.refs.fetch) {
+                const url = firstRemote.refs.fetch;
                 // Extract repo name from URL (e.g., git@github.com:user/repo.git)
                 const match = url.match(/([^/]+)\.git$/);
-                if (match) {
+                if (match && match[1]) {
                     return match[1];
                 }
             }

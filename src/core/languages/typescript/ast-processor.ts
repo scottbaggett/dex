@@ -6,7 +6,7 @@ import {
     ImportNode,
     MemberNode,
     SkippedItem
-} from '../types';
+} from "../types.js";
 
 /**
  * TypeScript AST processor using TypeScript compiler API

@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
-import { StructuredFormatter } from "./structured";
-import { DistillationResult, CompressionResult } from "../../../types";
+import { StructuredFormatter } from "./structured.js";
+import { DistillationResult, CompressionResult } from "../../../types.js";
 
 describe("StructuredFormatter", () => {
     const formatter = new StructuredFormatter();

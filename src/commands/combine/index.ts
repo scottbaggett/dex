@@ -4,23 +4,20 @@ import ora from "ora";
 import clipboardy from "clipboardy";
 import { readFileSync, statSync } from "fs";
 import { resolve, relative, join } from "path";
-import { XmlFormatter } from "./formatters/xml";
-import { MarkdownFormatter } from "./formatters/markdown";
-import { JsonFormatter } from "./formatters/json";
-import type {
-    GitChange,
-    DexOptions,
-    OutputFormat,
-} from "../../types";
-import { formatFileSize } from "../../utils/file-scanner";
-import { FileSelector } from "../../utils/file-selector";
-import { OutputManager } from "../../utils/output-manager";
-import { GitExtractor } from "../../core/git";
+import { XmlFormatter } from "./formatters/xml.js";
+import { MarkdownFormatter } from "./formatters/markdown.js";
+import { JsonFormatter } from "./formatters/json.js";
+import type { GitChange } from "../../types.js";
+import { CombineOptionsSchema } from "../../schemas.js";
+import { formatFileSize } from "../../utils/file-scanner.js";
+import { FileSelector } from "../../utils/file-selector.js";
+import { OutputManager } from "../../utils/output-manager.js";
+import { GitExtractor } from "../../core/git.js";
 import {
     countTokens,
-    formatTokenCount,
     formatEstimatedTokens,
-} from "../../utils/tokens";
+} from "../../utils/tokens.js";
+import { z } from "zod";
 
 function collectPatterns(value: string, previous: string[]): string[] {
     return previous.concat([value]);
@@ -69,22 +66,23 @@ export function createCombineCommand(): Command {
             "1000",
         )
         .option("--no-gitignore", "Do not respect .gitignore patterns")
-        .action(async (...args: any[]) => {
+        .action(async (...args: unknown[]) => {
             // Handle optional paths argument - if no paths provided, args[0] will be the command object
-            const paths = Array.isArray(args[0]) ? args[0] : ["."];
-            const cmdObject = args[args.length - 1]; // Commander puts the command object last
+            const paths = Array.isArray(args[0]) ? args[0] as string[] : ["."];
+            const cmdObject = args[args.length - 1] as Command; // Commander puts the command object last
             const localOptions = cmdObject.opts();
             const parentOptions = cmdObject.parent?.opts() || {};
 
             // Merge parent and local options
             const mergedOptions = { ...parentOptions, ...localOptions };
-            await combineCommand(paths, mergedOptions);
+            const parsedOptions = CombineOptionsSchema.parse(mergedOptions);
+            await combineCommand(paths, parsedOptions);
         });
 
     return combine;
 }
 
-async function combineCommand(inputPaths: string[], options: any) {
+async function combineCommand(inputPaths: string[], options: z.infer<typeof CombineOptionsSchema>) {
     const spinner = ora("Scanning files...").start();
 
     // Handle stdout option - don't show spinner if outputting to stdout
@@ -165,7 +163,7 @@ async function combineCommand(inputPaths: string[], options: any) {
                 try {
                     statSync(filePath);
                     validFiles.push(filePath);
-                } catch (error) {
+                } catch {
                     errors.push(
                         `Staged file not accessible: ${relative(process.cwd(), filePath)}`,
                     );
@@ -252,7 +250,7 @@ async function combineCommand(inputPaths: string[], options: any) {
 
             for (let i = 0; i < maxSampleFiles; i++) {
                 try {
-                    const content = readFileSync(allFiles[i], "utf-8");
+                    const content = readFileSync(allFiles[i] || "", "utf-8");
                     sampleTokens += countTokens(content);
                     sampleSize += content.length;
                 } catch {
@@ -338,13 +336,13 @@ async function combineCommand(inputPaths: string[], options: any) {
                 const relativePath = relative(process.cwd(), filePath);
 
                 // Create a GitChange-like object for each file with content
-                const change: GitChange & { content?: string } = {
+                const change: GitChange = {
                     file: relativePath,
                     status: options.staged ? "modified" : "added", // Use 'modified' for staged files
                     additions: content.split("\n").length,
                     deletions: 0,
                     diff: content, // Store content in diff field for compatibility
-                    content: content, // Also store in content field for clarity
+                    content,
                 };
 
                 changes.push(change);
@@ -368,34 +366,9 @@ async function combineCommand(inputPaths: string[], options: any) {
             process.exit(1);
         }
 
-        // Create context object
-        const totalLines = Array.from(fullFiles.values()).reduce(
-            (sum, content) => sum + content.split("\n").length,
-            0,
-        );
-        const totalChars = Array.from(fullFiles.values()).reduce(
-            (sum, content) => sum + content.length,
-            0,
-        );
+        // Context calculations removed - unused variables
 
-        // Determine extraction method and repository info based on mode
-        let extractionMethod: string;
-        let repoName: string;
-        let repoBranch: string;
-        let repoCommit: string;
-
-        if (options.staged) {
-            const gitExtractor = new GitExtractor();
-            extractionMethod = "staged-files-combine";
-            repoName = "staged-changes";
-            repoBranch = await gitExtractor.getCurrentBranch();
-            repoCommit = await gitExtractor.getLatestCommit();
-        } else {
-            extractionMethod = "combine";
-            repoName = "combined-files";
-            repoBranch = "local";
-            repoCommit = "local";
-        }
+        // Repository info removed - unused in current implementation
 
         // Format output
         const formatToUse = options.format || "xml";
@@ -408,17 +381,23 @@ async function combineCommand(inputPaths: string[], options: any) {
 
         switch (formatToUse) {
             case "xml":
+                {
                 const xmlFormatter = new XmlFormatter();
                 output = xmlFormatter.format(changes);
                 break;
+            }
             case "json":
+            {
                 const jsonFormatter = new JsonFormatter();
                 output = jsonFormatter.format(changes);
                 break;
-            case "markdown":
+            }
+            case "md":
+            {
                 const markdownFormatter = new MarkdownFormatter();
                 output = markdownFormatter.format(changes);
                 break;
+            }
             default:
                 throw new Error(`Invalid format: ${options.format}`);
         }
@@ -472,7 +451,7 @@ async function combineCommand(inputPaths: string[], options: any) {
                 contextString = "staged-files";
             } else if (filePaths.length === 1) {
                 // For single path, preserve the path structure
-                contextString = filePaths[0];
+                contextString = filePaths[0] || "";
             } else {
                 // For multiple paths, join them with underscores
                 contextString = filePaths.join("_");

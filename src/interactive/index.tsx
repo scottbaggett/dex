@@ -1,7 +1,7 @@
 import React from "react";
 import { render } from "ink";
-import FileSelector from "./FileSelector";
-import type { GitChange } from "../types";
+import FileSelector from "./FileSelector.js";
+import type { GitChange } from "../types.js";
 
 export interface EnhancedGitChange extends GitChange {
     fileSize?: number;

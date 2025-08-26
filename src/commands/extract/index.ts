@@ -2,14 +2,14 @@ import { Command, Option } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import clipboardy from "clipboardy";
-import { ContextEngine } from "../../core/context";
-import { GitExtractor } from "../../core/git";
-import { MarkdownFormatter } from "./formatters/markdown";
-import { JsonFormatter } from "./formatters/json";
-import { XmlFormatter } from "./formatters/xml";
-import type { DexOptions, OutputFormat } from "../../types";
-import { OutputManager } from "../../utils/output-manager";
-import { mergeWithConfig } from "../../core/config";
+import { ContextEngine } from "../../core/context.js";
+import { GitExtractor } from "../../core/git.js";
+import { MarkdownFormatter } from "./formatters/markdown.js";
+import { JsonFormatter } from "./formatters/json.js";
+import { XmlFormatter } from "./formatters/xml.js";
+import type { DexOptions, OutputFormat } from "../../types.js";
+import { OutputManager } from "../../utils/output-manager.js";
+import { mergeWithConfig } from "../../core/config.js";
 
 interface ExtractCommandOptions {
     staged?: boolean;
@@ -150,7 +150,7 @@ export async function executeExtract(
                 spinner.fail(
                     chalk.red("Interactive mode requires a TTY terminal"),
                 );
-                const { FileSelector } = await import("../../utils/file-selector");
+                const { FileSelector } = await import("../../utils/file-selector.js");
                 const fileSelector = new FileSelector();
                 fileSelector.showTTYError();
                 process.exit(1);
@@ -159,7 +159,7 @@ export async function executeExtract(
             spinner.text = chalk.gray("Scanning files for selection...");
 
             try {
-                const { FileSelector } = await import("../../utils/file-selector");
+                const { FileSelector } = await import("../../utils/file-selector.js");
                 const fileSelector = new FileSelector();
 
                 // Collect all files in the repository (similar to combine command)
@@ -236,7 +236,7 @@ export async function executeExtract(
 
                 // Update dexOptions to include selected files for context extraction
                 dexOptions.selectedFiles = result.files.map(
-                    (change) => change.file,
+                    (change: any) => change.file,
                 );
 
                 spinner.start("Extracting context from selected files...");
@@ -306,6 +306,7 @@ export async function executeExtract(
             // Show skipped files if any
             if (
                 context.additionalContext?.notIncluded &&
+                typeof context.additionalContext.notIncluded === 'number' &&
                 context.additionalContext.notIncluded > 0
             ) {
                 console.log(
@@ -339,7 +340,7 @@ export async function executeExtract(
             case "xml":
                 formatter = new XmlFormatter();
                 break;
-            case "markdown":
+            case "md":
                 formatter = new MarkdownFormatter();
                 break;
             default:

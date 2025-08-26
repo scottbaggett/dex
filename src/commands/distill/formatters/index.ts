@@ -2,16 +2,16 @@
  * Formatter exports and initialization
  */
 
-export * from './types';
-export * from './registry';
-export { StructuredFormatter } from './structured';
-export { MarkdownFormatter } from './markdown';
-export { JsonFormatter } from './json';
+// Types are now in central /src/types.ts
+export * from "./registry.js";
+export { StructuredFormatter } from "./structured.js";
+export { MarkdownFormatter } from "./markdown.js";
+export { JsonFormatter } from "./json.js";
 
-import { formattersRegistry } from './registry';
-import { StructuredFormatter } from './structured';
-import { MarkdownFormatter } from './markdown';
-import { JsonFormatter } from './json';
+import { formattersRegistry } from "./registry.js";
+import { StructuredFormatter } from "./structured.js";
+import { MarkdownFormatter } from "./markdown.js";
+import { JsonFormatter } from "./json.js";
 
 /**
  * Initialize default formatters

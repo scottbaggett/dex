@@ -73,7 +73,7 @@ MAX_SIZE = 1000
         // Create nested directory structure
         fs.mkdirSync(path.join(testDir, 'src'));
         fs.writeFileSync(path.join(testDir, 'src', 'index.ts'), `
-export { PublicClass } from '../public';
+export { PublicClass } from "../public.js";
 export default function main() {
     console.log('main');
 }

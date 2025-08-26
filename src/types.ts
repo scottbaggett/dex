@@ -1,101 +1,29 @@
-export type OutputFormat = "markdown" | "json" | "xml" | "txt";
+// Re-export from schemas for backwards compatibility
+export {
+    OutputFormat,
+    OutputFormatSchema,
+    DexOptions,
+    DexOptionsSchema,
+    GitChange,
+    GitChangeSchema,
+    GitStatus,
+    GitStatusSchema,
+    Metadata,
+    MetadataSchema,
+    ExtractedContext,
+    ExtractedContextSchema,
+    ExtractOptions,
+    ExtractOptionsSchema,
+    CombineOptions,
+    CombineOptionsSchema,
+    DistillOptions,
+    DistillOptionsSchema,
+    TreeOptions,
+    TreeOptionsSchema,
+} from "./schemas.js";
 
-export interface DexOptions {
-    // Git options
-    since?: string;
-    range?: string;
-    staged?: boolean;
-    all?: boolean;
-
-    // Time-based options
-    timeRange?: string; // e.g., "2h", "30m", "1d"
-    isTimeRange?: boolean;
-
-    // Full file options
-    full?: string; // Pattern for files to show in full
-    diffOnly?: boolean; // Force diff view for all files (disable Smart Context)
-
-    // Untracked files
-    includeUntracked?: boolean;
-    untrackedPattern?: string;
-
-    // Filter options
-    path?: string;
-    type?: string[];
-
-    // File selection options
-    selectedFiles?: string[];
-
-    // Output options
-    format?: OutputFormat;
-    clipboard?: boolean;
-
-    interactive?: boolean;
-
-    // Optimization (from --optimize flag)
-    symbols?: boolean;
-    aid?: boolean;
-
-    // Display options
-    noMetadata?: boolean;
-
-    // Prompt options removed
-}
-
-export interface GitChange {
-    file: string;
-    status: "added" | "modified" | "deleted" | "renamed";
-    additions: number;
-    deletions: number;
-    diff: string;
-    oldFile?: string; // for renames
-    lastModified?: Date; // file modification time
-}
-
-export interface Metadata {
-    generated: string; // ISO timestamp
-    repository: {
-        name: string;
-        branch: string;
-        commit: string;
-    };
-    extraction: {
-        method?: string; // How changes were detected (e.g., "feature branch", "staged changes")
-        filters?: {
-            path?: string;
-            type?: string[];
-        };
-    };
-    tokens: {
-        estimated: number;
-    };
-    tool: {
-        name: string;
-        version: string;
-    };
-}
-
-export interface ExtractedContext {
-    changes: GitChange[];
-    scope: {
-        filesChanged: number;
-        functionsModified: number;
-        linesAdded: number;
-        linesDeleted: number;
-    };
-    fullFiles?: Map<string, string>;
-    metadata: Metadata;
-    tokenSavings?: {
-        fullFileTokens: number;
-        actualTokens: number;
-        saved: number;
-        percentSaved: number;
-    };
-    additionalContext?: {
-        totalChanges?: number;
-        notIncluded?: number;
-    };
-}
+// Import for use in local interfaces
+import type { ExtractedContext, DexOptions, DistillOptions } from "./schemas.js";
 
 export interface SymbolMap {
     [file: string]: {
@@ -104,15 +32,6 @@ export interface SymbolMap {
         exports: string[];
         imports: string[];
     };
-}
-
-export interface FormatterOptions {
-    context: ExtractedContext;
-    options: DexOptions;
-}
-
-export interface Formatter {
-    format(options: FormatterOptions): string;
 }
 
 // Snapshot-related types
@@ -163,21 +82,8 @@ export interface SnapshotOptions {
 
 // Distiller types
 
-export interface DistillerOptions {
-    path?: string;
-    excludePatterns?: string[];
-    includeComments?: boolean;
-    includeDocstrings?: boolean;
-    includeImports?: boolean;
-    format?: "txt" | "markdown" | "json" | string;
-    output?: string;
-    since?: string;
-    staged?: boolean;
-    parallel?: boolean;
-    dryRun?: boolean;
-    includePrivate?: boolean;
-    includePatterns?: string[];
-}
+// Re-export DistillerOptions as alias for DistillOptions
+export type DistillerOptions = DistillOptions;
 
 export interface CompressionResult {
     files: CompressedFile[];
@@ -240,4 +146,73 @@ export interface DependencyMap {
         imports: string[];
         exports: string[];
     };
+}
+
+// ============================================================
+// FORMATTER TYPES
+// ============================================================
+
+// Extract Command Formatters (format Git changes/diffs)
+export interface FormatterOptions {
+    context: ExtractedContext;
+    options: DexOptions;
+}
+
+export interface Formatter {
+    format(options: FormatterOptions): string;
+}
+
+// Distill Command Formatters (format API signatures)
+export interface DistillFormatterOptions {
+    // Control what to include
+    includeImports?: boolean;
+    includePrivate?: boolean;
+    includeDocstrings?: boolean;
+    includeComments?: boolean;
+    includeMetadata?: boolean;
+    
+    // Output style
+    preserveStructure?: boolean;
+    groupByType?: boolean;
+    
+    // Language hints
+    language?: string;
+    syntaxHighlight?: boolean;
+}
+
+export interface DistillFormatter {
+    name: string;
+    format: string;  // 'xml', 'markdown', 'json', 'text'
+    
+    /**
+     * Format a distillation result
+     */
+    formatDistillation(
+        result: DistillationResult,
+        options?: DistillFormatterOptions
+    ): string;
+    
+    /**
+     * Format a compression result
+     */
+    formatCompression(
+        result: CompressionResult,
+        options?: DistillFormatterOptions
+    ): string;
+    
+    /**
+     * Format combined results
+     */
+    formatCombined(
+        compression: CompressionResult,
+        distillation: DistillationResult,
+        options?: DistillFormatterOptions
+    ): string;
+}
+
+export interface FormatterRegistry {
+    register(formatter: DistillFormatter): void;
+    get(format: string): DistillFormatter | null;
+    getDefault(): DistillFormatter;
+    list(): string[];
 }

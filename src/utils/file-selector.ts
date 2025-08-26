@@ -1,10 +1,10 @@
 import { resolve, relative } from "path";
 import { statSync, existsSync } from "fs";
 import chalk from "chalk";
-import type { GitChange } from "../types";
-import { FileScanner } from "./file-scanner";
-import { GitExtractor } from "../core/git";
-import simpleGit from "simple-git";
+import type { GitChange } from "../types.js";
+import { FileScanner } from "./file-scanner.js";
+import { GitExtractor } from "../core/git.js";
+import { simpleGit } from "simple-git";
 
 export interface FileSelectionOptions {
     includePatterns?: string[];
@@ -338,6 +338,13 @@ export class FileSelector {
                 copyToClipboard: result.copyToClipboard,
             };
         } catch (error) {
+            // Add better error logging
+            if (process.env.DEBUG) {
+                console.error("Interactive mode error:", error);
+                if (error instanceof Error) {
+                    console.error("Stack trace:", error.stack);
+                }
+            }
             if (
                 error instanceof Error &&
                 error.message === "Interactive mode cancelled"
