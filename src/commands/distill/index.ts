@@ -248,7 +248,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                     const fullPath = path.isAbsolute(file)
                         ? file
                         : path.join(baseDir, file);
-                    const content = require("fs").readFileSync(
+                    const content = await fs.readFile(
                         fullPath,
                         "utf-8",
                     );

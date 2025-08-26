@@ -261,8 +261,12 @@ export class ContextEngine {
         fullFiles: Map<string, string>,
         detectionMethod: string,
     ): Promise<Metadata> {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const packageJson = require("../../package.json");
+        const packageJson = JSON.parse(
+            await import("fs").then(fs => fs.promises.readFile(
+                new URL("../../package.json", import.meta.url),
+                "utf-8"
+            ))
+        );
 
         const [repoName, branch, commit] = await Promise.all([
             this.gitExtractor.getRepositoryName(),
