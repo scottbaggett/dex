@@ -162,8 +162,8 @@ describe('test', () => {
             let result = await distiller.distill(testDir);
             
             if (isDistillationResult(result)) {
-                let tsFile = result.apis.find(api => api.file.includes('index.ts'));
-                let userService = tsFile?.exports.find(e => e.name === 'UserService');
+                const tsFile = result.apis.find(api => api.file.includes('index.ts'));
+                const userService = tsFile?.exports.find(e => e.name === 'UserService');
                 expect(userService?.members?.some(m => m.name === 'getUser')).toBe(true);
                 expect(userService?.members?.some(m => m.name === 'logAccess')).toBe(false);
                 expect(userService?.members?.some(m => m.name === 'validateUser')).toBe(false);

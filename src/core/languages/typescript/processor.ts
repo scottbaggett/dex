@@ -490,7 +490,7 @@ export class TypeScriptProcessor {
         } | null = null;
         let braceDepth = 0;
         let parenDepth = 0;
-        let currentSignature: string[] = [];
+        const currentSignature: string[] = [];
         
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];

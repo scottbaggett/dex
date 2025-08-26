@@ -446,7 +446,7 @@ export class PythonProcessor {
     }
     
     private filterExports(exports: ExportNode[], options: ProcessingOptions): ExportNode[] {
-        let filtered = exports;
+        const filtered = exports;
         
         // Sort if not preserving order
         if (!options.preserveOrder) {

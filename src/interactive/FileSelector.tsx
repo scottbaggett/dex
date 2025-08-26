@@ -321,8 +321,8 @@ const FileSelector: React.FC<FileSelectorProps> = ({
         
         let patternIdx = 0;
         let strIdx = 0;
-        let patternLength = pattern.length;
-        let strLength = str.length;
+        const patternLength = pattern.length;
+        const strLength = str.length;
         
         while (patternIdx < patternLength && strIdx < strLength) {
             if (pattern[patternIdx] === str[strIdx]) {
