@@ -30,11 +30,6 @@ export interface DexOptions {
     format?: OutputFormat;
     clipboard?: boolean;
 
-    // Task integration
-    task?: string; // Direct task description
-    taskFile?: string; // Path to task file
-    taskUrl?: string; // URL to fetch task from
-    taskStdin?: boolean; // Read task from stdin (--task=-)
     interactive?: boolean;
 
     // Optimization (from --optimize flag)
@@ -88,7 +83,6 @@ export interface ExtractedContext {
         linesAdded: number;
         linesDeleted: number;
     };
-    task?: TaskContext;
     fullFiles?: Map<string, string>;
     metadata: Metadata;
     tokenSavings?: {
@@ -101,15 +95,6 @@ export interface ExtractedContext {
         totalChanges?: number;
         notIncluded?: number;
     };
-}
-
-export interface TaskContext {
-    description: string;
-    goals?: string[];
-    issueUrl?: string;
-    issueTitle?: string;
-    issueBody?: string;
-    labels?: string[];
 }
 
 export interface SymbolMap {
