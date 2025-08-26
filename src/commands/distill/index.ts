@@ -42,6 +42,7 @@ export function createDistillCommand(): Command {
         .option("-o, --output <file>", "Write output to specific file")
         .option("-c, --clipboard", "Copy output to clipboard")
         .option("--stdout", "Print output to stdout")
+        .option("-s, --select", "Interactively select files to distill")
         .option("--comments <value>", "Include comments (0 or 1)", "0")
         .option("--docstrings <value>", "Include docstrings (0 or 1)", "1")
         .option("--private <value>", "Include private members (0 or 1)", "0")
