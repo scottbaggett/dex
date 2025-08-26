@@ -398,15 +398,15 @@ describe("JsonFormatter", () => {
 
     describe("formatFileSize helper", () => {
         test("formats file sizes correctly", () => {
-            // @ts-ignore - accessing private method for testing
+            // @ts-expect-error - accessing private method for testing
             expect(formatter.formatFileSize(512)).toBe("512 B");
-            // @ts-ignore
+            // @ts-expect-error - accessing private method for testing
             expect(formatter.formatFileSize(1024)).toBe("1.0 KB");
-            // @ts-ignore
+            // @ts-expect-error - accessing private method for testing  
             expect(formatter.formatFileSize(1536)).toBe("1.5 KB");
-            // @ts-ignore
+            // @ts-expect-error - accessing private method for testing
             expect(formatter.formatFileSize(1048576)).toBe("1.0 MB");
-            // @ts-ignore
+            // @ts-expect-error - accessing private method for testing
             expect(formatter.formatFileSize(1572864)).toBe("1.5 MB");
         });
     });
