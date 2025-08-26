@@ -3,7 +3,6 @@ import type {
     DexOptions,
     ExtractedContext,
     GitChange,
-    TaskContext,
     Metadata,
 } from "../types";
 import { minimatch } from "minimatch";
@@ -82,9 +81,6 @@ export class ContextEngine {
         // Calculate scope
         const scope = this.calculateScope(changes);
 
-        // Build task context if provided
-        const task = await this.buildTaskContext(options);
-
         // Collect metadata
         const metadata = await this.collectMetadata(
             options,
@@ -102,7 +98,6 @@ export class ContextEngine {
         return {
             changes,
             scope,
-            task,
             fullFiles: fullFiles.size > 0 ? fullFiles : undefined,
             metadata,
             tokenSavings,
@@ -258,20 +253,6 @@ export class ContextEngine {
             linesAdded,
             linesDeleted,
         };
-    }
-
-    private async buildTaskContext(
-        options: DexOptions,
-    ): Promise<TaskContext | undefined> {
-        if (!options.task) {
-            return undefined;
-        }
-
-        const context: TaskContext = {
-            description: options.task,
-        };
-
-        return context;
     }
 
     private async collectMetadata(
