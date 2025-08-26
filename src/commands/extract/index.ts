@@ -9,7 +9,6 @@ import { JsonFormatter } from "./formatters/json";
 import { XmlFormatter } from "./formatters/xml";
 import type { DexOptions, OutputFormat } from "../../types";
 import { OutputManager } from "../../utils/output-manager";
-import * as readline from "readline";
 import { mergeWithConfig } from "../../core/config";
 
 interface ExtractCommandOptions {
@@ -21,8 +20,6 @@ interface ExtractCommandOptions {
     type?: string;
     format?: OutputFormat;
     clipboard?: boolean;
-    task?: string;
-    interactive?: boolean;
     includeUntracked?: boolean;
     untrackedPattern?: string;
     optimize?: string[];
@@ -105,31 +102,6 @@ export async function executeExtract(
             process.exit(1);
         }
 
-        // Parse task source
-        let task: string | undefined;
-        let taskFile: string | undefined;
-        let taskUrl: string | undefined;
-        let taskStdin = false;
-
-        if (options.task) {
-            if (options.task === "-") {
-                taskStdin = true;
-            } else if (
-                options.task.startsWith("http://") ||
-                options.task.startsWith("https://")
-            ) {
-                taskUrl = options.task;
-            } else if (
-                options.task.includes(".") &&
-                !options.task.includes(" ")
-            ) {
-                // Likely a file path
-                taskFile = options.task;
-            } else {
-                // Direct task description
-                task = options.task;
-            }
-        }
 
         // Use format directly
         const format = options.format;
@@ -151,15 +123,9 @@ export async function executeExtract(
             type: options.type ? options.type.split(",") : undefined,
             format: format as OutputFormat,
             clipboard: options.clipboard,
-            task,
-            taskFile,
-            taskUrl,
-            taskStdin,
-            interactive: options.interactive,
             aid,
             symbols,
             noMetadata: !options.metadata,
-            // Prompt options removed
         };
 
         // Merge with config file defaults
@@ -176,92 +142,6 @@ export async function executeExtract(
             process.exit(1);
         }
 
-        // Interactive mode for task input
-        if (dexOptions.interactive && !task && !taskFile && !taskStdin) {
-            spinner.stop();
-
-            // Check if we're in a TTY (some environments may have undefined instead of false)
-            if (process.stdin.isTTY === false) {
-                console.error(
-                    chalk.red("Error: Interactive mode requires a TTY"),
-                );
-                process.exit(1);
-            }
-
-            const headerSpinner = ora({
-                text: chalk.cyan("Interactive Task Input Mode"),
-                spinner: "dots",
-                color: "cyan",
-            }).start();
-
-            await new Promise((resolve) => setTimeout(resolve, 800));
-            headerSpinner.succeed(chalk.cyan("Interactive Task Input Mode"));
-
-            const rl = readline.createInterface({
-                input: process.stdin,
-                output: process.stdout,
-            });
-
-            console.log(
-                chalk.gray(
-                    "\nEnter your task description (press Enter twice to finish):",
-                ),
-            );
-            console.log(
-                chalk.gray(
-                    "Tip: Use multiple lines for detailed descriptions\n",
-                ),
-            );
-
-            const lines: string[] = [];
-            let consecutiveEmptyLines = 0;
-
-            const taskInput = await new Promise<string>((resolve) => {
-                function askForLine() {
-                    rl.question(chalk.blue("▸ "), (answer) => {
-                        if (answer === "") {
-                            consecutiveEmptyLines++;
-                            if (
-                                consecutiveEmptyLines >= 2 &&
-                                lines.length > 0
-                            ) {
-                                while (
-                                    lines.length > 0 &&
-                                    lines[lines.length - 1] === ""
-                                ) {
-                                    lines.pop();
-                                }
-                                rl.close();
-                                resolve(lines.join("\n"));
-                                return;
-                            }
-                        } else {
-                            consecutiveEmptyLines = 0;
-                        }
-
-                        lines.push(answer);
-                        askForLine();
-                    });
-                }
-
-                askForLine();
-
-                rl.on("SIGINT", () => {
-                    console.log(chalk.yellow("\n\nTask input cancelled."));
-                    rl.close();
-                    process.exit(0);
-                });
-            });
-
-            if (taskInput) {
-                dexOptions.task = taskInput;
-                console.log(chalk.green("\n✓ Task description captured\n"));
-                spinner.start("Analyzing changes...");
-            } else {
-                console.log(chalk.yellow("\nNo task description provided."));
-                process.exit(0);
-            }
-        }
 
         // Handle interactive selection if requested - do this BEFORE context extraction
         if (options.select) {
@@ -554,11 +434,6 @@ export function createExtractCommand(): Command {
                 .choices(["markdown", "json", "xml"]),
         )
         .option("-c, --clipboard", "Copy output to clipboard")
-        .option(
-            "--task <source>",
-            "Task context (description, file path, URL, or - for stdin)",
-        )
-        .option("-i, --interactive", "Interactive mode for task input")
         .option("-u, --include-untracked", "Include untracked files")
         .option(
             "--untracked-pattern <pattern>",
