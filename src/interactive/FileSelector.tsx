@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useApp, useInput } from "ink";
+const TextInput = require("ink-text-input").default;
 import type { GitChange } from "../types";
 import type { EnhancedGitChange } from "./index";
 import * as path from "path";
@@ -235,6 +236,9 @@ const FileSelector: React.FC<FileSelectorProps> = ({
     const [sortBy, setSortBy] = useState<SortBy>("name");
     const [filterBy, setFilterBy] = useState<FilterBy>("all");
     const [menuCursor, setMenuCursor] = useState(0);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchInput, setSearchInput] = useState("");
+    const [isSearching, setIsSearching] = useState(false);
 
     // Apply sorting to files
     const applySorting = (files: FileItem[], sort: SortBy): FileItem[] => {
@@ -309,6 +313,49 @@ const FileSelector: React.FC<FileSelectorProps> = ({
         });
     };
 
+    // Fuzzy search function
+    const fuzzyMatch = (str: string, pattern: string): boolean => {
+        if (!pattern) return true;
+        pattern = pattern.toLowerCase();
+        str = str.toLowerCase();
+        
+        let patternIdx = 0;
+        let strIdx = 0;
+        let patternLength = pattern.length;
+        let strLength = str.length;
+        
+        while (patternIdx < patternLength && strIdx < strLength) {
+            if (pattern[patternIdx] === str[strIdx]) {
+                patternIdx++;
+            }
+            strIdx++;
+        }
+        
+        return patternIdx === patternLength;
+    };
+
+    // Apply search filtering
+    const applySearchFilter = (
+        files: FileItem[],
+        query: string,
+    ): FileItem[] => {
+        if (!query) return files;
+        
+        return files.filter((file) => {
+            // Search in file path and filename
+            const fileName = path.basename(file.file);
+            const fullPath = file.file;
+            
+            // Check for exact substring match first (faster)
+            if (fullPath.toLowerCase().includes(query.toLowerCase())) {
+                return true;
+            }
+            
+            // Then try fuzzy match
+            return fuzzyMatch(fullPath, query) || fuzzyMatch(fileName, query);
+        });
+    };
+
     // Initialize display items and calculate token estimates
     useEffect(() => {
         const initializeItems = async () => {
@@ -331,8 +378,9 @@ const FileSelector: React.FC<FileSelectorProps> = ({
             );
             setTokenEstimates(estimates);
 
-            // Apply filtering and sorting
+            // Apply filtering, search, and sorting
             files = applyFiltering(files, filterBy);
+            files = applySearchFilter(files, searchQuery);
             files = applySorting(files, sortBy);
 
             // Group files by directory
@@ -415,7 +463,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({
         };
 
         initializeItems();
-    }, [changes, sortBy, filterBy]);
+    }, [changes, sortBy, filterBy, searchQuery]);
 
     const [cursor, setCursor] = useState(0);
     const [stats, setStats] = useState({
@@ -513,8 +561,32 @@ const FileSelector: React.FC<FileSelectorProps> = ({
         });
     };
 
+    // Handle search input changes
+    const handleSearchChange = (value: string) => {
+        setSearchInput(value);
+        setSearchQuery(value); // Update search query in real-time
+    };
+
+    // Handle search submit
+    const handleSearchSubmit = () => {
+        setIsSearching(false);
+    };
+
     useInput((input, key) => {
-        // Handle menu navigation first
+        // Handle search mode when active
+        if (isSearching) {
+            if (key.escape) {
+                setSearchInput("");
+                setSearchQuery("");
+                setIsSearching(false);
+                return;
+            }
+            
+            // Don't handle other inputs when searching, let TextInput handle them
+            return;
+        }
+        
+        // Handle menu navigation
         if (viewMode === "sort" || viewMode === "filter") {
             if (key.escape) {
                 setViewMode("files");
@@ -738,22 +810,26 @@ const FileSelector: React.FC<FileSelectorProps> = ({
             setMenuCursor(0);
             return;
         }
+        
+        // Search mode - using 'slash' key
+        if (input === "/" && !isSearching) {
+            setIsSearching(true);
+            // Don't clear the search query if it exists
+            setSearchInput(searchQuery);
+            return;
+        }
+        
+        // Clear search when in files view with active search
+        if (searchQuery && (input === "x" || input === "X")) {
+            setSearchQuery("");
+            setSearchInput("");
+            setIsSearching(false);
+            return;
+        }
     });
 
     return (
         <Box flexDirection="column" width="100%">
-            {/* Header */}
-            <Box borderStyle="round" borderColor="cyan" paddingX={1}>
-                <Text color="cyan">DEX Interactive Mode</Text>
-                <Text color="gray"> - {changes.length} files</Text>
-                {filterBy !== "all" && (
-                    <Text color="yellow"> [{filterBy}]</Text>
-                )}
-                {sortBy !== "name" && (
-                    <Text color="yellow"> [sorted by {sortBy}]</Text>
-                )}
-            </Box>
-
             {/* Show menu or file list based on mode */}
             {viewMode === "sort" ? (
                 <Box flexDirection="column" paddingX={1} marginY={1}>
@@ -819,19 +895,22 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                 </Box>
             ) : (
                 <>
+                    {/* Show active search query if searching */}
+                    {searchQuery ? (
+                        <Box paddingX={1}>
+                            <Text color="yellow">Searching: </Text>
+                            <Text color="cyan">"{searchQuery}"</Text>
+                            <Text color="gray"> (press X to clear)</Text>
+                        </Box>
+                    ) : null}
+                    
                     {/* Instructions */}
-                    <Box paddingX={1} marginY={1}>
-                        <Text color="white">
-                            Select files to include in extraction
-                        </Text>
-                        <Text color="gray">
-                            {" "}
-                            [Directories select all files within]
-                        </Text>
+                    <Box borderColor="white" borderStyle="single" paddingX={1}>
+                        <Text color="cyan">DEX: Select Files</Text>
                     </Box>
 
                     {/* Column headers */}
-                    <Box paddingX={1} marginY={1}>
+                    <Box paddingX={1}>
                         <Text color="gray"> </Text>
                         <Text color="gray"> </Text>
                         <Text color="gray"> </Text>
@@ -1117,7 +1196,7 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                         paddingX={1}
                     >
                         <Text>
-                            {`Selected: ${stats.selectedCount} files | ${stats.totalAdditions} additions | ${stats.totalDeletions} deletions | ~${(stats.estimatedTokens / 1000).toFixed(1)}K tokens`}
+                            {`Selected: ${stats.selectedCount} files  ~${(stats.estimatedTokens / 1000).toFixed(1)}K tokens`}
                         </Text>
                         {displayItems.length > 10 && (
                             <Text color="gray">{` | ${cursor + 1}/${displayItems.length}`}</Text>
@@ -1126,38 +1205,56 @@ const FileSelector: React.FC<FileSelectorProps> = ({
                 </>
             )}
 
+            {/* Search input line at bottom when searching */}
+            {isSearching && (
+                <Box paddingX={1} borderStyle="single" borderColor="yellow">
+                    <Text color="yellow" bold>Search: </Text>
+                    <TextInput 
+                        value={searchInput}
+                        onChange={handleSearchChange}
+                        onSubmit={handleSearchSubmit}
+                        placeholder=""
+                    />
+                    <Text color="gray">  (ESC to cancel, ENTER to close)</Text>
+                </Box>
+            )}
+            
             {/* Help - simplified and contextual */}
-            <Box paddingX={1} marginTop={1}>
-                {viewMode === "files" ? (
-                    <Box>
-                        <Text color="cyan">↑↓</Text>
-                        <Text color="white"> move | </Text>
-                        <Text color="cyan">SPACE</Text>
-                        <Text color="white"> select | </Text>
-                        <Text color="cyan">a/n</Text>
-                        <Text color="white"> all/none | </Text>
-                        <Text color="cyan">s</Text>
-                        <Text color="white"> sort | </Text>
-                        <Text color="cyan">f</Text>
-                        <Text color="white"> filter | </Text>
-                        <Text color="cyan">c</Text>
-                        <Text color="white"> copy | </Text>
-                        <Text color="cyan">ENTER</Text>
-                        <Text color="white"> confirm | </Text>
-                        <Text color="cyan">ESC</Text>
-                        <Text color="white"> cancel</Text>
-                    </Box>
+            {!isSearching && (
+                <Box paddingX={1} marginTop={1}>
+                    {viewMode === "files" ? (
+                        <Box>
+                            <Text color="cyan">↑↓</Text>
+                            <Text color="white"> move | </Text>
+                            <Text color="cyan">␣</Text>
+                            <Text color="white"> select | </Text>
+                            <Text color="cyan">a/n</Text>
+                            <Text color="white"> all/none | </Text>
+                            <Text color="cyan">s</Text>
+                            <Text color="white"> sort | </Text>
+                            <Text color="cyan">f</Text>
+                            <Text color="white"> filter | </Text>
+                            <Text color="cyan">/</Text>
+                            <Text color="white"> search | </Text>
+                            <Text color="cyan">c</Text>
+                            <Text color="white"> copy | </Text>
+                            <Text color="cyan">⏎</Text>
+                            <Text color="white"> confirm | </Text>
+                            <Text color="cyan">ESC</Text>
+                            <Text color="white"> cancel</Text>
+                        </Box>
                 ) : (
                     <Box>
                         <Text color="cyan">↑↓</Text>
                         <Text color="white"> select option | </Text>
-                        <Text color="cyan">ENTER</Text>
+                        <Text color="cyan">⏎</Text>
                         <Text color="white"> apply | </Text>
                         <Text color="cyan">ESC</Text>
                         <Text color="white"> back</Text>
                     </Box>
                 )}
-            </Box>
+                </Box>
+            )}
         </Box>
     );
 };
