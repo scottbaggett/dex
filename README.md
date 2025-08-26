@@ -3,7 +3,7 @@ Context extraction and codebase analysis for AI workflows. Generate precise, tok
 
 <p align="center">
   <img src="https://img.shields.io/badge/Token_Efficiency-90%25_Reduction-cyan?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/LLM_Ready-Markdown_JSON_XML-cyan?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/LLM_Ready-Markdown_JSON_txt-cyan?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Focus-Surgically_Precise-cyan?style=for-the-badge" />
   <br/>
   <i>Local installation via Bun</i>
@@ -32,8 +32,8 @@ dex --help
 cd your-project
 dex init
 
-# Extract your current changes (XML by default)
-dex -s --format markdown --clipboard
+# Extract your current changes (txt by default)
+dex -s --format md --clipboard
 ```
 
 ## Core Commands
@@ -57,7 +57,7 @@ Key options:
 - --diff-only: Force diffs (disable Smart Context)
 - -p, --path <pattern>: Filter by file path
 - -t, --type <csv>: Filter by file types (e.g. ts,tsx,js)
-- -f, --format <fmt>: markdown | json | xml (default: xml)
+- -f, --format <fmt>: markdown | json | txt (default: txt)
 - -c, --clipboard: Copy output to clipboard
 - --task <source>: Description, file path, URL, or '-' for stdin
 - -i, --interactive: Prompt for task description (TTY)
@@ -111,7 +111,7 @@ dex combine --staged -c                # Use staged files; copy to clipboard
 ```
 
 **Key options:**
-- -f, --format <fmt>: xml | markdown | json (default: xml)
+- -f, --format <fmt>: txt | md | json (default: txt)
 - --staged: Use all staged files (full contents)
 - -c, --clipboard: Copy to clipboard
 - --no-metadata: Omit metadata block
@@ -214,7 +214,7 @@ DEX saves outputs to `.dex/` with descriptive, timestamped filenames. Use `--cli
 
 ## Requirements
 
-- **Either** Bun 1.0+ **or** Node.js 23.5+
+- **Either** Bun 1.0+ **or** Node.js 24.6+
   - Bun is recommended for faster installation and direct TypeScript execution
   - Node.js works fine but requires building TypeScript to JavaScript first
 - Git (for change tracking)
@@ -222,7 +222,7 @@ DEX saves outputs to `.dex/` with descriptive, timestamped filenames. Use `--cli
 ## Tips
 
 - Use `--select` to interactively choose files when you don’t want to depend on Git state.
-- Prefer `--format xml` for agents that parse structure, `--format markdown` for human review, and `--format json` for programmatic pipelines.
+- Prefer `--format txt` for agents that parse structure, `--format md` for human review, and `--format json` for programmatic pipelines.
 - `distill` supports `--dry-run` to preview scope and `--exclude` repeatedly for fine control.
 
 ## Contributing
