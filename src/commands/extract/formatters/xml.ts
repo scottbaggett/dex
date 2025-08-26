@@ -2,7 +2,6 @@ import { Formatter } from "../../../core/formatter";
 import type {
     FormatterOptions,
     ExtractedContext,
-    TaskContext,
     Metadata,
 } from "../../../types";
 // Prompt features removed
@@ -10,48 +9,17 @@ import type {
 export class XmlFormatter extends Formatter {
     format({ context, options }: FormatterOptions): string {
         const sections: string[] = [];
-
-        // XML declaration
-        sections.push('<?xml version="1.0" encoding="UTF-8"?>');
+        // code context section
         sections.push("<code_context>");
-
-        // Header
-        sections.push(this.formatHeader(context, options));
-
-        // Metadata (unless excluded)
-        if (!options.noMetadata) {
-            sections.push(this.formatMetadata(context.metadata));
-        }
-
-        // Task context if present
-        if (context.task) {
-            sections.push(this.formatTaskSection(context.task));
-        }
-
-        // Scope summary
-        sections.push(this.formatScope(context.scope));
 
         // Changes section
         if (context.changes.length > 0) {
             sections.push(this.formatChanges(context, options));
         }
 
-        // AI prompt features removed
-
         sections.push("</code_context>");
 
         return sections.join("\n");
-    }
-
-    private formatHeader(
-        context: ExtractedContext,
-        _options: FormatterOptions["options"],
-    ): string {
-        const title = context.task?.description
-            ? `Context: ${context.task.description}`
-            : "Code Context";
-
-        return `  <title>${this.escapeXml(title)}</title>`;
     }
 
     private formatMetadata(metadata: Metadata): string {
@@ -107,52 +75,6 @@ export class XmlFormatter extends Formatter {
         );
         lines.push(`    </tool>`);
         lines.push(`  </metadata>`);
-
-        return lines.join("\n");
-    }
-
-    private formatTaskSection(task: TaskContext): string {
-        const lines = ["  <task_overview>"];
-
-        if (task.description) {
-            lines.push(
-                `    <description>${this.escapeXml(task.description)}</description>`,
-            );
-        }
-
-        if (task.goals && task.goals.length > 0) {
-            lines.push(`    <goals>`);
-            for (const goal of task.goals) {
-                lines.push(`      <goal>${this.escapeXml(goal)}</goal>`);
-            }
-            lines.push(`    </goals>`);
-        }
-
-        if (task.issueUrl) {
-            lines.push(`    <issue>`);
-            lines.push(`      <url>${this.escapeXml(task.issueUrl)}</url>`);
-            if (task.issueTitle) {
-                lines.push(
-                    `      <title>${this.escapeXml(task.issueTitle)}</title>`,
-                );
-            }
-            if (task.issueBody) {
-                lines.push(
-                    `      <body>${this.escapeXml(task.issueBody)}</body>`,
-                );
-            }
-            lines.push(`    </issue>`);
-        }
-
-        if (task.labels && task.labels.length > 0) {
-            lines.push(`    <labels>`);
-            for (const label of task.labels) {
-                lines.push(`      <label>${this.escapeXml(label)}</label>`);
-            }
-            lines.push(`    </labels>`);
-        }
-
-        lines.push(`  </task_overview>`);
 
         return lines.join("\n");
     }

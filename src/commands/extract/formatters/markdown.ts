@@ -2,26 +2,16 @@ import { Formatter } from "../../../core/formatter";
 import type {
     FormatterOptions,
     ExtractedContext,
-    TaskContext,
     Metadata,
 } from "../../../types";
-// Prompt features removed
 
 export class MarkdownFormatter extends Formatter {
     format({ context, options }: FormatterOptions): string {
         const sections: string[] = [];
 
-        // Header
-        sections.push(this.formatHeader(context, options));
-
         // Metadata (unless excluded)
         if (!options.noMetadata) {
             sections.push(this.formatMetadata(context.metadata));
-        }
-
-        // Task context if present
-        if (context.task) {
-            sections.push(this.formatTaskSection(context.task));
         }
 
         // Scope summary
@@ -32,23 +22,7 @@ export class MarkdownFormatter extends Formatter {
             sections.push(this.formatChanges(context, options));
         }
 
-        // Impact analysis (placeholder for future AST analysis)
-        // TODO: Add when AST analysis is implemented
-
-        // AI prompt features removed
-        
         return sections.join("\n\n");
-    }
-
-    private formatHeader(
-        context: ExtractedContext,
-        _options: FormatterOptions["options"],
-    ): string {
-        const title = context.task?.description
-            ? `Context: ${context.task.description}`
-            : "Code Context";
-
-        return `# ${title}`;
     }
 
     private formatMetadata(metadata: Metadata): string {
@@ -79,32 +53,6 @@ export class MarkdownFormatter extends Formatter {
             `- **Estimated Tokens:** ~${metadata.tokens.estimated.toLocaleString()}`,
         );
         lines.push(`- **dex Version:** ${metadata.tool.version}`);
-
-        return lines.join("\n");
-    }
-
-    private formatTaskSection(task: TaskContext): string {
-        const lines = ["## Task Overview"];
-
-        if (task.description) {
-            lines.push(`- **Description:** ${task.description}`);
-        }
-
-        if (task.goals && task.goals.length > 0) {
-            lines.push(`- **Goals:** ${task.goals.join(", ")}`);
-        }
-
-        if (task.issueUrl) {
-            lines.push(
-                `- **Issue:** [${task.issueTitle || task.issueUrl}](${task.issueUrl})`,
-            );
-        }
-
-        if (task.labels && task.labels.length > 0) {
-            lines.push(`- **Labels:** ${task.labels.join(", ")}`);
-        }
-
-        // Removed AI prompt bullet
 
         return lines.join("\n");
     }

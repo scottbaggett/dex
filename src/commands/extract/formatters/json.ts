@@ -1,8 +1,7 @@
 import { Formatter } from "../../../core/formatter";
-import type { FormatterOptions, TaskContext, ExtractedContext } from "../../../types";
+import type { FormatterOptions, ExtractedContext } from "../../../types";
 
 interface JsonOutput {
-    task?: TaskContext;
     scope: ExtractedContext["scope"];
     changes: Array<{
         file: string;
@@ -19,7 +18,6 @@ interface JsonOutput {
 export class JsonFormatter extends Formatter {
     format({ context, options }: FormatterOptions): string {
         const output: JsonOutput = {
-            task: context.task,
             scope: context.scope,
             changes: context.changes.map((change) => ({
                 file: change.file,
