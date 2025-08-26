@@ -3,8 +3,8 @@ import chalk from "chalk";
 import ora from "ora";
 import clipboardy from "clipboardy";
 import { readFileSync, statSync } from "fs";
-import { resolve, relative, join } from "path";
-import { XmlFormatter } from "./formatters/xml.js";
+import { resolve, relative, join, basename } from "path";
+import { TextFormatter } from "./formatters/text.js";
 import { MarkdownFormatter } from "./formatters/markdown.js";
 import { JsonFormatter } from "./formatters/json.js";
 import type { GitChange } from "../../types.js";
@@ -13,11 +13,24 @@ import { formatFileSize } from "../../utils/file-scanner.js";
 import { FileSelector } from "../../utils/file-selector.js";
 import { OutputManager } from "../../utils/output-manager.js";
 import { GitExtractor } from "../../core/git.js";
-import {
-    countTokens,
-    formatEstimatedTokens,
-} from "../../utils/tokens.js";
+import { countTokens, formatEstimatedTokens } from "../../utils/tokens.js";
 import { z } from "zod";
+import { ProgressBar } from "../../utils/progress.js";
+import {
+    agentInstructions,
+    combineSuccessMessage,
+    combineSuccess,
+    combineStagedNotFound,
+    combinePathIssues,
+    noFilesFound,
+    savedToMessage,
+    copiedToClipboard,
+    scanningFiles,
+    genericError,
+    formatTokenCount,
+    interactiveCancelled,
+    notInGitRepo,
+} from "../../utils/messages.js";
 
 function collectPatterns(value: string, previous: string[]): string[] {
     return previous.concat([value]);
@@ -32,11 +45,7 @@ export function createCombineCommand(): Command {
             "[paths...]",
             "Paths to files or directories to combine (defaults to current directory)",
         )
-        .option(
-            "-f, --format <type>",
-            "Output format (xml, markdown, json)",
-            "xml",
-        )
+        .option("-f, --format <type>", "Output format (text, md, json)", "txt")
         .option("-o, --output <file>", "Write output to specific file")
         .option("-c, --clipboard", "Copy output to clipboard")
         .option("--stdout", "Print output to stdout")
@@ -53,7 +62,6 @@ export function createCombineCommand(): Command {
             collectPatterns,
             [],
         )
-        .option("--no-metadata", "Exclude metadata from output")
         .option("--staged", "Only process staged files")
         .option("--since <ref>", "Only process files changed since git ref")
         .option(
@@ -68,7 +76,9 @@ export function createCombineCommand(): Command {
         .option("--no-gitignore", "Do not respect .gitignore patterns")
         .action(async (...args: unknown[]) => {
             // Handle optional paths argument - if no paths provided, args[0] will be the command object
-            const paths = Array.isArray(args[0]) ? args[0] as string[] : ["."];
+            const paths = Array.isArray(args[0])
+                ? (args[0] as string[])
+                : ["."];
             const cmdObject = args[args.length - 1] as Command; // Commander puts the command object last
             const localOptions = cmdObject.opts();
             const parentOptions = cmdObject.parent?.opts() || {};
@@ -82,11 +92,14 @@ export function createCombineCommand(): Command {
     return combine;
 }
 
-async function combineCommand(inputPaths: string[], options: z.infer<typeof CombineOptionsSchema>) {
-    const spinner = ora("Scanning files...").start();
+async function combineCommand(
+    inputPaths: string[],
+    options: z.infer<typeof CombineOptionsSchema>,
+) {
+    const spinner = ora(scanningFiles()).start();
 
     // Handle stdout option - don't show spinner if outputting to stdout
-    const isStdout = options.stdout || (!options.output && !options.clipboard);
+    const isStdout = options.stdout;
     if (isStdout) {
         spinner.stop();
     }
@@ -112,7 +125,7 @@ async function combineCommand(inputPaths: string[], options: z.infer<typeof Comb
 
             const hasStagedChanges = await gitExtractor.hasStagedChanges();
             if (!hasStagedChanges) {
-                spinner.fail(chalk.red("No staged files found"));
+                spinner.fail(combineStagedNotFound());
                 console.log(
                     chalk.gray(
                         'Tip: Use "git add <files>" to stage files first',
@@ -185,313 +198,284 @@ async function combineCommand(inputPaths: string[], options: z.infer<typeof Comb
         }
 
         if (errors.length > 0) {
-            spinner.warn(chalk.yellow("Some paths had issues:"));
-            for (const error of errors) {
-                console.warn(chalk.yellow(`  ${error}`));
-            }
+            spinner.warn(combinePathIssues(errors));
         }
 
         if (allFiles.length === 0) {
-            spinner.fail(chalk.red("No valid files found"));
+            spinner.fail(noFilesFound());
             process.exit(1);
-        }
-
-        // Safety check for too many files
-        if (allFiles.length >= maxFiles) {
-            spinner.warn(
-                chalk.yellow(
-                    `Found ${allFiles.length} files, limited to ${maxFiles}`,
-                ),
-            );
-        }
-
-        // Show file count and size info
-        const totalSize = allFiles.reduce((sum, filePath) => {
-            try {
-                return sum + statSync(filePath).size;
-            } catch {
-                return sum;
-            }
-        }, 0);
-
-        if (allFiles.length > 50 && !options.staged && !options.dryRun) {
-            spinner.warn(
-                chalk.yellow(
-                    `Processing ${allFiles.length} files (${formatFileSize(totalSize)}). Consider using --select to choose specific files.`,
-                ),
-            );
         }
 
         // Handle dry-run mode
         if (options.dryRun) {
-            spinner.stop();
-            console.log(
-                chalk.cyan(`\nDry run - Files that would be processed:\n`),
+            spinner.warn(
+                chalk.yellow(
+                    `Would process ${allFiles.length} files (dry-run mode)`,
+                ),
             );
-
-            for (const filePath of allFiles) {
-                const relativePath = relative(process.cwd(), filePath);
-                const size = statSync(filePath).size;
-                const fileSize = formatFileSize(size);
+            for (const file of allFiles) {
+                const size = formatFileSize(statSync(file).size);
                 console.log(
-                    chalk.green(`  ✓ ${relativePath}`) +
-                        chalk.gray(` (${fileSize})`),
+                    chalk.gray(
+                        `  • ${relative(process.cwd(), file)} (${size})`,
+                    ),
                 );
             }
-
-            console.log(chalk.cyan(`\nSummary:`));
-            console.log(`  Files: ${allFiles.length}`);
-            console.log(`  Total size: ${formatFileSize(totalSize)}`);
-
-            // Read a sample of files to get accurate token count
-            let sampleTokens = 0;
-            let sampleSize = 0;
-            const maxSampleFiles = Math.min(5, allFiles.length);
-
-            for (let i = 0; i < maxSampleFiles; i++) {
-                try {
-                    const content = readFileSync(allFiles[i] || "", "utf-8");
-                    sampleTokens += countTokens(content);
-                    sampleSize += content.length;
-                } catch {
-                    // Skip files that can't be read
-                }
-            }
-
-            // Extrapolate from sample or use fallback
-            const estimatedTokens =
-                sampleSize > 0
-                    ? Math.round((sampleTokens / sampleSize) * totalSize)
-                    : Math.ceil(totalSize / 4);
-
-            console.log(
-                `  Estimated tokens: ${formatEstimatedTokens(estimatedTokens)}`,
-            );
-
-            console.log(
-                chalk.dim(`\nRun without --dry-run to process these files.`),
+            spinner.warn(
+                chalk.yellow(
+                    `Total: ${allFiles.length} files, ~${formatEstimatedTokens(
+                        allFiles.reduce(
+                            (total, file) => total + statSync(file).size,
+                            0,
+                        ),
+                    )} tokens`,
+                ),
             );
             return;
         }
 
-        // Handle interactive selection if requested (skip for staged mode)
-        let finalFiles = allFiles;
+        // Handle --select mode
+        if (options.select) {
+            spinner.stop();
 
-        if (options.select && !options.staged) {
             // Check if interactive mode is possible
             if (!process.stdin.isTTY || !process.stdin.setRawMode) {
-                spinner.fail(
+                console.error(
                     chalk.red("Interactive mode requires a TTY terminal"),
                 );
-                const fileSelector = new FileSelector();
-                fileSelector.showTTYError();
+                console.log(
+                    chalk.gray(
+                        "Try running without --select or use a different terminal",
+                    ),
+                );
                 process.exit(1);
             }
 
-            spinner.stop();
-
-            try {
-                // Convert file paths to GitChange objects for the selector
-                const fileSelector = new FileSelector();
-                const fileChanges = fileSelector.filesToGitChanges(allFiles);
-                const result = await fileSelector.selectFiles(fileChanges);
-
-                // Convert back to file paths
-                finalFiles = result.files.map((change) => resolve(change.file));
-
-                // Override clipboard option if user pressed 'c'
-                if (result.copyToClipboard) {
-                    options.clipboard = true;
+            // Count total tokens first for display
+            let totalTokens = 0;
+            for (const file of allFiles) {
+                try {
+                    const fileContent = readFileSync(file, "utf-8");
+                    totalTokens += countTokens(fileContent);
+                } catch {
+                    // Skip unreadable files
                 }
+            }
 
-                spinner.start("Processing selected files...");
-            } catch (error) {
-                if (
-                    error instanceof Error &&
-                    error.message === "File selection cancelled"
-                ) {
-                    console.log(chalk.yellow("\nFile selection cancelled."));
+            // Launch interactive file selection
+            console.log(
+                chalk.cyan(`\nFound ${allFiles.length} files `) +
+                    chalk.gray(`(~${Math.round(totalTokens / 1000)}k tokens)`),
+            );
+            console.log(
+                chalk.cyan(
+                    "Use ↑↓ to navigate, Space to select, Enter to confirm\n",
+                ),
+            );
+
+            const { launchInteractiveMode } = await import(
+                "../../interactive/index.js"
+            );
+            try {
+                const result = await launchInteractiveMode({
+                    changes: allFiles.map((file) => ({
+                        file: relative(process.cwd(), file),
+                        status: "modified" as const,
+                        additions: 0,
+                        deletions: 0,
+                        diff: "",
+                    })),
+                });
+
+                if (!result || result.files.length === 0) {
+                    console.log(interactiveCancelled());
                     process.exit(0);
                 }
-                throw error;
+
+                allFiles = result.files.map((f) =>
+                    resolve(process.cwd(), f.file),
+                );
+
+                // If user pressed 'c' to copy to clipboard
+                if (result.copyToClipboard) {
+                    options.clipboard = true;
+                    options.output = undefined;
+                }
+            } catch (error) {
+                spinner.fail(
+                    chalk.red(
+                        `Interactive mode failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+                    ),
+                );
+                process.exit(1);
             }
+
+            spinner.start("Processing selected files...");
         }
 
-        // Read file contents
-        const processingText = options.staged
-            ? "Reading staged files..."
-            : "Reading files...";
+        // Stop spinner before progress bar
+        spinner.stop();
+
+        // Create progress bar for file processing
+        const progress = new ProgressBar({
+            label: "Combining",
+            showSize: true,
+            unit: "files",
+        });
+
         if (!isStdout) {
-            spinner.text = chalk.gray(
-                `${processingText} (${finalFiles.length} files)`,
-            );
+            progress.start(allFiles.length);
         }
 
+        const startTime = Date.now();
+
+        // Process files
         const changes: GitChange[] = [];
-        const fullFiles = new Map<string, string>();
+        const failedFiles: string[] = [];
+        let totalSize = 0;
 
-        for (const filePath of finalFiles) {
+        for (let i = 0; i < allFiles.length; i++) {
+            const file = allFiles[i];
+            if (!file) continue;
+
             try {
-                const content = readFileSync(filePath, "utf-8");
-                const relativePath = relative(process.cwd(), filePath);
+                const relativePath = relative(process.cwd(), file);
+                const stats = statSync(file);
+                const content = readFileSync(file, "utf-8");
 
-                // Create a GitChange-like object for each file with content
-                const change: GitChange = {
+                changes.push({
                     file: relativePath,
-                    status: options.staged ? "modified" : "added", // Use 'modified' for staged files
+                    status: "modified" as const,
+                    content,
                     additions: content.split("\n").length,
                     deletions: 0,
-                    diff: content, // Store content in diff field for compatibility
-                    content,
-                };
+                    diff: "",
+                });
 
-                changes.push(change);
-                fullFiles.set(relativePath, content);
+                totalSize += stats.size;
+
+                if (!isStdout) {
+                    progress.update(i + 1, totalSize, totalSize);
+                }
             } catch (error) {
-                errors.push(
-                    `Failed to read ${filePath}: ${error instanceof Error ? error.message : "Unknown error"}`,
-                );
+                const relativePath = relative(process.cwd(), file);
+                if (relativePath) {
+                    failedFiles.push(relativePath);
+                }
             }
         }
 
-        if (errors.length > 0) {
-            spinner.warn(chalk.yellow("Some files could not be read"));
-            for (const error of errors) {
-                console.warn(chalk.yellow(`  ${error}`));
+        if (!isStdout) {
+            progress.complete();
+        }
+
+        if (failedFiles.length > 0) {
+            console.warn(chalk.yellow("Some files could not be read"));
+            for (const file of failedFiles) {
+                console.warn(chalk.yellow(`  • ${file}`));
             }
         }
 
         if (changes.length === 0) {
-            spinner.fail(chalk.red("No files could be read"));
+            console.error(chalk.red("No files could be read"));
             process.exit(1);
         }
 
-        // Context calculations removed - unused variables
+        // Format output based on specified format
+        const formatter = getFormatter(options.format);
+        const output = formatter.format(changes);
 
-        // Repository info removed - unused in current implementation
+        // Handle output based on options
+        const totalTokens = countTokens(output);
+        const tokenStr = formatTokenCount(totalTokens);
 
-        // Format output
-        const formatToUse = options.format || "xml";
-        if (!isStdout) {
-            spinner.text = chalk.gray(
-                `Formatting as ${chalk.cyan(formatToUse)}...`,
-            );
-        }
-        let output: string;
-
-        switch (formatToUse) {
-            case "xml":
-                {
-                const xmlFormatter = new XmlFormatter();
-                output = xmlFormatter.format(changes);
-                break;
-            }
-            case "json":
-            {
-                const jsonFormatter = new JsonFormatter();
-                output = jsonFormatter.format(changes);
-                break;
-            }
-            case "md":
-            {
-                const markdownFormatter = new MarkdownFormatter();
-                output = markdownFormatter.format(changes);
-                break;
-            }
-            default:
-                throw new Error(`Invalid format: ${options.format}`);
-        }
-
-        // Handle output
-        if (options.stdout) {
-            console.log(output);
-        } else if (options.output) {
-            const { writeFileSync } = await import("fs");
-            writeFileSync(options.output, output);
-            const successMsg = options.staged
-                ? `Combined staged files written to: ${options.output}`
-                : `Combined files written to: ${options.output}`;
-            spinner.succeed(chalk.green(successMsg));
-        } else if (options.clipboard) {
+        if (options.clipboard) {
             try {
                 await clipboardy.write(output);
-
-                // Show enhanced success message with metadata
-                const tokenCount = countTokens(output);
-                const tokenStr = tokenCount >= 1000
-                    ? `${(tokenCount / 1000).toFixed(1)}k`
-                    : `${tokenCount}`;
-
-                spinner.succeed(
-                    chalk.cyan("✨ Combined ") +
-                        chalk.white(`${changes.length} files `) +
-                        chalk.cyan("→ ") +
-                        chalk.yellow(`${tokenStr} tokens `) +
-                        chalk.gray("(copied to clipboard)"),
-                );
-            } catch (error) {
-                spinner.fail(chalk.red("Failed to copy to clipboard"));
-                console.error(
-                    chalk.red(
-                        `Clipboard error: ${error instanceof Error ? error.message : "Unknown error"}`,
+                const sizeKB = Math.round(totalSize / 1024);
+                console.log(
+                    combineSuccess(
+                        changes.length,
+                        sizeKB,
+                        Date.now() - startTime,
                     ),
                 );
-                console.log(chalk.yellow("Falling back to terminal output:"));
-                console.log(output);
+                console.log(copiedToClipboard("Combined output"));
+                console.log(
+                    chalk.dim("Size: ") +
+                        chalk.white(
+                            formatFileSize(Buffer.byteLength(output, "utf-8")),
+                        ),
+                );
+                console.log(chalk.dim("Tokens: ") + chalk.white(tokenStr));
+            } catch {
+                console.error(chalk.red("Failed to copy to clipboard"));
             }
+        } else if (options.output) {
+            // Write to specified file
+            const { writeFileSync } = await import("fs");
+            const outputPath = resolve(options.output);
+            writeFileSync(outputPath, output, "utf-8");
+
+            const sizeKB = Math.round(totalSize / 1024);
+            console.log(
+                combineSuccess(changes.length, sizeKB, Date.now() - startTime),
+            );
+            console.log(savedToMessage(outputPath));
+            console.log("\n" + agentInstructions(outputPath));
+        } else if (isStdout) {
+            // Print to stdout
+            console.log(output);
         } else {
-            // Save to .dex/ directory using OutputManager
+            // Save to default location
             const outputManager = new OutputManager();
 
-            // Generate context string for filename
-            let contextString: string;
-            if (options.select) {
-                contextString = "select";
-            } else if (options.staged) {
-                contextString = "staged-files";
-            } else if (filePaths.length === 1) {
-                // For single path, preserve the path structure
-                contextString = filePaths[0] || "";
+            // Determine context based on input paths
+            let context: string;
+            if (options.staged) {
+                context = "staged";
+            } else if (inputPaths.length === 1 && inputPaths[0]) {
+                // Use basename of the path for single path input
+                const inputPath =
+                    inputPaths[0] === "."
+                        ? process.cwd()
+                        : resolve(inputPaths[0]);
+                context = basename(inputPath);
             } else {
-                // For multiple paths, join them with underscores
-                contextString = filePaths.join("_");
+                // Multiple paths - use "combined" or first path's basename
+                context = "combined";
             }
 
             await outputManager.saveOutput(output, {
                 command: "combine",
-                context: contextString,
-                format: options.format || "xml",
+                context,
+                format: options.format as "txt" | "md" | "json",
             });
 
             const fullPath = await outputManager.getFilePath({
                 command: "combine",
-                context: contextString,
-                format: options.format || "xml",
+                context,
+                format: options.format as "txt" | "md" | "json",
             });
 
-            // Format token display
-            const tokenCount = countTokens(output);
-            const tokenStr = tokenCount >= 1000
-                ? `${(tokenCount / 1000).toFixed(1)}k`
-                : `${tokenCount}`;
-
-            spinner.succeed(
-                chalk.cyan("✨ Combined ") +
-                    chalk.white(`${changes.length} files `) +
-                    chalk.cyan("→ ") +
-                    chalk.yellow(`${tokenStr} tokens`),
-            );
-            console.log(chalk.gray(`Saved to: ${fullPath}`));
-
-            // Show agent instruction
-            console.log(chalk.dim(`\nFor agents: cat "${fullPath}"`));
+            console.log(combineSuccessMessage(changes, tokenStr, fullPath));
+            console.log(agentInstructions(fullPath));
         }
     } catch (error) {
-        spinner.fail(
-            chalk.red(
-                `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-            ),
-        );
+        spinner.fail(genericError(error));
         process.exit(1);
+    }
+}
+
+function getFormatter(
+    format = "txt",
+): TextFormatter | MarkdownFormatter | JsonFormatter {
+    switch (format) {
+        case "md":
+            return new MarkdownFormatter();
+        case "json":
+            return new JsonFormatter();
+        default:
+            return new TextFormatter();
     }
 }

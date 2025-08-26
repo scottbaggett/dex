@@ -37,7 +37,6 @@ program
     .description(packageJson.description)
     .version(packageJson.version);
 
-
 program.addCommand(createExtractCommand());
 program.addCommand(createDistillCommand());
 
@@ -84,15 +83,16 @@ program.allowUnknownOption().action(async (options, command) => {
                     extractOptions.clipboard = true;
                 } else if (arg === "--format" || arg === "-f") {
                     const format = args[++i];
-                    if (format && ["md", "json", "xml", "txt", "jsonl"].includes(format)) {
-                        extractOptions.format = format as ExtractOptions["format"];
+                    if (format && ["md", "json", "txt"].includes(format)) {
+                        extractOptions.format =
+                            format as ExtractOptions["format"];
                     } else {
                         throw new Error(`Invalid format: ${format}`);
                     }
                 } else if (arg === "--path" || arg === "-p") {
                     extractOptions.path = args[++i];
                 } else if (arg === "--type" || arg === "-t") {
-                    extractOptions.type = args[++i]?.split(',');
+                    extractOptions.type = args[++i]?.split(",");
                 } else if (arg === "--interactive" || arg === "-i") {
                     extractOptions.interactive = true;
                 } else if (arg === "--include-untracked" || arg === "-u") {
@@ -104,13 +104,20 @@ program.allowUnknownOption().action(async (options, command) => {
                 } else if (arg === "--select") {
                     extractOptions.select = true;
                 } else if (arg === "--sort-by") {
-                    extractOptions.sortBy = args[++i] as ExtractOptions["sortBy"];
+                    extractOptions.sortBy = args[
+                        ++i
+                    ] as ExtractOptions["sortBy"];
                 } else if (arg === "--sort-order") {
-                    extractOptions.sortOrder = args[++i] as ExtractOptions["sortOrder"];
+                    extractOptions.sortOrder = args[
+                        ++i
+                    ] as ExtractOptions["sortOrder"];
                 } else if (arg === "--filter-by") {
-                    extractOptions.filterBy = args[++i] as ExtractOptions["filterBy"];
+                    extractOptions.filterBy = args[
+                        ++i
+                    ] as ExtractOptions["filterBy"];
                 } else if (arg === "--full") {
-                    extractOptions.full = args[++i] === "true" ? "true" : "false";
+                    extractOptions.full =
+                        args[++i] === "true" ? "true" : "false";
                 } else if (arg === "--diff-only") {
                     extractOptions.diffOnly = true;
                 }
@@ -128,18 +135,13 @@ program.allowUnknownOption().action(async (options, command) => {
     }
 });
 
-
-
-
 program.addCommand(createCombineCommand());
 program.addCommand(createTreeCommand());
-
 
 program
     .command("help-selection")
     .description("Show detailed file selection options")
     .action(async () => {
-        
         console.log(FileSelector.getOptionsHelp());
         process.exit(0);
     });
