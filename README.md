@@ -6,11 +6,11 @@ Context extraction and codebase analysis for AI workflows. Generate precise, tok
   <img src="https://img.shields.io/badge/LLM_Ready-Markdown_JSON_XML-cyan?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Focus-Surgically_Precise-cyan?style=for-the-badge" />
   <br/>
-  <i>Fast path recommended: Bun</i>
+  <i>Local installation via Bun</i>
   <br/>
-  <code>bunx dex</code>
+  <code>git clone</code>
   ·
-  <code>bun add -g dex</code>
+  <code>bun link</code>
   ·
   <code>dex --help</code>
 
@@ -19,11 +19,14 @@ Context extraction and codebase analysis for AI workflows. Generate precise, tok
 ## Quick Start
 
 ```bash
-# Install (recommended)
-bun add -g @scottbaggett/dex
+# Clone and install locally
+git clone https://github.com/scottbaggett/dex.git
+cd dex
+bun install
+bun link
 
-# Or run without installing
-bunx dex --help
+# Now use dex globally
+dex --help
 
 # Initialize project scaffolding
 cd your-project
@@ -35,7 +38,7 @@ dex -s --format markdown --clipboard
 
 ## Core Commands
 
-### `Extract changes` (default command)
+## `Extract` (default command)
 Extracts Git changes and formats context for LLMs.
 
 ```bash
@@ -69,60 +72,60 @@ Key options:
 
 Outputs are saved to `.dex/` by default unless `--clipboard`, `--stdout` (where available), or an explicit `--output` is used.
 
-### 🗜️ Distill codebases
+## Distill
 Extract clean API signatures from entire codebases, removing implementation details for token-efficient LLM context.
 
 ```bash
 dex distill .                          # Distill current project
 dex distill packages/api               # Distill a specific directory
 dex distill src/index.ts               # Distill a single file
-dex distill . --depth all              # Include private/protected members
+dex distill . --private 1              # Include private members
 dex distill . --include "*.ts"         # Only TypeScript files
 dex distill . --stdout                 # Print to stdout
 ```
 
 Key options:
-- -f, --format <type>: compressed | distilled | both (default: distilled)
+- -f, --format <type>: txt | markdown | json (default: markdown)
 - -o, --output <file>: Write to a specific file
 - -c, --clipboard: Copy output to clipboard
 - --stdout: Print to stdout
-- --include <pattern>: Include file patterns (e.g., "*.ts", "src/**/*.js")
-- --exclude <pattern>: Exclude file patterns (repeatable)
-- --exclude-names <pattern>: Exclude specific export names (e.g., "*Test*", "_*")
-- --depth <level>: API surface depth - public | protected | all (default: public)
-- --include-private: Include private members
-- --with-comments: Include code comments
-- --no-docstrings: Exclude docstrings
-- --compact: Compact output mode
-- --no-compress: Skip compression phase
+- -s, --select: Interactive file selection
+- --include <patterns...>: Include file patterns (e.g., "*.ts" "src/**/*.js")
+- --exclude <patterns...>: Exclude file patterns
+- --comments <0|1>: Include comments (default: 0)
+- --docstrings <0|1>: Include docstrings (default: 1)
+- --private <0|1>: Include private members (default: 0)
 - --no-parallel: Disable parallel processing
+- --dry-run: Preview what would be processed
 - --since <ref>: Only process files changed since git ref
 - --staged: Only process staged files
 
-### `Combine` files and folders
+## `Combine`
 Create a single, LLM‑friendly document from many files.
 
 ```bash
 dex combine src/auth/ src/api/         # Combine directories
 dex combine file1.ts file2.ts          # Combine specific files
-dex combine --select                   # Pick files interactively (TTY)
-dex combine -s -c                      # Use staged files; copy to clipboard
+dex combine -s                         # Pick files interactively (TTY)
+dex combine --staged -c                # Use staged files; copy to clipboard
 ```
 
 **Key options:**
-- --output-format <fmt>: xml | markdown | json (default: xml)
-- -s, --staged: Use all staged files (full contents)
-- -c, --copy: Copy to clipboard
+- -f, --format <fmt>: xml | markdown | json (default: xml)
+- --staged: Use all staged files (full contents)
+- -c, --clipboard: Copy to clipboard
 - --no-metadata: Omit metadata block
 - -o, --output <file>: Write to file instead of saving to `.dex/`
-- --include <csv>: Include patterns, e.g. "*.ts,*.js"
-- --exclude <csv>: Exclude patterns, e.g. "*.test.*,*.spec.*"
+- --include <patterns...>: Include patterns, e.g. "*.ts" "*.js"
+- --exclude <patterns...>: Exclude patterns, e.g. "*.test.*" "*.spec.*"
 - --max-files <n>: Limit files processed (default 1000)
-- --max-depth <n>: Directory scan depth (default 10)
 - --no-gitignore: Ignore .gitignore
-- --select: Interactive picker (TTY)
+- -s, --select: Interactive picker (TTY)
+- --stdout: Print output to stdout
+- --since <ref>: Only process files changed since git ref
+- --dry-run: Show what files would be processed
 
-### 🌳 Visualize APIs and structure
+### Tree
 Generate a beautiful API tree or outline for quick understanding.
 
 ```bash
@@ -157,15 +160,63 @@ Configuration is auto‑loaded from, in order:
 
 ## Installation
 
-- Bun (recommended): `bun add -g @scottbaggett/dex` or run via `bunx dex`
-- npm: `npm install -g dex`
-- pnpm: `pnpm add -g dex`
+### Local Installation
+
+#### Option 1: Using Bun (Recommended - Faster)
+
+```bash
+# Clone the repository
+git clone https://github.com/scottbaggett/dex.git
+cd dex
+
+# Install dependencies and link globally
+bun install
+bun link
+
+# Verify installation
+dex --help
+```
+
+#### Option 2: Using npm/Node.js
+
+```bash
+# Clone the repository
+git clone https://github.com/scottbaggett/dex.git
+cd dex
+
+# Install dependencies
+npm install
+
+# Build the TypeScript code
+npm run build
+
+# Link globally
+npm link
+
+# Verify installation
+dex --help
+```
+
+### Alternative: Run directly from source
+
+```bash
+# With Bun (no build needed, runs TypeScript directly)
+cd /path/to/dex
+bun run src/cli/dex.ts [command] [options]
+
+# With Node.js (requires build first)
+cd /path/to/dex
+npm run build
+node dist/cli/dex.js [command] [options]
+```
 
 DEX saves outputs to `.dex/` with descriptive, timestamped filenames. Use `--clipboard`, `--stdout` (where available), or `--output <file>` to override.
 
 ## Requirements
 
-- Bun 1.0+ or Node.js 16+
+- **Either** Bun 1.0+ **or** Node.js 23.5+
+  - Bun is recommended for faster installation and direct TypeScript execution
+  - Node.js works fine but requires building TypeScript to JavaScript first
 - Git (for change tracking)
 
 ## Tips
