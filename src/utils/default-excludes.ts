@@ -3,17 +3,17 @@
  */
 
 export const DEFAULT_EXCLUDES = {
-    // Version control
-    git: [".git/**"],
+    // Version control (recursive)
+    git: ["**/.git/**"],
     
-    // Dependencies
-    dependencies: ["node_modules/**", "vendor/**", "bower_components/**"],
+    // Dependencies (recursive - matches in any subdirectory)
+    dependencies: ["**/node_modules/**", "**/vendor/**", "**/bower_components/**"],
     
-    // Build outputs
-    build: ["dist/**", "build/**", "out/**", ".next/**", ".nuxt/**"],
+    // Build outputs (recursive for submodules/monorepos)
+    build: ["**/dist/**", "**/build/**", "**/out/**", "**/.next/**", "**/.nuxt/**"],
     
-    // Testing and coverage
-    testing: ["coverage/**", ".nyc_output/**"],
+    // Testing and coverage (recursive)
+    testing: ["**/coverage/**", "**/.nyc_output/**"],
     testFiles: ["**/*.spec.ts", "**/*.spec.js", "**/*.test.ts", "**/*.test.js", "**/*.test.tsx", "**/*.test.jsx"],
     
     // Logs and temp files  
@@ -60,29 +60,29 @@ export const DEFAULT_EXCLUDES = {
         "*.beam", "*.elc", "*.wasm",
     ],
     
-    // Python
-    python: ["__pycache__/**", ".pytest_cache/**", ".mypy_cache/**", "*.pyc", "*.pyo"],
+    // Python (recursive)
+    python: ["**/__pycache__/**", "**/.pytest_cache/**", "**/.mypy_cache/**", "*.pyc", "*.pyo"],
     
-    // Java/Kotlin
-    java: ["target/**", "*.class", ".gradle/**", "gradle/**"],
+    // Java/Kotlin (recursive)
+    java: ["**/target/**", "*.class", "**/.gradle/**", "**/gradle/**"],
     
-    // .NET
-    dotnet: ["bin/**", "obj/**", "*.dll", "*.exe", "*.pdb"],
+    // .NET (recursive)
+    dotnet: ["**/bin/**", "**/obj/**", "*.dll", "*.exe", "*.pdb"],
     
-    // Rust
-    rust: ["target/**", "*.rlib"],
+    // Rust (recursive)
+    rust: ["**/target/**", "*.rlib"],
     
     // Go
     go: ["*.test", "*.out"],
     
-    // Cache directories
-    cache: [".cache/**", ".parcel-cache/**", ".turbo/**", ".nx/**"],
+    // Cache directories (recursive)
+    cache: ["**/.cache/**", "**/.parcel-cache/**", "**/.turbo/**", "**/.nx/**"],
     
-    // IDE/Editor
-    ide: [".idea/**", ".vscode/**", "*.swp", "*.swo", "*~", ".project", ".classpath"],
+    // IDE/Editor (recursive)
+    ide: ["**/.idea/**", "**/.vscode/**", "*.swp", "*.swo", "*~", ".project", ".classpath"],
     
-    // Dex specific  
-    dex: [".dex/**", ".opencode/**", ".workarea/**"],
+    // Dex specific (recursive)
+    dex: ["**/.dex/**", "**/.opencode/**", "**/.workarea/**"],
 };
 
 /**
