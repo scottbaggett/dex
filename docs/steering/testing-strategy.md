@@ -1,70 +1,61 @@
 # DEX Testing Strategy
 
-This document outlines the testing strategy for DEX, a CLI tool for intelligent code analysis and context extraction. All code contributions must include tests following these guidelines to ensure reliability, maintainability, and architectural integrity.
+Essential testing patterns for reliable CLI functionality.
 
-## Testing Philosophy & Organization
-
-Our testing philosophy prioritizes **real-world scenarios** over implementation details. Tests must verify that DEX works correctly across different project structures, file systems, and git repositories. We focus on testing behavior that users and AI agents depend on: accurate parsing, reliable git operations, consistent output formats, and graceful error handling.
-
-We follow the testing pyramid model: **80% Unit tests** (parsers, utilities, core logic), **15% Integration tests** (command workflows, file operations), and **5% End-to-End tests** (full CLI scenarios).
-
-### Test Organization
+## Test Structure
 
 ```
 src/
-├── core/
-│   ├── git.ts
-│   ├── git.test.ts              # Unit tests
-│   └── git.integration.test.ts  # Integration tests
-├── commands/
-│   ├── distill.ts
-│   └── distill.test.ts
-└── __tests__/
-    ├── e2e/
-    │   ├── distill.e2e.test.ts
-    │   └── extract.e2e.test.ts
-    ├── fixtures/
-    │   ├── sample-repos/
-    │   └── test-files/
-    └── helpers/
-        ├── cli-runner.ts
-        └── temp-repo.ts
+├── core/git.ts
+├── core/git.test.ts         # Unit tests
+├── commands/distill.test.ts # Integration tests
+└── tests/
+    ├── e2e/                 # End-to-end scenarios
+    ├── fixtures/            # Test data
+    └── helpers/             # Test utilities
 ```
 
-## Unit Testing Standards
+## Unit Tests
 
-### Basic Structure
-
-Use `describe`, `test`, and `expect` from `bun:test`. Group related functionality and use descriptive test names that explain the scenario being tested.
+**Test core logic with real examples**
 
 ```typescript
 import { test, expect, describe } from "bun:test";
 import { GitExtractor } from "./git";
+import { DistillOptionsSchema } from "./schemas";
 
 describe("GitExtractor", () => {
-  test("should detect git repository correctly", async () => {
+  test("detects git repository", async () => {
     const extractor = new GitExtractor();
     const isGitRepo = await extractor.isGitRepository();
     expect(isGitRepo).toBe(true);
   });
 
-  test("should handle non-git directory gracefully", async () => {
+  test("handles non-git directory gracefully", async () => {
     const extractor = new GitExtractor("/tmp");
     const isGitRepo = await extractor.isGitRepository();
     expect(isGitRepo).toBe(false);
   });
 });
+
+describe("Schema validation", () => {
+  test("validates options correctly", () => {
+    const valid = { format: "md", exclude: ["*.test.ts"] };
+    expect(() => DistillOptionsSchema.parse(valid)).not.toThrow();
+
+    const invalid = { format: "bad-format" };
+    expect(() => DistillOptionsSchema.parse(invalid)).toThrow();
+  });
+});
 ```
 
-### Parser Testing
+## Parser Testing
 
-Test parsers with real code samples to ensure accurate extraction:
+**Use real code samples**
 
 ```typescript
-import { RegexParser } from "./regex-parser";
-
-describe("RegexParser TypeScript extraction", () => {
-  test("should extract exported functions with signatures", async () => {
+describe("RegexParser TypeScript", () => {
+  test("extracts exported functions", async () => {
     const code = `
       export function calculateSum(a: number, b: number): number {
         return a + b;
@@ -79,12 +70,11 @@ describe("RegexParser TypeScript extraction", () => {
     expect(result.exports[0]).toMatchObject({
       name: "calculateSum",
       type: "function",
-      visibility: "public",
-      signature: expect.stringContaining("(a: number, b: number): number")
+      signature: expect.stringContaining("(a: number, b: number)")
     });
   });
 
-  test("should distinguish between public and private class methods", async () => {
+  test("distinguishes public/private methods", async () => {
     const code = `
       export class DataProcessor {
         public process(data: string): string { /* ... */ }
@@ -96,103 +86,25 @@ describe("RegexParser TypeScript extraction", () => {
     const parsed = await parser.parse(code, "typescript");
     const result = parser.extract(parsed);
 
-    const classExport = result.exports.find(e => e.name === "DataProcessor");
-    expect(classExport?.members).toContainEqual(
+    const classExport = result.exports[0];
+    expect(classExport.members).toContainEqual(
       expect.objectContaining({ name: "process", visibility: "public" })
     );
-    expect(classExport?.members).toContainEqual(
+    expect(classExport.members).toContainEqual(
       expect.objectContaining({ name: "sanitize", visibility: "private" })
     );
   });
 });
 ```
 
-### File System Operations
+## Integration Tests
 
-Test file operations with temporary directories and mock scenarios:
-
-```typescript
-import { OutputManager } from "./output-manager";
-import { createTempDir, cleanupTempDir } from "../__tests__/helpers/temp-repo";
-
-describe("OutputManager", () => {
-  let tempDir: string;
-  let outputManager: OutputManager;
-
-  beforeEach(async () => {
-    tempDir = await createTempDir();
-    outputManager = new OutputManager(tempDir);
-  });
-
-  afterEach(async () => {
-    await cleanupTempDir(tempDir);
-  });
-
-  test("should create output file with correct naming pattern", async () => {
-    const content = "# Test Output";
-    const options = { command: "distill", context: "test", format: "markdown" };
-
-    const filePath = await outputManager.saveOutput(content, options);
-
-    expect(filePath).toMatch(/dex\.distill\.test\.txt$/);
-    expect(await fs.readFile(filePath, "utf-8")).toBe(content);
-  });
-
-  test("should detect git root correctly", async () => {
-    // Create a git repo in temp directory
-    await simpleGit(tempDir).init();
-
-    const projectRoot = await outputManager.getProjectRoot();
-    expect(projectRoot).toBe(tempDir);
-  });
-});
-```
-
-### Error Handling
-
-Test both expected errors and edge cases:
+**Test command workflows with temp directories**
 
 ```typescript
-describe("Error handling", () => {
-  test("should throw specific error for invalid file path", async () => {
-    const distiller = new Distiller({ path: "/nonexistent/path" });
+import { runCLI, createTestRepo } from "../tests/helpers";
 
-    await expect(distiller.distill("/nonexistent/path"))
-      .rejects.toThrow("Path not found: /nonexistent/path");
-  });
-
-  test("should provide helpful error message for git operations outside repo", async () => {
-    const extractor = new GitExtractor("/tmp");
-
-    await expect(extractor.getCurrentChanges())
-      .rejects.toThrow("Not in a git repository");
-  });
-
-  test("should gracefully handle parser failures", async () => {
-    const parser = new RegexParser();
-    const malformedCode = "export function incomplete(";
-
-    const parsed = await parser.parse(malformedCode, "typescript");
-    const result = parser.extract(parsed);
-
-    // Should not crash, may return partial results
-    expect(result).toHaveProperty("exports");
-    expect(Array.isArray(result.exports)).toBe(true);
-  });
-});
-```
-
-## Integration Testing
-
-### Command Workflow Testing
-
-Test complete command workflows with realistic scenarios:
-
-```typescript
-import { runCLI } from "../__tests__/helpers/cli-runner";
-import { createTestRepo } from "../__tests__/helpers/temp-repo";
-
-describe("Distill command integration", () => {
+describe("Distill command", () => {
   let testRepo: string;
 
   beforeEach(async () => {
@@ -202,23 +114,19 @@ describe("Distill command integration", () => {
     });
   });
 
-  test("should distill repository and generate output file", async () => {
+  test("distills repository successfully", async () => {
     const result = await runCLI(["distill", "src/"], { cwd: testRepo });
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Distilled 2 files");
-    expect(result.stdout).toContain("dex.distill.src.txt");
 
-    // Verify output file exists and has expected content
+    // Verify output file
     const outputPath = path.join(testRepo, ".dex", "dex.distill.src.txt");
-    expect(await fs.pathExists(outputPath)).toBe(true);
-
     const content = await fs.readFile(outputPath, "utf-8");
     expect(content).toContain("export const version");
-    expect(content).toContain("export function helper");
   });
 
-  test("should respect exclude patterns", async () => {
+  test("respects exclude patterns", async () => {
     const result = await runCLI([
       "distill", "src/",
       "--exclude", "**/*.test.ts"
@@ -230,82 +138,33 @@ describe("Distill command integration", () => {
 });
 ```
 
-### Git Integration Testing
+## E2E Tests
 
-Test git operations with real repositories:
-
-```typescript
-describe("Git integration", () => {
-  test("should extract changes from commit range", async () => {
-    const repo = await createTestRepo();
-    const git = simpleGit(repo);
-
-    // Create initial commit
-    await git.add(".");
-    await git.commit("Initial commit");
-
-    // Make changes
-    await fs.writeFile(path.join(repo, "new-file.ts"), "export const NEW = true;");
-    await git.add(".");
-    await git.commit("Add new file");
-
-    // Test extraction
-    const result = await runCLI(["HEAD~1..HEAD"], { cwd: repo });
-
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("new-file.ts");
-    expect(result.stdout).toContain("export const NEW");
-  });
-});
-```
-
-## End-to-End Testing
-
-### Full CLI Scenarios
-
-Test complete user workflows:
+**Test complete user workflows**
 
 ```typescript
-describe("DEX E2E scenarios", () => {
-  test("developer workflow: analyze unknown codebase", async () => {
-    // Create a realistic project structure
+describe("Developer workflow", () => {
+  test("analyzes unknown codebase", async () => {
     const project = await createTestRepo({
-      "package.json": JSON.stringify({ name: "test-project" }),
       "src/index.ts": "export { API } from './api';",
-      "src/api.ts": "export class API { public getData() {} }",
-      "src/utils/helper.ts": "export function format(data: any) { return data; }"
+      "src/api.ts": "export class API { getData() {} }"
     });
 
-    // Step 1: Get overview with tree command
+    // Get overview
     const treeResult = await runCLI(["tree", "src/"], { cwd: project });
-    expect(treeResult.exitCode).toBe(0);
     expect(treeResult.stdout).toContain("API");
-    expect(treeResult.stdout).toContain("getData");
 
-    // Step 2: Dry run to preview distillation
-    const dryRunResult = await runCLI(["distill", "src/", "--dry-run"], { cwd: project });
-    expect(dryRunResult.exitCode).toBe(0);
-    expect(dryRunResult.stdout).toContain("Files that would be processed");
-    expect(dryRunResult.stdout).toContain("3 files");
-
-    // Step 3: Full distillation
+    // Distill files
     const distillResult = await runCLI(["distill", "src/"], { cwd: project });
     expect(distillResult.exitCode).toBe(0);
-    expect(distillResult.stdout).toContain("Distilled 3 files");
-
-    // Verify output quality
-    const outputFile = path.join(project, ".dex", "dex.distill.src.txt");
-    const content = await fs.readFile(outputFile, "utf-8");
-    expect(content).toContain("export class API");
-    expect(content).toContain("public getData()");
+    expect(distillResult.stdout).toContain("Distilled 2 files");
   });
 
-  test("AI agent workflow: structured output consumption", async () => {
+  test("AI agent consumes structured output", async () => {
     const project = await createTestRepo({
       "src/service.ts": `
         export interface UserService {
           getUser(id: string): Promise<User>;
-          updateUser(user: User): Promise<void>;
         }
       `
     });
@@ -313,30 +172,18 @@ describe("DEX E2E scenarios", () => {
     const result = await runCLI(["distill", "src/", "--stdout"], { cwd: project });
 
     expect(result.exitCode).toBe(0);
-
-    // Verify structured output suitable for AI consumption
-    const output = result.stdout;
-    expect(output).toContain("interface UserService");
-    expect(output).toContain("getUser(id: string): Promise<User>");
-    expect(output).toContain("updateUser(user: User): Promise<void>");
-
-    // Should be valid parseable format
-    expect(() => {
-      // Basic structural validation
-      expect(output).toMatch(/<.*>/); // Contains structured markup
-    }).not.toThrow();
+    expect(result.stdout).toContain("interface UserService");
+    expect(result.stdout).toContain("getUser(id: string)");
   });
 });
 ```
 
-## Test Utilities & Helpers
+## Test Helpers
 
-### CLI Runner Helper
+**CLI Runner**
 
 ```typescript
-// __tests__/helpers/cli-runner.ts
-import { spawn } from "child_process";
-
+// tests/helpers/cli-runner.ts
 export interface CLIResult {
   exitCode: number;
   stdout: string;
@@ -345,7 +192,7 @@ export interface CLIResult {
 
 export async function runCLI(args: string[], options: { cwd?: string } = {}): Promise<CLIResult> {
   return new Promise((resolve) => {
-    const child = spawn("node", ["dist/cli.js", ...args], {
+    const child = spawn("bun", ["run", "cli.ts", ...args], {
       cwd: options.cwd || process.cwd(),
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -355,27 +202,24 @@ export async function runCLI(args: string[], options: { cwd?: string } = {}): Pr
 
     child.stdout.on("data", (data) => stdout += data.toString());
     child.stderr.on("data", (data) => stderr += data.toString());
-
-    child.on("close", (code) => {
-      resolve({ exitCode: code || 0, stdout, stderr });
-    });
+    child.on("close", (code) => resolve({ exitCode: code || 0, stdout, stderr }));
   });
 }
 ```
 
-### Test Repository Helper
+**Test Repository**
 
 ```typescript
-// __tests__/helpers/temp-repo.ts
+// tests/helpers/temp-repo.ts
 import { promises as fs } from "fs";
-import * as path from "path";
-import * as os from "os";
+import { tmpdir } from "os";
+import { join } from "path";
 import simpleGit from "simple-git";
 
 export async function createTestRepo(files: Record<string, string> = {}): Promise<string> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "dex-test-"));
+  const tempDir = await fs.mkdtemp(join(tmpdir(), "dex-test-"));
 
-  // Initialize git repo
+  // Init git
   const git = simpleGit(tempDir);
   await git.init();
   await git.addConfig("user.name", "Test User");
@@ -383,112 +227,78 @@ export async function createTestRepo(files: Record<string, string> = {}): Promis
 
   // Create files
   for (const [filePath, content] of Object.entries(files)) {
-    const fullPath = path.join(tempDir, filePath);
-    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    const fullPath = join(tempDir, filePath);
+    await fs.mkdir(dirname(fullPath), { recursive: true });
     await fs.writeFile(fullPath, content);
   }
 
   return tempDir;
 }
-
-export async function cleanupTempDir(dirPath: string): Promise<void> {
-  await fs.rm(dirPath, { recursive: true, force: true });
-}
 ```
 
-## Performance & Coverage Requirements
+## Error Testing
 
-### Performance Testing
+**Test both success and failure paths**
 
 ```typescript
-describe("Performance requirements", () => {
-  test("should process large repository within reasonable time", async () => {
-    const largeRepo = await createLargeTestRepo(100); // 100 files
-
-    const startTime = Date.now();
-    const result = await runCLI(["distill", "src/"], { cwd: largeRepo });
-    const duration = Date.now() - startTime;
-
-    expect(result.exitCode).toBe(0);
-    expect(duration).toBeLessThan(30000); // 30 seconds max
+describe("Error handling", () => {
+  test("invalid file path throws helpful error", async () => {
+    await expect(distiller.distill("/nonexistent"))
+      .rejects.toThrow("Path not found: /nonexistent");
   });
 
-  test("should handle concurrent operations efficiently", async () => {
-    const repo = await createTestRepo();
+  test("git operations outside repo fail gracefully", async () => {
+    const extractor = new GitExtractor("/tmp");
+    await expect(extractor.getCurrentChanges())
+      .rejects.toThrow("Not in a git repository");
+  });
 
-    const promises = Array(5).fill(0).map(() =>
-      runCLI(["tree", "src/"], { cwd: repo })
-    );
-
-    const results = await Promise.all(promises);
-    results.forEach(result => {
-      expect(result.exitCode).toBe(0);
-    });
+  test("schema validation provides clear errors", () => {
+    expect(() => OptionsSchema.parse({ format: "invalid" }))
+      .toThrow("Invalid enum value");
   });
 });
 ```
 
-### Coverage Requirements
+## Coverage Requirements
 
-- **Statements**: 85% minimum
-- **Functions**: 85% minimum
-- **Lines**: 85% minimum
-- **Branches**: 80% minimum
+- **85% minimum** for statements, functions, lines
+- **80% minimum** for branches
+- **100% coverage** for critical paths: parsers, git ops, CLI args
 
-Critical paths require 100% coverage:
-- Parser extraction logic
-- Git operations
-- File system operations
-- Error handling paths
-- CLI argument processing
+## Test Commands
 
-### CI Pipeline
+```bash
+# Run all tests
+bun test
 
-```yaml
-# .github/workflows/test.yml
-- name: Run tests
-  run: |
-    bun test --coverage --bail
-    bun run test:integration
-    bun run test:e2e
+# Run with coverage
+bun test --coverage
 
-- name: Check coverage thresholds
-  run: bun run coverage:check
+# Run specific test
+bun test --grep "should extract functions"
+
+# Watch mode
+bun test --watch
+
+# Integration tests only
+bun test --grep "integration"
 ```
 
 ## Best Practices
 
-### Do:
-- ✅ Test with realistic file structures and git repositories
-- ✅ Use descriptive test names that explain the scenario
-- ✅ Test both success and error paths
-- ✅ Mock external dependencies (network, file system when appropriate)
-- ✅ Test CLI output format stability for AI agent compatibility
-- ✅ Use temporary directories for file system tests
-- ✅ Clean up resources in `afterEach` hooks
+✅ **Do:**
+- Test with realistic code samples
+- Use descriptive test names
+- Test both success and error paths
+- Clean up temp directories
+- Mock external dependencies
 
-### Don't:
-- ❌ Test private methods directly
-- ❌ Make real network requests in unit tests
-- ❌ Share state between tests
-- ❌ Hardcode file paths or rely on specific directory structures
-- ❌ Ignore flaky tests - fix them immediately
-- ❌ Test implementation details over behavior
+❌ **Don't:**
+- Test private methods directly
+- Share state between tests
+- Ignore flaky tests
+- Hardcode file paths
+- Test implementation over behavior
 
-### Debugging Test Failures
-
-```bash
-# Run specific test with verbose output
-bun test --grep "should extract functions" --verbose
-
-# Run tests in watch mode during development
-bun test --watch
-
-# Debug with inspector
-bun test --inspect-wait --grep "failing test"
-
-# Run only integration tests
-bun test --grep "integration"
-```
-
-This testing strategy ensures DEX remains reliable, maintainable, and trustworthy for both developers and AI agents consuming its output.
+Keep tests focused, fast, and reliable. Every feature needs tests before merging.
