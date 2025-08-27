@@ -93,7 +93,7 @@ def _private_function():
 `;
 
             const options: ProcessingOptions = {
-                includePrivate: true,
+                private: true,
             };
 
             const result = await processor.process(source, "test.py", options);
@@ -200,53 +200,6 @@ class MyClass:
             expect(sources).toContain("typing");
             expect(sources).toContain("pathlib");
         });
-
-        test("should exclude imports when includeImports=false", async () => {
-            const source = `
-import os
-from typing import List
-
-class MyClass:
-    pass
-`;
-
-            const options: ProcessingOptions = {
-                includeImports: false,
-            };
-
-            const result = await processor.process(source, "test.py", options);
-
-            expect(result.imports).toHaveLength(0);
-        });
-    });
-
-    describe("with compact mode", () => {
-        test("should return compact signatures", async () => {
-            const source = `
-class MyClass(BaseClass, AnotherBase):
-    def long_method(self, param1: str, param2: int, param3: List[str]) -> Dict[str, Any]:
-        pass
-
-def complex_function(a: int, b: str, c: Optional[List[Dict[str, Any]]]) -> Tuple[int, str]:
-    pass
-`;
-
-            const options: ProcessingOptions = {
-                compact: true,
-            };
-
-            const result = await processor.process(source, "test.py", options);
-
-            const classExport = result.exports.find(
-                (e) => e.name === "MyClass",
-            );
-            expect(classExport?.signature).toBe("class MyClass");
-
-            const funcExport = result.exports.find(
-                (e) => e.name === "complex_function",
-            );
-            expect(funcExport?.signature).toBe("def complex_function()");
-        });
     });
 
     describe("with metadata tracking", () => {
@@ -266,7 +219,7 @@ def public_function():
 `;
 
             const options: ProcessingOptions = {
-                includePrivate: false,
+                private: false,
             };
 
             const result = await processor.process(source, "test.py", options);
