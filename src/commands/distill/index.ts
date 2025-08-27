@@ -63,9 +63,8 @@ export function createDistillCommand(): Command {
         )
         .option("-s, --staged", "Only process staged files")
         .option(
-            "--batch-size <number>",
-            "Number of files to process in parallel (1-100, default: 10)",
-            "10",
+            "--workers <number>",
+            "Number of worker threads (0-1=sequential, 2-8=parallel, default=4)",
         )
         .action((...args: any[]) => {
             const targetPath = typeof args[0] === "string" ? args[0] : ".";
@@ -118,7 +117,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             private: options.private === "1",
             dryRun: options.dryRun,
             select: options.select,
-            batchSize: parseInt(options.batchSize || "10", 10),
+            workers: options.workers !== undefined ? parseInt(options.workers, 10) : undefined,
         };
 
         // Handle file selection if requested

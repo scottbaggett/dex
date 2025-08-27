@@ -108,7 +108,6 @@ export const DistillOptionsSchema = z.object({
     output: z.string().optional(),
     since: z.string().optional(),
     staged: z.boolean().optional(),
-    parallel: z.boolean().optional(),
     dryRun: z.boolean().optional(),
     clipboard: z.boolean().optional(),
     stdout: z.boolean().optional(),
@@ -119,6 +118,7 @@ export const DistillOptionsSchema = z.object({
     internal: z.boolean().optional(),
     exclude: z.array(z.string()).optional().default([]),
     include: z.array(z.string()).optional().default([]),
+    workers: z.number().min(1).max(16).optional(),
 });
 export type DistillOptions = z.infer<typeof DistillOptionsSchema>;
 

@@ -16,6 +16,9 @@ import { globby } from "globby";
 import { createHash } from "crypto";
 import { ProgressBar } from "../../utils/progress.js";
 import { getDistillExcludes } from "../../utils/default-excludes.js";
+import { Piscina } from "piscina";
+import { fileURLToPath } from "url";
+import { resolve } from "path";
 
 /**
  * Core distillation engine that extracts and compresses API signatures from source code.
@@ -29,17 +32,57 @@ export class Distiller {
     private formatters = getFormatterRegistry();
     private options: DistillerOptions;
     private progress?: ProgressBar;
+    private workerPool?: Piscina;
 
     constructor(options: Partial<DistillerOptions> = {}) {
         this.options = {
             docstrings: true,
             comments: false,
             format: "txt",
-            parallel: true,
+            workers: 4, // Sweet spot: 4 workers balances parallelism with overhead
             exclude: [],
             include: [],
             ...options,
         } as DistillerOptions;
+        
+        // Initialize worker pool if using parallel processing
+        if (this.options.workers && this.options.workers > 1) {
+            this.initializeWorkerPool();
+        }
+    }
+    
+    /**
+     * Initializes the worker thread pool for parallel processing.
+     * Creates a Piscina pool with the specified number of worker threads.
+     * @private
+     */
+    private initializeWorkerPool(): void {
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+        const workerPath = resolve(__dirname, "process-file.worker.js");
+        
+        this.workerPool = new Piscina({
+            filename: workerPath,
+            maxThreads: this.options.workers,
+            // Ensure we have enough queue depth for large projects
+            maxQueue: 1000,
+        });
+        
+        if (process.env.DEBUG) {
+            console.log(`Initialized worker pool with ${this.options.workers} threads`);
+        }
+    }
+    
+    /**
+     * Cleans up the worker pool when done.
+     * Should be called when distillation is complete.
+     * @private
+     */
+    private async cleanup(): Promise<void> {
+        if (this.workerPool) {
+            await this.workerPool.destroy();
+            this.workerPool = undefined;
+        }
     }
 
     /**
@@ -63,11 +106,15 @@ export class Distiller {
         targetPath: string,
         progress?: ProgressBar,
     ): Promise<DistillationResult> {
-        const filesToDistill = await this.getFilesToProcess(targetPath);
-        const stats = await fs.stat(targetPath);
-        const basePath = stats.isFile() ? dirname(targetPath) : targetPath;
+        try {
+            const filesToDistill = await this.getFilesToProcess(targetPath);
+            const stats = await fs.stat(targetPath);
+            const basePath = stats.isFile() ? dirname(targetPath) : targetPath;
 
-        return this.distillSelectedFiles(filesToDistill, basePath, progress);
+            return await this.distillSelectedFiles(filesToDistill, basePath, progress);
+        } finally {
+            await this.cleanup();
+        }
     }
 
     /**
@@ -94,9 +141,6 @@ export class Distiller {
         progress?: ProgressBar,
     ): Promise<DistillationResult> {
         this.progress = progress;
-
-        // Initialize language modules
-        await this.registry.initializeAll();
 
         if (this.progress) {
             this.progress.start(selectedFiles.length);
@@ -143,12 +187,13 @@ export class Distiller {
         };
     }
 
+
     /**
      * Core processing method that distills files into API signatures.
      *
      * This method orchestrates the actual distillation process:
      * 1. Loads file content (if needed)
-     * 2. Detects language and selects appropriate processor
+     * 2. Processes files using worker threads for true parallelism
      * 3. Extracts API signatures using language-specific processors
      * 4. Calculates token metrics and compression ratios
      * 5. Updates progress bar throughout the process
@@ -189,107 +234,155 @@ export class Distiller {
                   )
                 : (files as CompressedFile[]);
 
+        // Initialize language modules if not using workers (sequential mode)
+        if (!this.workerPool) {
+            await this.registry.initializeAll();
+        }
+
+        // Prepare processing options
+        const processingOptions: ProcessingOptions = {
+            comments: this.options.comments,
+            docstrings: this.options.docstrings,
+            public: this.options.public !== false, // Default true
+            private: this.options.private === true, // Default false
+            protected: this.options.protected !== false, // Default true
+            internal: this.options.internal !== false, // Default true
+            include: undefined, // Not used for name filtering at processor level
+            exclude: undefined, // Not used for name filtering at processor level
+        };
+
         let processedCount = 0;
         let cumulativeOriginalSize = 0;
         let cumulativeDistilledSize = 0;
 
-        for (const file of filesToProcess) {
-            const language = file.language || detectLanguage(file.path);
-            if (!language || !this.registry.isFileSupported(file.path)) {
-                processedCount++;
-                // Update progress even for unsupported files
-                if (this.progress) {
-                    this.progress.update(
-                        processedCount,
-                        cumulativeOriginalSize,
-                        cumulativeDistilledSize,
-                    );
+        // Process file using worker pool or direct processing
+        const processFileAsync = async (file: CompressedFile) => {
+            let result;
+            
+            if (this.workerPool) {
+                // Use worker thread for true parallelism
+                try {
+                    result = await this.workerPool.run({
+                        filePath: file.path,
+                        content: file.content,
+                        processingOptions,
+                    });
+                } catch (error) {
+                    if (process.env.DEBUG) {
+                        console.warn(`Worker failed for ${file.path}:`, error);
+                    }
+                    // Fallback result on worker error
+                    const language = detectLanguage(file.path);
+                    result = { 
+                        api: null, 
+                        dependencies: null, 
+                        originalTokens: countTokens(file.content), 
+                        language 
+                    };
                 }
-                continue;
-            }
+            } else {
+                // Sequential processing without workers
+                const language = file.language || detectLanguage(file.path);
+                
+                if (!language || !this.registry.isFileSupported(file.path)) {
+                    result = { api: null, dependencies: null, originalTokens: 0, language: null };
+                } else {
+                    const origTokens = countTokens(file.content);
+                    try {
+                        const processResult = await this.registry.processFile(
+                            file.path,
+                            file.content,
+                            processingOptions,
+                        );
 
-            // Update structure
-            const dir = file.path.split("/").slice(0, -1).join("/");
-            if (dir) directoriesSet.add(dir);
-            structure.fileCount++;
-            structure.languages[language] =
-                (structure.languages[language] || 0) + 1;
+                        // Convert to ExtractedAPI format
+                        const extracted: ExtractedAPI = {
+                            file: file.path,
+                            imports: processResult.imports.map((i: any) => i.source),
+                            exports: processResult.exports.map((e: any) => ({
+                                name: e.name,
+                                type: this.mapExportKind(e.kind),
+                                signature: e.signature,
+                                visibility: e.visibility || "public",
+                                location: {
+                                    startLine: e.line || 0,
+                                    endLine: e.line || 0,
+                                },
+                                members: e.members?.map((m: any) => ({
+                                    name: m.name,
+                                    signature: m.signature,
+                                    type:
+                                        m.kind === "constructor" ||
+                                        m.kind === "getter" ||
+                                        m.kind === "setter"
+                                            ? "method"
+                                            : (m.kind as "property" | "method"),
+                                })),
+                            })),
+                        };
 
-            // Calculate tokens
-            originalTokens += countTokens(file.content);
-            cumulativeOriginalSize += file.size;
+                        const deps = {
+                            imports: processResult.imports.map((i: any) => i.source),
+                            exports: processResult.exports.map((e: any) => e.name),
+                        };
 
-            try {
-                // Process with language registry
-                const processingOptions: ProcessingOptions = {
-                    comments: this.options.comments,
-                    docstrings: this.options.docstrings,
-                    public: this.options.public !== false, // Default true
-                    private: this.options.private === true, // Default false
-                    protected: this.options.protected !== false, // Default true
-                    internal: this.options.internal !== false, // Default true
-                    include: undefined, // Not used for name filtering at processor level
-                    exclude: undefined, // Not used for name filtering at processor level
-                };
-
-                const result = await this.registry.processFile(
-                    file.path,
-                    file.content,
-                    processingOptions,
-                );
-
-                // Convert to ExtractedAPI format
-                const extracted: ExtractedAPI = {
-                    file: file.path,
-                    imports: result.imports.map((i: any) => i.source),
-                    exports: result.exports.map((e: any) => ({
-                        name: e.name,
-                        type: this.mapExportKind(e.kind),
-                        signature: e.signature,
-                        visibility: e.visibility || "public",
-                        location: {
-                            startLine: e.line || 0,
-                            endLine: e.line || 0,
-                        },
-                        members: e.members?.map((m: any) => ({
-                            name: m.name,
-                            signature: m.signature,
-                            type:
-                                m.kind === "constructor" ||
-                                m.kind === "getter" ||
-                                m.kind === "setter"
-                                    ? "method"
-                                    : (m.kind as "property" | "method"),
-                        })),
-                    })),
-                };
-
-                apis.push(extracted);
-
-                // We'll calculate distilled tokens from the final formatted output
-                // since different formatters produce different sizes
-                cumulativeDistilledSize += file.content.length;
-
-                // Extract dependencies (imports/exports)
-                dependencies[file.path] = {
-                    imports: result.imports.map((i: any) => i.source),
-                    exports: result.exports.map((e: any) => e.name),
-                };
-            } catch (error) {
-                // Silently continue with other files
-                if (process.env.DEBUG) {
-                    console.warn(`Failed to distill ${file.path}:`, error);
+                        result = { api: extracted, dependencies: deps, originalTokens: origTokens, language };
+                    } catch (error) {
+                        if (process.env.DEBUG) {
+                            console.warn(`Failed to distill ${file.path}:`, error);
+                        }
+                        result = { api: null, dependencies: null, originalTokens: origTokens, language };
+                    }
                 }
             }
-
-            // Update progress
+            
+            // Update counters
             processedCount++;
+            cumulativeOriginalSize += file.size;
+            
+            // Update structure for all files (even failed ones)
+            if (result.language) {
+                const dir = file.path.split("/").slice(0, -1).join("/");
+                if (dir) directoriesSet.add(dir);
+                structure.fileCount++;
+                structure.languages[result.language] =
+                    (structure.languages[result.language] || 0) + 1;
+            }
+
+            // Add to results if processing succeeded
+            if (result.api) {
+                apis.push(result.api);
+                cumulativeDistilledSize += file.content.length;
+                originalTokens += result.originalTokens;
+                
+                if (result.dependencies) {
+                    dependencies[file.path] = result.dependencies;
+                }
+            }
+            
+            // Update progress
             if (this.progress) {
                 this.progress.update(
                     processedCount,
                     cumulativeOriginalSize,
                     cumulativeDistilledSize,
                 );
+            }
+            
+            return result;
+        };
+        
+        // Process all files
+        if (this.workerPool) {
+            // Parallel processing with worker threads
+            // Piscina handles the queue and concurrency internally
+            await Promise.all(
+                filesToProcess.map(file => processFileAsync(file))
+            );
+        } else {
+            // Sequential processing
+            for (const file of filesToProcess) {
+                await processFileAsync(file);
             }
         }
 

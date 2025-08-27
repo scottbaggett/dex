@@ -85,7 +85,7 @@ dex distill . --stdout                 # Print to stdout
 ```
 
 Key options:
-- -f, --format <type>: txt | markdown | json (default: markdown)
+- -f, --format <type>: txt | markdown | json (default: txt)
 - -o, --output <file>: Write to a specific file
 - -c, --clipboard: Copy output to clipboard
 - --stdout: Print to stdout
@@ -95,7 +95,7 @@ Key options:
 - --comments <0|1>: Include comments (default: 0)
 - --docstrings <0|1>: Include docstrings (default: 1)
 - --private <0|1>: Include private members (default: 0)
-- --no-parallel: Disable parallel processing
+- --workers <number>: Number of parallel worker threads (default: 4, optimal: 2-8)
 - --dry-run: Preview what would be processed
 - --since <ref>: Only process files changed since git ref
 - --staged: Only process staged files
@@ -211,6 +211,28 @@ node dist/cli/dex.js [command] [options]
 ```
 
 DEX saves outputs to `.dex/` with descriptive, timestamped filenames. Use `--clipboard`, `--stdout` (where available), or `--output <file>` to override.
+
+## Performance & Parallel Processing
+
+DEX uses worker threads for true CPU parallelism when processing large codebases:
+
+```bash
+# Default: 4 worker threads (optimal for most systems)
+dex distill .
+
+# Sequential processing for small projects
+dex distill . --workers 1
+
+# More workers for large codebases (diminishing returns beyond 8)
+dex distill . --workers 8
+```
+
+**Performance Notes:**
+- **Sweet spot**: 4 workers balances speed with overhead
+- **Small projects** (<100 files): Use 1-2 workers to avoid overhead
+- **Large projects** (1000+ files): Use 4-8 workers for best performance
+- **Memory-intensive**: Each worker uses ~50-100MB RAM
+- **CPU architecture matters**: More workers ≠ always faster due to memory bandwidth limits
 
 ## Requirements
 

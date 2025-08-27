@@ -105,7 +105,6 @@ export async function treeCommand(
             internal: options.internal ?? true,
             protected: options.protected ?? true,
             format: "txt",
-            parallel: true,
         };
 
         // Create progress bar
