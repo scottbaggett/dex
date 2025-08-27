@@ -31,9 +31,7 @@ export function createDistillCommand(): Command {
             "[path]",
             "Path to directory or file to distill (defaults to current directory)",
         )
-
-        .option("-f, --format <type>", "Output format (text, md, json)", "txt")
-
+        .option("-f, --format <type>", "Output format (txt, md, json)", "txt")
         .option("-o, --output <file>", "Write output to specific file")
         .option("-c, --clipboard", "Copy output to clipboard")
         .option("--stdout", "Print output to stdout")
@@ -41,6 +39,12 @@ export function createDistillCommand(): Command {
         .option("--comments <value>", "Include comments (0 or 1)", "0")
         .option("--docstrings <value>", "Include docstrings (0 or 1)", "1")
         .option("--private <value>", "Include private members (0 or 1)", "0")
+        .option(
+            "--protected <value>",
+            "Include protected members (0 or 1)",
+            "0",
+        )
+        .option("--internal <value>", "Include internal members (0 or 1)", "0")
         .option(
             "--exclude <patterns...>",
             "Exclude file patterns",
@@ -53,13 +57,16 @@ export function createDistillCommand(): Command {
             collectPatterns,
             [],
         )
-        .option("--no-parallel", "Disable parallel processing")
         .option(
             "--dry-run",
             "Show what files would be processed without running distillation",
         )
-        .option("--since <ref>", "Only process files changed since git ref")
-        .option("--staged", "Only process staged files")
+        .option("-s, --staged", "Only process staged files")
+        .option(
+            "--batch-size <number>",
+            "Number of files to process in parallel (1-100, default: 10)",
+            "10",
+        )
         .action((...args: any[]) => {
             const targetPath = typeof args[0] === "string" ? args[0] : ".";
             const cmdObject = args[args.length - 1];
@@ -111,6 +118,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             private: options.private === "1",
             dryRun: options.dryRun,
             select: options.select,
+            batchSize: parseInt(options.batchSize || "10", 10),
         };
 
         // Handle file selection if requested

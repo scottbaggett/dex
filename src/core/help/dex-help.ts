@@ -42,7 +42,10 @@ export class DexHelpFormatter extends Help {
             "  dex distill .     Distill entire repo → .dex/dex.distill.{path}.txt",
         );
         lines.push(
-            "  dex combine a/ b/ Combine files → .dex/dex.combine.{context}.txt\n",
+            "  dex combine a/ b/ Combine files → .dex/dex.combine.{context}.txt",
+        );
+        lines.push(
+            "  dex tree         Visual tree for your codebase → .dex/dex.tree.txt\n",
         );
 
         // Core Options (hand-picked)
@@ -51,19 +54,15 @@ export class DexHelpFormatter extends Help {
         lines.push("  -a, --all                  staged + unstaged");
         lines.push("  -f, --format <fmt>         md|json|txt");
         lines.push("  -c, --clipboard            copy to clipboard");
-        lines.push(
-            "      --full <pattern>       include full files matching pattern",
-        );
         lines.push("      --select               interactive file picker");
         lines.push("      --sort-by <opt>        name|updated|size|status");
         lines.push("      --sort-order <ord>     asc|desc");
-        lines.push(
-            "      --filter-by <opt>      all|staged|unstaged|untracked",
-        );
-        lines.push("      --task <src>           description / file / URL\n");
 
         // Sub commands
         lines.push(chalk.yellow("COMMANDS"));
+        lines.push(
+            "  extract     (default) Create a combined document of changes for analysis",
+        );
         lines.push("  combine     Combine multiple files into one document");
         lines.push("  distill     Compress entire codebase");
         lines.push("  tree        Visual tree for your codebase\n");
