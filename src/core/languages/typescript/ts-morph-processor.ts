@@ -43,8 +43,8 @@ export class TsMorphProcessor {
         const imports: ImportNode[] = [];
         const skipped: SkippedItem[] = [];
 
-        // Process imports
-        if (options.includeImports !== false) {
+        // Process imports - always include them for context
+        {
             sourceFile.getImportDeclarations().forEach((importDecl) => {
                 const moduleSpecifier = importDecl.getModuleSpecifierValue();
                 const namedImports = importDecl.getNamedImports();
@@ -237,24 +237,20 @@ export class TsMorphProcessor {
 
         signature += name;
 
-        if (!options.compact) {
-            const params = func
-                .getParameters()
-                .map((p: any) => {
-                    const paramName = p.getName();
-                    const type = p.getType().getText();
-                    const isOptional = p.isOptional();
-                    return `${paramName}${isOptional ? "?" : ""}: ${type}`;
-                })
-                .join(", ");
+        const params = func
+            .getParameters()
+            .map((p: any) => {
+                const paramName = p.getName();
+                const type = p.getType().getText();
+                const isOptional = p.isOptional();
+                return `${paramName}${isOptional ? "?" : ""}: ${type}`;
+            })
+            .join(", ");
 
-            const returnType = func.getReturnType().getText();
-            signature += `(${params}): ${returnType}`;
-        } else {
-            signature += "()";
-        }
+        const returnType = func.getReturnType().getText();
+        signature += `(${params}): ${returnType}`;
 
-        const docstring = options.includeDocstrings
+        const docstring = options.docstrings
             ? this.extractDocstring(func)
             : undefined;
 
@@ -283,19 +279,15 @@ export class TsMorphProcessor {
         const baseClass = cls.getExtends();
         const _implements = cls.getImplements();
 
-        if (!options.compact) {
-            if (baseClass) {
-                signature += ` extends ${baseClass.getText()}`;
-            }
-            if (_implements.length > 0) {
-                signature += ` _implements ${_implements.map((i: any) => i.getText()).join(", ")}`;
-            }
+        if (baseClass) {
+            signature += ` extends ${baseClass.getText()}`;
+        }
+        if (_implements.length > 0) {
+            signature += ` implements ${_implements.map((i: any) => i.getText()).join(", ")}`;
         }
 
-        const members = options.compact
-            ? undefined
-            : this.extractClassMembers(cls, options);
-        const docstring = options.includeDocstrings
+        const members = this.extractClassMembers(cls, options);
+        const docstring = options.docstrings
             ? this.extractDocstring(cls)
             : undefined;
 
@@ -320,14 +312,12 @@ export class TsMorphProcessor {
         let signature = `interface ${name}`;
 
         const baseInterfaces = iface.getExtends();
-        if (!options.compact && baseInterfaces.length > 0) {
+        if (baseInterfaces.length > 0) {
             signature += ` extends ${baseInterfaces.map((b: any) => b.getText()).join(", ")}`;
         }
 
-        const members = options.compact
-            ? undefined
-            : this.extractInterfaceMembers(iface, options);
-        const docstring = options.includeDocstrings
+        const members = this.extractInterfaceMembers(iface, options);
+        const docstring = options.docstrings
             ? this.extractDocstring(iface)
             : undefined;
 
@@ -351,15 +341,13 @@ export class TsMorphProcessor {
 
         let signature = `type ${name}`;
 
-        if (!options.compact) {
-            const typeParams = typeAlias.getTypeParameters();
-            if (typeParams.length > 0) {
-                signature += `<${typeParams.map((t: any) => t.getName()).join(", ")}>`;
-            }
-            signature += ` = ${typeAlias.getType().getText()}`;
+        const typeParams = typeAlias.getTypeParameters();
+        if (typeParams.length > 0) {
+            signature += `<${typeParams.map((t: any) => t.getName()).join(", ")}>`;
         }
+        signature += ` = ${typeAlias.getType().getText()}`;
 
-        const docstring = options.includeDocstrings
+        const docstring = options.docstrings
             ? this.extractDocstring(typeAlias)
             : undefined;
 
@@ -385,7 +373,7 @@ export class TsMorphProcessor {
         if (isConst) signature += "const ";
         signature += `enum ${name}`;
 
-        const docstring = options.includeDocstrings
+        const docstring = options.docstrings
             ? this.extractDocstring(enumDecl)
             : undefined;
 
@@ -411,14 +399,12 @@ export class TsMorphProcessor {
         let signature = isConst ? "const " : "let ";
         signature += name;
 
-        if (!options.compact) {
-            const type = varDecl.getType().getText();
-            signature += `: ${type}`;
+        const type = varDecl.getType().getText();
+        signature += `: ${type}`;
 
-            const initializer = varDecl.getInitializer();
-            if (initializer) {
-                signature += ` = ${initializer.getText()}`;
-            }
+        const initializer = varDecl.getInitializer();
+        if (initializer) {
+            signature += ` = ${initializer.getText()}`;
         }
 
         return {
@@ -438,11 +424,14 @@ export class TsMorphProcessor {
 
         // Extract properties
         cls.getProperties().forEach((prop: any) => {
-            if (
-                !options.includePrivate &&
-                prop.hasModifier(SyntaxKind.PrivateKeyword)
-            )
-                return;
+            // Check visibility modifiers
+            const isPrivate = prop.hasModifier(SyntaxKind.PrivateKeyword);
+            const isProtected = prop.hasModifier(SyntaxKind.ProtectedKeyword);
+            const isPublic = !isPrivate && !isProtected;
+            
+            if (isPrivate && !options.private) return;
+            if (isProtected && !options.protected) return;
+            if (isPublic && options.public === false) return;
 
             const name = prop.getName();
             const isStatic = prop.isStatic();
@@ -453,26 +442,28 @@ export class TsMorphProcessor {
             if (isReadonly) signature += "readonly ";
             signature += name;
 
-            if (!options.compact) {
-                const type = prop.getType().getText();
-                signature += `: ${type}`;
-            }
+            const type = prop.getType().getText();
+            signature += `: ${type}`;
 
             members.push({
                 name,
                 kind: "property",
                 signature,
-                isPrivate: prop.hasModifier(SyntaxKind.PrivateKeyword),
+                isPrivate,
+                isProtected,
             });
         });
 
         // Extract methods
         cls.getMethods().forEach((method: any) => {
-            if (
-                !options.includePrivate &&
-                method.hasModifier(SyntaxKind.PrivateKeyword)
-            )
-                return;
+            // Check visibility modifiers
+            const isPrivate = method.hasModifier(SyntaxKind.PrivateKeyword);
+            const isProtected = method.hasModifier(SyntaxKind.ProtectedKeyword);
+            const isPublic = !isPrivate && !isProtected;
+            
+            if (isPrivate && !options.private) return;
+            if (isProtected && !options.protected) return;
+            if (isPublic && options.public === false) return;
 
             const name = method.getName();
             const isStatic = method.isStatic();
@@ -483,86 +474,83 @@ export class TsMorphProcessor {
             if (isAsync) signature += "async ";
             signature += name;
 
-            if (!options.compact) {
-                const params = method
-                    .getParameters()
-                    .map((p: any) => {
-                        const paramName = p.getName();
-                        const type = p.getType().getText();
-                        const isOptional = p.isOptional();
-                        return `${paramName}${isOptional ? "?" : ""}: ${type}`;
-                    })
-                    .join(", ");
+            const params = method
+                .getParameters()
+                .map((p: any) => {
+                    const paramName = p.getName();
+                    const type = p.getType().getText();
+                    const isOptional = p.isOptional();
+                    return `${paramName}${isOptional ? "?" : ""}: ${type}`;
+                })
+                .join(", ");
 
-                const returnType = method.getReturnType().getText();
-                signature += `(${params}): ${returnType}`;
-            } else {
-                signature += "()";
-            }
+            const returnType = method.getReturnType().getText();
+            signature += `(${params}): ${returnType}`;
 
             members.push({
                 name,
                 kind: name === "constructor" ? "constructor" : "method",
                 signature,
-                isPrivate: method.hasModifier(SyntaxKind.PrivateKeyword),
+                isPrivate,
+                isProtected,
             });
         });
 
         // Extract getters and setters
         cls.getGetAccessors().forEach((getter: any) => {
-            if (
-                !options.includePrivate &&
-                getter.hasModifier(SyntaxKind.PrivateKeyword)
-            )
-                return;
+            // Check visibility modifiers
+            const isPrivate = getter.hasModifier(SyntaxKind.PrivateKeyword);
+            const isProtected = getter.hasModifier(SyntaxKind.ProtectedKeyword);
+            const isPublic = !isPrivate && !isProtected;
+            
+            if (isPrivate && !options.private) return;
+            if (isProtected && !options.protected) return;
+            if (isPublic && options.public === false) return;
 
             const name = getter.getName();
             let signature = `get ${name}`;
 
-            if (!options.compact) {
-                const returnType = getter.getReturnType().getText();
-                signature += `(): ${returnType}`;
-            } else {
-                signature += "()";
-            }
+            const returnType = getter.getReturnType().getText();
+            signature += `(): ${returnType}`;
 
             members.push({
                 name,
                 kind: "getter",
                 signature,
-                isPrivate: getter.hasModifier(SyntaxKind.PrivateKeyword),
+                isPrivate,
+                isProtected,
             });
         });
 
         cls.getSetAccessors().forEach((setter: any) => {
-            if (
-                !options.includePrivate &&
-                setter.hasModifier(SyntaxKind.PrivateKeyword)
-            )
-                return;
+            // Check visibility modifiers
+            const isPrivate = setter.hasModifier(SyntaxKind.PrivateKeyword);
+            const isProtected = setter.hasModifier(SyntaxKind.ProtectedKeyword);
+            const isPublic = !isPrivate && !isProtected;
+            
+            if (isPrivate && !options.private) return;
+            if (isProtected && !options.protected) return;
+            if (isPublic && options.public === false) return;
 
             const name = setter.getName();
             let signature = `set ${name}`;
 
-            if (!options.compact) {
-                const params = setter
-                    .getParameters()
-                    .map((p: any) => {
-                        const paramName = p.getName();
-                        const type = p.getType().getText();
-                        return `${paramName}: ${type}`;
-                    })
-                    .join(", ");
-                signature += `(${params})`;
-            } else {
-                signature += "()";
-            }
+            const params = setter
+                .getParameters()
+                .map((p: any) => {
+                    const paramName = p.getName();
+                    const type = p.getType().getText();
+                    return `${paramName}: ${type}`;
+                })
+                .join(", ");
+            signature += `(${params})`;
 
             members.push({
                 name,
                 kind: "setter",
                 signature,
-                isPrivate: setter.hasModifier(SyntaxKind.PrivateKeyword),
+                isPrivate,
+                isProtected,
             });
         });
 
@@ -583,10 +571,8 @@ export class TsMorphProcessor {
             let signature = name;
             if (isOptional) signature += "?";
 
-            if (!options.compact) {
-                const type = prop.getType().getText();
-                signature += `: ${type}`;
-            }
+            const type = prop.getType().getText();
+            signature += `: ${type}`;
 
             members.push({
                 name,
@@ -601,22 +587,18 @@ export class TsMorphProcessor {
 
             let signature = name;
 
-            if (!options.compact) {
-                const params = method
-                    .getParameters()
-                    .map((p: any) => {
-                        const paramName = p.getName();
-                        const type = p.getType().getText();
-                        const isOptional = p.isOptional();
-                        return `${paramName}${isOptional ? "?" : ""}: ${type}`;
-                    })
-                    .join(", ");
+            const params = method
+                .getParameters()
+                .map((p: any) => {
+                    const paramName = p.getName();
+                    const type = p.getType().getText();
+                    const isOptional = p.isOptional();
+                    return `${paramName}${isOptional ? "?" : ""}: ${type}`;
+                })
+                .join(", ");
 
-                const returnType = method.getReturnType().getText();
-                signature += `(${params}): ${returnType}`;
-            } else {
-                signature += "()";
-            }
+            const returnType = method.getReturnType().getText();
+            signature += `(${params}): ${returnType}`;
 
             members.push({
                 name,
@@ -641,16 +623,16 @@ export class TsMorphProcessor {
         options: ProcessingOptions,
     ): boolean {
         // Check patterns
-        if (options.excludePatterns) {
-            for (const pattern of options.excludePatterns) {
+        if (options.exclude) {
+            for (const pattern of options.exclude) {
                 if (this.matchesPattern(node.name, pattern)) {
                     return false;
                 }
             }
         }
 
-        if (options.includePatterns && options.includePatterns.length > 0) {
-            return options.includePatterns.some((pattern) =>
+        if (options.include && options.include.length > 0) {
+            return options.include.some((pattern) =>
                 this.matchesPattern(node.name, pattern),
             );
         }
@@ -662,16 +644,16 @@ export class TsMorphProcessor {
         node: ExportNode,
         options: ProcessingOptions,
     ): "private" | "pattern" | "depth" | "comment" {
-        if (options.excludePatterns) {
-            for (const pattern of options.excludePatterns) {
+        if (options.exclude) {
+            for (const pattern of options.exclude) {
                 if (this.matchesPattern(node.name, pattern)) {
                     return "pattern";
                 }
             }
         }
 
-        if (options.includePatterns && options.includePatterns.length > 0) {
-            const matches = options.includePatterns.some((pattern) =>
+        if (options.include && options.include.length > 0) {
+            const matches = options.include.some((pattern) =>
                 this.matchesPattern(node.name, pattern),
             );
             if (!matches) return "pattern";

@@ -3,54 +3,56 @@
  * Each language defines its own parser type and processing strategy
  */
 
-export type ParserType = 'tree-sitter' | 'line-based' | 'regex' | 'custom';
+import { PrivateIdentifier } from "ts-morph";
+
+export type ParserType = "tree-sitter" | "line-based" | "regex" | "custom";
 
 /**
  * Processing options from CLI/user
  */
 export interface ProcessingOptions {
     // Output control
-    includePrivate?: boolean;      // Include private members
-    includeComments?: boolean;      // Include comment nodes
-    includeDocstrings?: boolean;    // Include documentation
-    includeImports?: boolean;       // Include import statements
-    
+    comments?: boolean; // Include comment nodes
+    docstrings?: boolean; // Include documentation
+    public?: boolean; // Include public members
+    private?: boolean; // Include private members
+    protected?: boolean; // Include protected members
+    internal?: boolean; // Include internal members
+
     // Depth control
-    depth?: 'public' | 'protected' | 'all';  // API surface depth
-    maxDepth?: number;              // Maximum nesting depth
-    
+    maxDepth?: number; // Maximum nesting depth
+
     // Filtering
-    includePatterns?: string[];     // Include only matching names
-    excludePatterns?: string[];     // Exclude matching names
-    
+    include?: string[]; // Include only matching names
+    exclude?: string[]; // Exclude matching names
+
     // Output format hints
-    compact?: boolean;              // Compact output mode
-    preserveOrder?: boolean;        // Maintain source order
-    
+    preserveOrder?: boolean; // Maintain source order
+
     // Performance
-    maxFileSize?: number;           // Skip files larger than this
-    timeout?: number;               // Processing timeout in ms
+    maxFileSize?: number; // Skip files larger than this
+    timeout?: number; // Processing timeout in ms
 }
 
 export interface LanguageModule {
-    name: string;                    // 'typescript', 'python', etc.
-    displayName: string;             // 'TypeScript', 'Python', etc.
-    extensions: string[];            // ['.ts', '.tsx', '.js', '.jsx']
-    
+    name: string; // 'typescript', 'python', etc.
+    displayName: string; // 'TypeScript', 'Python', etc.
+    extensions: string[]; // ['.ts', '.tsx', '.js', '.jsx']
+
     // Lifecycle
     initialize(): Promise<void>;
     isInitialized(): boolean;
-    
+
     // Processing - MUST respect options
     process(
-        source: string, 
+        source: string,
         filePath: string,
-        options: ProcessingOptions
+        options: ProcessingOptions,
     ): Promise<ProcessResult>;
-    
+
     // Capabilities
     getCapabilities(): LanguageCapabilities;
-    
+
     // Validation
     canProcess(filePath: string): boolean;
     supportsExtension(ext: string): boolean;
@@ -65,7 +67,6 @@ export interface LanguageCapabilities {
     maxRecommendedFileSize?: number;
 }
 
-
 export interface ProcessResult {
     imports: ImportNode[];
     exports: ExportNode[];
@@ -73,14 +74,14 @@ export interface ProcessResult {
     metadata?: {
         parseTime?: number;
         nodeCount?: number;
-        skipped?: SkippedItem[];    // What was filtered out
+        skipped?: SkippedItem[]; // What was filtered out
         languageVersion?: string;
     };
 }
 
 export interface SkippedItem {
     name: string;
-    reason: 'private' | 'pattern' | 'depth' | 'comment';
+    reason: "private" | "pattern" | "depth" | "comment";
     line?: number;
 }
 
@@ -88,7 +89,7 @@ export interface ImportNode {
     source: string;
     specifiers: ImportSpecifier[];
     line?: number;
-    raw?: string;  // Original import statement
+    raw?: string; // Original import statement
 }
 
 export interface ImportSpecifier {
@@ -102,35 +103,36 @@ export interface ExportNode {
     name: string;
     kind: ExportKind;
     signature: string;
-    visibility?: 'public' | 'private' | 'protected';
+    visibility?: "public" | "private" | "protected";
     members?: MemberNode[];
     line?: number;
-    depth?: number;                 // Nesting depth
+    depth?: number; // Nesting depth
     isDefault?: boolean;
     isExported?: boolean;
-    docstring?: string;             // If includeDocstrings is true
-    comment?: string;               // If includeComments is true
-    raw?: string;  // Original declaration
+    docstring?: string; // If includeDocstrings is true
+    comment?: string; // If includeComments is true
+    raw?: string; // Original declaration
 }
 
-export type ExportKind = 
-    | 'function'
-    | 'class' 
-    | 'interface'
-    | 'type'
-    | 'enum'
-    | 'const'
-    | 'let'
-    | 'var'
-    | 'namespace'
-    | 'module';
+export type ExportKind =
+    | "function"
+    | "class"
+    | "interface"
+    | "type"
+    | "enum"
+    | "const"
+    | "let"
+    | "var"
+    | "namespace"
+    | "module";
 
 export interface MemberNode {
     name: string;
-    kind: 'property' | 'method' | 'getter' | 'setter' | 'constructor';
+    kind: "property" | "method" | "getter" | "setter" | "constructor";
     signature: string;
     isStatic?: boolean;
     isPrivate?: boolean;
+    isProtected?: boolean;
     isOptional?: boolean;
 }
 
@@ -138,6 +140,5 @@ export interface ProcessError {
     message: string;
     line?: number;
     column?: number;
-    severity?: 'error' | 'warning' | 'info';
+    severity?: "error" | "warning" | "info";
 }
-

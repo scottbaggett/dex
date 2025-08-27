@@ -102,32 +102,27 @@ export type CombineOptions = z.infer<typeof CombineOptionsSchema>;
 
 export const DistillOptionsSchema = z.object({
     path: z.string().optional(),
-    excludePatterns: z.array(z.string()).optional(),
-    includeComments: z.boolean().optional(),
-    includeDocstrings: z.boolean().optional(),
-    includeImports: z.boolean().optional(),
+    comments: z.boolean().optional(),
+    docstrings: z.boolean().optional(),
     format: OutputFormatSchema.optional(),
     output: z.string().optional(),
     since: z.string().optional(),
     staged: z.boolean().optional(),
     parallel: z.boolean().optional(),
     dryRun: z.boolean().optional(),
-    includePrivate: z.boolean().optional(),
-    includePatterns: z.array(z.string()).optional(),
     clipboard: z.boolean().optional(),
     stdout: z.boolean().optional(),
     select: z.boolean().optional(),
-    comments: z.string().optional(),
-    docstrings: z.string().optional(),
-    private: z.string().optional(),
+    private: z.boolean().optional(),
+    public: z.boolean().optional(),
+    protected: z.boolean().optional(),
+    internal: z.boolean().optional(),
     exclude: z.array(z.string()).optional().default([]),
     include: z.array(z.string()).optional().default([]),
-    noParallel: z.boolean().optional(),
 });
 export type DistillOptions = z.infer<typeof DistillOptionsSchema>;
 
 export const TreeOptionsSchema = z.object({
-    format: z.enum(["tree", "outline", "json"]).optional().default("tree"),
     output: z.string().optional(),
     stdout: z.boolean().optional(),
     clipboard: z.boolean().optional(),

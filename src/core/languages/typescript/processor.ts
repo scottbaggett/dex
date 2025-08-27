@@ -12,14 +12,16 @@ export class TypeScriptProcessor {
 
     async initialize(): Promise<void> {
         try {
-            // Try to use ts-morph first (best API)
             this.tsMorphProcessor = new TsMorphProcessor();
         } catch {
             try {
-                // Fall back to TypeScript compiler API
+                console.warn(
+                    "ts-morph processor initialization failed, falling back to AST processor",
+                );
                 this.astProcessor = new TypeScriptASTProcessor();
             } catch {
                 // Both failed, will use line-based parsing
+                console.warn("Failed to initialize TypeScript processor");
             }
         }
     }
@@ -69,11 +71,8 @@ export class TypeScriptProcessor {
             const line = lines[i];
             const trimmed = line?.trim();
 
-            // Extract imports
-            if (
-                trimmed?.startsWith("import ") &&
-                options.includeImports !== false
-            ) {
+            // Extract imports - always include for context
+            if (trimmed?.startsWith("import ")) {
                 const match = trimmed.match(/from\s+['"](.+?)['"]/);
                 if (match) {
                     imports.push({

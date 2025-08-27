@@ -1,7 +1,5 @@
-// TODO: Refactor 'depth' and implement proper flags from config.
 import type {
     DistillerOptions,
-    CompressionResult,
     DistillationResult,
     CompressedFile,
     ExtractedAPI,
@@ -17,78 +15,79 @@ import { join, dirname, basename } from "path";
 import { globby } from "globby";
 import { createHash } from "crypto";
 import { ProgressBar } from "../../utils/progress.js";
+import { getDistillExcludes } from "../../utils/default-excludes.js";
 
+/**
+ * Core distillation engine that extracts and compresses API signatures from source code.
+ *
+ * The Distiller processes source files to extract their public API surface, removing
+ * implementation details while preserving type information and documentation.
+ * It supports multiple programming languages through pluggable processors.
+ */
 export class Distiller {
     private registry = getLanguageRegistry();
     private formatters = getFormatterRegistry();
     private options: DistillerOptions;
     private progress?: ProgressBar;
 
-    // TODO: Implement proper shared excludes from config.
-    private defaultExcludes = [
-        "node_modules/**",
-        ".git/**",
-        ".dex/**",
-        "dist/**",
-        "build/**",
-        "coverage/**",
-        "*.log",
-        ".DS_Store",
-        "thumbs.db",
-        "*.lock",
-        "package-lock.json",
-        ".env*",
-        "*.min.js",
-        "*.min.css",
-        "*.map",
-        "**/*.spec.ts",
-        "**/*.spec.js",
-        "**/*.test.ts",
-        "**/*.test.js",
-    ];
-
     constructor(options: Partial<DistillerOptions> = {}) {
         this.options = {
-            includeDocstrings: true,
-            includeComments: false,
+            docstrings: true,
+            comments: false,
             format: "txt",
             parallel: true,
             exclude: [],
             include: [],
             ...options,
         } as DistillerOptions;
-
-        // Registry is auto-initialized on import
     }
 
+    /**
+     * Distills a file or directory, extracting API signatures and type information.
+     *
+     * This is the main entry point for distillation. It discovers files based on
+     * the target path and configured patterns, then processes them.
+     *
+     * @param targetPath - Path to a file or directory to distill
+     * @param progress - Optional progress bar for tracking operation status
+     * @returns A DistillationResult containing extracted APIs, structure, and metadata
+     *
+     * @example
+     * ```typescript
+     * const distiller = new Distiller({ format: 'json' });
+     * const result = await distiller.distill('./src');
+     * console.log(`Processed ${result.apis.length} files`);
+     * ```
+     */
     async distill(
         targetPath: string,
         progress?: ProgressBar,
     ): Promise<DistillationResult> {
-        this.progress = progress;
-
-        // Initialize language modules
-        await this.registry.initializeAll();
-
-        // Get files to process
         const filesToDistill = await this.getFilesToProcess(targetPath);
-
-        if (this.progress) {
-            this.progress.start(filesToDistill.length);
-        }
-
         const stats = await fs.stat(targetPath);
         const basePath = stats.isFile() ? dirname(targetPath) : targetPath;
 
-        // Distill the files
-        const distillationResult = await this.distillFiles(
-            filesToDistill,
-            basePath,
-        );
-
-        return distillationResult;
+        return this.distillSelectedFiles(filesToDistill, basePath, progress);
     }
 
+    /**
+     * Distills a pre-selected list of files.
+     *
+     * This method is used when files have already been selected (e.g., from
+     * interactive mode or git staging). It skips the file discovery phase.
+     *
+     * @param selectedFiles - Array of relative file paths to process
+     * @param basePath - Base directory path for resolving file paths
+     * @param progress - Optional progress bar for tracking operation status
+     * @returns A DistillationResult containing extracted APIs, structure, and metadata
+     *
+     * @example
+     * ```typescript
+     * const distiller = new Distiller({ private: true });
+     * const files = ['utils/helper.ts', 'models/user.ts'];
+     * const result = await distiller.distillSelectedFiles(files, './src');
+     * ```
+     */
     async distillSelectedFiles(
         selectedFiles: string[],
         basePath: string,
@@ -112,95 +111,17 @@ export class Distiller {
         return distillationResult;
     }
 
-    private async compress(targetPath: string): Promise<CompressionResult> {
-        const files = await this.getFilesToProcess(targetPath);
-        const stats = await fs.stat(targetPath);
-        const basePath = stats.isFile() ? dirname(targetPath) : targetPath;
-        return this.compressFiles(files, basePath);
-    }
-
-    private async compressSelectedFiles(
-        selectedFiles: string[],
-        basePath: string,
-    ): Promise<CompressionResult> {
-        return this.compressFiles(selectedFiles, basePath);
-    }
-
-    private async compressFiles(
-        files: string[],
-        basePath: string,
-    ): Promise<CompressionResult> {
-        const compressedFiles: CompressedFile[] = [];
-        let totalSize = 0;
-        const excludedCount = 0;
-
-        // Start progress if available
-        if (this.progress) {
-            this.progress.start(files.length);
-        }
-
-        // Process files in parallel batches
-        if (this.options.parallel) {
-            const batchSize = 50;
-            let cumulativeOriginalSize = 0;
-            let cumulativeDistilledSize = 0;
-
-            for (let i = 0; i < files.length; i += batchSize) {
-                const batch = files.slice(i, i + batchSize);
-                const results = await Promise.all(
-                    batch.map((file) =>
-                        this.compressFile(join(basePath, file), file),
-                    ),
-                );
-                compressedFiles.push(...results);
-                totalSize += results.reduce((sum, f) => sum + f.size, 0);
-
-                // Update cumulative sizes
-                cumulativeOriginalSize += results.reduce(
-                    (sum, f) => sum + f.size,
-                    0,
-                );
-                cumulativeDistilledSize += results.reduce(
-                    (sum, f) => sum + Math.ceil(f.content.length / 4) * 4,
-                    0,
-                );
-
-                // Update progress
-                if (this.progress) {
-                    const processedCount = Math.min(
-                        i + batchSize,
-                        files.length,
-                    );
-                    this.progress.update(
-                        processedCount,
-                        cumulativeOriginalSize,
-                        cumulativeDistilledSize,
-                    );
-                }
-            }
-        } else {
-            // Sequential processing
-            for (const file of files) {
-                const compressed = await this.compressFile(
-                    join(basePath, file),
-                    file,
-                );
-                compressedFiles.push(compressed);
-                totalSize += compressed.size;
-            }
-        }
-
-        return {
-            files: compressedFiles,
-            metadata: {
-                totalFiles: compressedFiles.length,
-                totalSize,
-                excludedCount,
-                timestamp: new Date().toISOString(),
-            },
-        };
-    }
-
+    /**
+     * Reads a file and extracts its metadata.
+     *
+     * Despite the name "compressFile", this method doesn't actually compress.
+     * It reads the file content and generates metadata like size, hash, and language.
+     *
+     * @param fullPath - Absolute path to the file
+     * @param relativePath - Optional relative path for the result
+     * @returns CompressedFile object with file content and metadata
+     * @private
+     */
     private async compressFile(
         fullPath: string,
         relativePath?: string,
@@ -222,6 +143,21 @@ export class Distiller {
         };
     }
 
+    /**
+     * Core processing method that distills files into API signatures.
+     *
+     * This method orchestrates the actual distillation process:
+     * 1. Loads file content (if needed)
+     * 2. Detects language and selects appropriate processor
+     * 3. Extracts API signatures using language-specific processors
+     * 4. Calculates token metrics and compression ratios
+     * 5. Updates progress bar throughout the process
+     *
+     * @param files - Array of file paths or CompressedFile objects to process
+     * @param basePath - Base directory for resolving relative paths
+     * @returns DistillationResult with extracted APIs, dependencies, and metrics
+     * @private
+     */
     private async distillFiles(
         files: CompressedFile[] | string[],
         basePath: string,
@@ -286,14 +222,14 @@ export class Distiller {
             try {
                 // Process with language registry
                 const processingOptions: ProcessingOptions = {
-                    includePrivate: this.options.includePrivate,
-                    includeComments: this.options.includeComments,
-                    includeDocstrings: this.options.includeDocstrings,
-                    includeImports: true,
-                    // TODO: REPLACE DEPTH HERE
-                    depth: this.options.includePrivate ? "all" : "public",
-                    includePatterns: undefined, // Not used for name filtering at processor level
-                    excludePatterns: undefined, // Not used for name filtering at processor level
+                    comments: this.options.comments,
+                    docstrings: this.options.docstrings,
+                    public: this.options.public !== false, // Default true
+                    private: this.options.private === true, // Default false
+                    protected: this.options.protected !== false, // Default true
+                    internal: this.options.internal !== false, // Default true
+                    include: undefined, // Not used for name filtering at processor level
+                    exclude: undefined, // Not used for name filtering at processor level
                 };
 
                 const result = await this.registry.processFile(
@@ -357,6 +293,31 @@ export class Distiller {
             }
         }
 
+        // Calculate distilled tokens from the APIs
+        let distilledTokens = 0;
+        for (const api of apis) {
+            // Estimate tokens from the API signatures
+            for (const exp of api.exports) {
+                distilledTokens += countTokens(exp.signature);
+                if (exp.docstring) {
+                    distilledTokens += countTokens(exp.docstring);
+                }
+                if (exp.members) {
+                    for (const member of exp.members) {
+                        distilledTokens += countTokens(member.signature);
+                    }
+                }
+            }
+        }
+
+        const compressionRatio =
+            originalTokens > 0
+                ? Math.round(
+                      ((originalTokens - distilledTokens) / originalTokens) *
+                          100,
+                  )
+                : 0;
+
         return {
             apis,
             structure: {
@@ -366,53 +327,61 @@ export class Distiller {
             dependencies,
             metadata: {
                 originalTokens,
-                distilledTokens: 0, // Will be calculated from formatted output
-                compressionRatio: 0, // Will be calculated from formatted output
+                distilledTokens,
+                compressionRatio,
             },
         };
     }
 
+    /**
+     * Discovers files to process based on include/exclude patterns.
+     *
+     * This method handles file discovery using glob patterns and respects
+     * the default exclude patterns (binaries, images, etc.) unless overridden.
+     * If the user includes test file patterns, test files won't be excluded.
+     *
+     * @param targetPath - Path to file or directory to scan
+     * @returns Array of relative file paths to process
+     *
+     * @example
+     * ```typescript
+     * // Process all TypeScript files except tests
+     * const distiller = new Distiller({ include: ['**∕*.ts'] });
+     * const files = await distiller.getFilesToProcess('./src');
+     *
+     * // Include test files explicitly
+     * const distiller2 = new Distiller({ include: ['**∕*.test.ts'] });
+     * const testFiles = await distiller2.getFilesToProcess('./src');
+     * ```
+     */
     async getFilesToProcess(targetPath: string): Promise<string[]> {
         const stats = await fs.stat(targetPath);
 
+        // For single files, return the relative path from parent directory
+        // This ensures consistency with how directories return relative paths
         if (stats.isFile()) {
-            // For single files, return the relative path from parent directory
-            // This ensures consistency with how directories return relative paths
             return [basename(targetPath)];
         }
 
         // Get all files using globby
         const patterns =
-            this.options.includePatterns &&
-            this.options.includePatterns.length > 0
-                ? this.options.includePatterns
+            this.options.include && this.options.include.length > 0
+                ? this.options.include
                 : ["**/*"];
 
-        // If include patterns are specified, filter out default excludes that conflict
-        let effectiveExcludes = [...this.defaultExcludes];
-        if (
-            this.options.includePatterns &&
-            this.options.includePatterns.length > 0
-        ) {
-            // Remove test file excludes if user is explicitly including test files
-            const hasTestPattern = this.options.includePatterns.some(
-                (p) =>
-                    p.includes(".test.") ||
-                    p.includes(".spec.") ||
-                    p.includes("test") ||
-                    p.includes("spec"),
-            );
-            if (hasTestPattern) {
-                effectiveExcludes = effectiveExcludes.filter(
-                    (e) => !e.includes(".test.") && !e.includes(".spec."),
-                );
-            }
-        }
+        // Get default excludes
+        // If user explicitly includes test patterns, we should allow test files
+        const includeTestFiles = this.options.include?.some(
+            (p) =>
+                p.includes(".test.") ||
+                p.includes(".spec.") ||
+                p.includes("**/test/**") ||
+                p.includes("**/tests/**") ||
+                p.includes("**/__tests__/**"),
+        );
 
-        const ignore = [
-            ...effectiveExcludes,
-            ...(this.options.excludePatterns || []),
-        ];
+        const defaultExcludes = getDistillExcludes({ includeTestFiles });
+        const ignore = [...defaultExcludes, ...(this.options.exclude || [])];
 
         const files = await globby(patterns, {
             cwd: targetPath,
@@ -438,31 +407,16 @@ export class Distiller {
         return files.map((f: string) => f);
     }
 
-    private serializeExtractedAPI(api: ExtractedAPI): string {
-        let result = `File: ${api.file}\n\n`;
-
-        for (const exp of api.exports) {
-            if (exp.docstring) {
-                result += `/**\n * ${exp.docstring.split("\n").join("\n * ")}\n */\n`;
-            }
-            result += `${exp.signature}\n\n`;
-        }
-
-        return result;
-    }
-
-    private extractDependencies(parsed: any): {
-        imports: string[];
-        exports: string[];
-    } {
-        // This is a simplified implementation
-        // In a real implementation, we'd walk the AST to find imports/exports
-        return {
-            imports: [],
-            exports: parsed.exports?.map((e: any) => e.name) || [],
-        };
-    }
-
+    /**
+     * Maps language-specific export kinds to standardized types.
+     *
+     * Different language processors may use different terminology for similar
+     * constructs. This method normalizes them to a consistent set of types.
+     *
+     * @param kind - Language-specific kind string from a processor
+     * @returns Normalized export kind
+     * @private
+     */
     private mapExportKind(
         kind: string,
     ): "function" | "class" | "interface" | "const" | "type" | "enum" {
@@ -486,7 +440,23 @@ export class Distiller {
     }
 
     /**
-     * Format the distillation result based on output format
+     * Formats the distillation result for output.
+     *
+     * Applies the configured formatter (txt, json, md, xml) to transform
+     * the raw distillation result into a formatted string. The formatter
+     * respects visibility options and documentation settings.
+     *
+     * @param result - The distillation result to format
+     * @param originalPath - Optional original file path (unused but kept for compatibility)
+     * @returns Formatted string representation of the distillation result
+     *
+     * @example
+     * ```typescript
+     * const distiller = new Distiller({ format: 'json', private: true });
+     * const result = await distiller.distill('./src');
+     * const json = distiller.formatResult(result);
+     * console.log(JSON.parse(json));
+     * ```
      */
     formatResult(result: DistillationResult, originalPath?: string): string {
         // Handle null/undefined result
@@ -508,10 +478,10 @@ export class Distiller {
         }
 
         return formatter.formatDistillation(result, {
-            includeImports: this.options.includeImports !== false,
-            includePrivate: this.options.includePrivate,
-            includeDocstrings: this.options.includeDocstrings,
-            includeComments: this.options.includeComments,
+            includeImports: true, // Always include imports for context
+            includePrivate: this.options.private === true,
+            includeDocstrings: this.options.docstrings !== false,
+            includeComments: this.options.comments === true,
             includeMetadata: true,
         });
     }

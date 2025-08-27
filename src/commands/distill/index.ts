@@ -1,3 +1,5 @@
+// TODO: Move all chalk console messages to @messages.ts
+
 import { Command } from "commander";
 import chalk from "chalk";
 import { Distiller } from "../../core/distiller/index.js";
@@ -10,14 +12,7 @@ import { ProgressBar } from "../../utils/progress.js";
 import { OutputManager } from "../../utils/output-manager.js";
 import { FileSelector } from "../../utils/file-selector.js";
 import { formatFileSize } from "../../utils/format.js";
-import {
-    pathNotFound,
-    distillSaved,
-    distillWritten,
-    copiedToClipboard,
-    agentInstructions,
-    genericError,
-} from "../../utils/messages.js";
+import { distillSaved, agentInstructions } from "../../utils/messages.js";
 import {
     countTokens,
     formatTokenCount,
@@ -25,9 +20,6 @@ import {
     calculateTokenSavings,
 } from "../../utils/tokens.js";
 
-/**
- *  Dex Distill
- */
 export function createDistillCommand(): Command {
     const command = new Command("distill");
 
@@ -66,13 +58,11 @@ export function createDistillCommand(): Command {
             "--dry-run",
             "Show what files would be processed without running distillation",
         )
-        // AI prompt features removed
         .option("--since <ref>", "Only process files changed since git ref")
         .option("--staged", "Only process staged files")
         .action((...args: any[]) => {
-            // Handle optional path argument - if no path provided, args[0] will be the command object
             const targetPath = typeof args[0] === "string" ? args[0] : ".";
-            const cmdObject = args[args.length - 1]; // Commander puts the command object last
+            const cmdObject = args[args.length - 1];
             const localOptions = cmdObject.opts();
             const parentOptions = cmdObject.parent?.opts() || {};
             const options = { ...parentOptions, ...localOptions };
@@ -95,41 +85,32 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
         unit: "files",
     });
     if (isStdout) {
-        // Disable progress for stdout output
-        progress.isSpinning = true; // Prevent it from starting
+        progress.isSpinning = true;
     }
 
     try {
-        // Resolve path
         const resolvedPath = resolve(targetPath);
-
-        // Check if path exists
         try {
             await fs.access(resolvedPath);
         } catch {
             console.error(chalk.red(`Path not found: ${targetPath}`));
             process.exit(1);
         }
-
-        // Build distiller options
         const cliExcludes = options.exclude || [];
 
         const distillerOptions: DistillerOptions = {
             path: resolvedPath,
             exclude: cliExcludes,
-            include: options.include || [],
-            excludePatterns: cliExcludes,
-            includeComments: options.comments === "1",
-            includeDocstrings: options.docstrings !== "0",
+            include: options.include,
+            comments: options.comments === "1",
+            docstrings: options.docstrings !== "0",
             format: options.format || "txt",
             output: options.output,
             since: options.since,
             staged: options.staged,
-            parallel: options.parallel !== false,
-            includePrivate: options.private === "1",
-            includePatterns: options.include || [],
-            // AI prompt features removed
+            private: options.private === "1",
             dryRun: options.dryRun,
+            select: options.select,
         };
 
         // Handle file selection if requested
@@ -150,7 +131,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                 const fileSelector = new FileSelector();
                 const { files: allFiles, errors } =
                     await fileSelector.collectFiles([resolvedPath], {
-                        excludePatterns: cliExcludes,
+                        exclude: cliExcludes,
                         maxFiles: 10000, // Higher limit for distill
                         maxDepth: 20,
                         respectGitignore: true,
@@ -254,10 +235,6 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                 }
             }
 
-            // For distilled tokens, we need to actually run distillation on a sample
-            // or use a more accurate estimate based on file type
-            // TypeScript/JavaScript files typically compress to ~8-10% of original
-            // depending on comments, docstrings, and code complexity
             const estimatedDistilledTokens = Math.ceil(
                 totalOriginalTokens * 0.09,
             );
@@ -311,10 +288,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             throw new Error("Distillation failed to produce a result");
         }
 
-        // Format result
         const formatted = distiller.formatResult(result, resolvedPath);
-
-        // No AI prompt injection
         const output = formatted;
 
         // Calculate actual tokens from the formatted output
@@ -353,7 +327,6 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                     chalk.green(options.output),
             );
         } else if (isStdout) {
-            // Print to stdout if explicitly requested
             console.log(output);
         } else {
             // Default: save using OutputManager

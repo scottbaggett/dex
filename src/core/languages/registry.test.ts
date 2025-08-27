@@ -1,50 +1,50 @@
-import { test, expect, describe, beforeEach } from 'bun:test';
+import { test, expect, describe, beforeEach } from "bun:test";
 import { LanguageRegistry } from "./registry.js";
-import { TypeScriptModule } from "./typescript.js";
-import { PythonModule } from "./python.js";
+import { TypeScriptModule } from "./typescript/index.js";
+import { PythonModule } from "./python/index.js";
 
-describe('LanguageRegistry', () => {
+describe("LanguageRegistry", () => {
     let registry: LanguageRegistry;
-    
+
     beforeEach(() => {
         registry = new LanguageRegistry();
     });
-    
-    test('should register language modules', () => {
+
+    test("should register language modules", () => {
         const tsModule = new TypeScriptModule();
         const pyModule = new PythonModule();
-        
+
         registry.register(tsModule);
         registry.register(pyModule);
-        
+
         expect(registry.getAllLanguages()).toHaveLength(2);
-        expect(registry.getLanguageByName('typescript')).toBe(tsModule);
-        expect(registry.getLanguageByName('python')).toBe(pyModule);
+        expect(registry.getLanguageByName("typescript")).toBe(tsModule);
+        expect(registry.getLanguageByName("python")).toBe(pyModule);
     });
-    
-    test('should map file extensions to languages', () => {
+
+    test("should map file extensions to languages", () => {
         registry.register(new TypeScriptModule());
         registry.register(new PythonModule());
-        
-        expect(registry.getLanguageForFile('test.ts')).not.toBeNull();
-        expect(registry.getLanguageForFile('test.tsx')).not.toBeNull();
-        expect(registry.getLanguageForFile('test.js')).not.toBeNull();
-        expect(registry.getLanguageForFile('test.py')).not.toBeNull();
-        expect(registry.getLanguageForFile('test.rb')).toBeNull();
+
+        expect(registry.getLanguageForFile("test.ts")).not.toBeNull();
+        expect(registry.getLanguageForFile("test.tsx")).not.toBeNull();
+        expect(registry.getLanguageForFile("test.js")).not.toBeNull();
+        expect(registry.getLanguageForFile("test.py")).not.toBeNull();
+        expect(registry.getLanguageForFile("test.rb")).toBeNull();
     });
-    
-    test('should check if file is supported', () => {
+
+    test("should check if file is supported", () => {
         registry.register(new TypeScriptModule());
         registry.register(new PythonModule());
-        
-        expect(registry.isFileSupported('test.ts')).toBe(true);
-        expect(registry.isFileSupported('test.py')).toBe(true);
-        expect(registry.isFileSupported('test.rb')).toBe(false);
+
+        expect(registry.isFileSupported("test.ts")).toBe(true);
+        expect(registry.isFileSupported("test.py")).toBe(true);
+        expect(registry.isFileSupported("test.rb")).toBe(false);
     });
-    
-    test('should process TypeScript file', async () => {
+
+    test("should process TypeScript file", async () => {
         registry.register(new TypeScriptModule());
-        
+
         const source = `
             export class TestClass {
                 publicMethod() {}
@@ -53,17 +53,17 @@ describe('LanguageRegistry', () => {
             
             export function testFunction() {}
         `;
-        
-        const result = await registry.processFile('test.ts', source, {});
-        
+
+        const result = await registry.processFile("test.ts", source, {});
+
         expect(result.exports).toHaveLength(2);
-        expect(result.exports[0].name).toBe('TestClass');
-        expect(result.exports[1].name).toBe('testFunction');
+        expect(result.exports[0].name).toBe("TestClass");
+        expect(result.exports[1].name).toBe("testFunction");
     });
-    
-    test('should process Python file', async () => {
+
+    test("should process Python file", async () => {
         registry.register(new PythonModule());
-        
+
         const source = `
 class TestClass:
     def public_method(self):
@@ -75,54 +75,58 @@ class TestClass:
 def test_function():
     pass
 `;
-        
-        const result = await registry.processFile('test.py', source, {});
-        
+
+        const result = await registry.processFile("test.py", source, {});
+
         expect(result.exports).toHaveLength(2);
-        const exportNames = result.exports.map(e => e.name);
-        expect(exportNames).toContain('TestClass');
-        expect(exportNames).toContain('test_function');
+        const exportNames = result.exports.map((e) => e.name);
+        expect(exportNames).toContain("TestClass");
+        expect(exportNames).toContain("test_function");
     });
-    
-    test('should respect processing options', async () => {
+
+    test("should respect processing options", async () => {
         registry.register(new TypeScriptModule());
-        
+
         const source = `
             export class TestClass {
                 publicMethod() {}
                 private privateMethod() {}
             }
         `;
-        
+
         // Without includePrivate
-        const result1 = await registry.processFile('test.ts', source, {
-            includePrivate: false
+        const result1 = await registry.processFile("test.ts", source, {
+            includePrivate: false,
         });
-        
+
         const classExport1 = result1.exports[0];
         if (classExport1.members) {
-            expect(classExport1.members.map(m => m.name)).not.toContain('privateMethod');
+            expect(classExport1.members.map((m) => m.name)).not.toContain(
+                "privateMethod",
+            );
         }
-        
+
         // With includePrivate
-        const result2 = await registry.processFile('test.ts', source, {
-            includePrivate: true
+        const result2 = await registry.processFile("test.ts", source, {
+            includePrivate: true,
         });
-        
+
         const classExport2 = result2.exports[0];
         if (classExport2.members) {
-            expect(classExport2.members.map(m => m.name)).toContain('privateMethod');
+            expect(classExport2.members.map((m) => m.name)).toContain(
+                "privateMethod",
+            );
         }
     });
-    
-    test('should unregister language modules', () => {
+
+    test("should unregister language modules", () => {
         const tsModule = new TypeScriptModule();
-        
+
         registry.register(tsModule);
         expect(registry.getAllLanguages()).toHaveLength(1);
-        
-        registry.unregister('typescript');
+
+        registry.unregister("typescript");
         expect(registry.getAllLanguages()).toHaveLength(0);
-        expect(registry.getLanguageByName('typescript')).toBeNull();
+        expect(registry.getLanguageByName("typescript")).toBeNull();
     });
 });

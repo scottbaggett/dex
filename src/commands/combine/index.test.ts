@@ -14,7 +14,6 @@ describe("combine command", () => {
         testDir = fs.mkdtempSync(path.join(os.tmpdir(), "combine-test-"));
         originalCwd = process.cwd();
         process.chdir(testDir);
-
         // Create test files
         fs.writeFileSync("file1.txt", "This is file 1 content");
         fs.writeFileSync("file2.txt", "This is file 2 content");
@@ -32,7 +31,6 @@ describe("combine command", () => {
         const program = new Command();
         program.addCommand(command);
 
-        // Mock stdout
         let output = "";
         const originalWrite = process.stdout.write;
         process.stdout.write = (chunk: string | Buffer) => {
@@ -41,12 +39,7 @@ describe("combine command", () => {
         };
 
         try {
-            await program.parseAsync([
-                "combine",
-                "file1.txt",
-                "file2.txt",
-                "--stdout",
-            ]);
+            await program.parseAsync(["combine", "file1.txt", "file2.txt"]);
             expect(output).toContain("<code_context>");
             expect(output).toContain('<file path="file1.txt">');
             expect(output).toContain("This is file 1 content");
@@ -73,7 +66,7 @@ describe("combine command", () => {
             await program.parseAsync([
                 "combine",
                 "file1.txt",
-                "--format",
+                "-f",
                 "md",
                 "--stdout",
             ]);

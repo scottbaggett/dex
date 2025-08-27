@@ -7,8 +7,8 @@ import { GitExtractor } from "../core/git.js";
 import { simpleGit } from "simple-git";
 
 export interface FileSelectionOptions {
-    includePatterns?: string[];
-    excludePatterns?: string[];
+    include?: string[];
+    exclude?: string[];
     maxFiles?: number;
     maxDepth?: number;
     respectGitignore?: boolean;
@@ -56,8 +56,8 @@ export class FileSelector {
         options: FileSelectionOptions = {},
     ): Promise<{ files: string[]; errors: string[] }> {
         const {
-            includePatterns = [],
-            excludePatterns = [],
+            include = [],
+            exclude = [],
             maxFiles = 1000,
             maxDepth = 10,
             respectGitignore = true,
@@ -83,8 +83,8 @@ export class FileSelector {
                 // Directory - scan for files
                 try {
                     const scannedFiles = await this.scanner.scan(resolvedPath, {
-                        includePatterns,
-                        excludePatterns,
+                        include,
+                        exclude,
                         maxFiles: maxFiles - allFiles.length, // Remaining file limit
                         maxDepth,
                         respectGitignore,

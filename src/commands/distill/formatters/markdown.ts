@@ -8,7 +8,7 @@ import { getSyntaxLanguage } from "../../../utils/language.js";
  */
 export class MarkdownFormatter implements DistillFormatter {
     name = "Markdown Formatter";
-    format = "markdown";
+    format = "md";
 
     formatDistillation(
         result: DistillationResult,

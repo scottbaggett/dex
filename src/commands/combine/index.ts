@@ -155,8 +155,8 @@ async function combineCommand(
         }
 
         // Parse options - patterns are already arrays thanks to collectPatterns
-        const includePatterns = options.include || [];
-        const excludePatterns = options.exclude || [];
+        const include = options.include || [];
+        const exclude = options.exclude || [];
         const maxFiles = parseInt(String(options.maxFiles || "1000"), 10);
         const maxDepth = parseInt(String(options.maxDepth || "10"), 10);
         const respectGitignore = !options.noGitignore;
@@ -186,8 +186,8 @@ async function combineCommand(
             // Collect all files from inputs (files and directories) - existing logic
             const fileSelector = new FileSelector();
             const result = await fileSelector.collectFiles(filePaths, {
-                includePatterns,
-                excludePatterns,
+                include,
+                exclude,
                 maxFiles,
                 maxDepth,
                 respectGitignore,

@@ -138,7 +138,7 @@ export async function executeExtract(
                 // Collect all files in the repository (similar to combine command)
                 const { files: allFiles, errors } =
                     await fileSelector.collectFiles([process.cwd()], {
-                        excludePatterns: [
+                        exclude: [
                             ".git/**",
                             ".dex/**",
                             "node_modules/**",

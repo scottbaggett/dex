@@ -1,6 +1,7 @@
 import { readdir, stat, readFile } from "fs/promises";
 import { join, relative, resolve, basename } from "path";
 import { existsSync } from "fs";
+import { getCombineExcludes } from "./default-excludes.js";
 
 export interface FileInfo {
     path: string;
@@ -11,69 +12,25 @@ export interface FileInfo {
 }
 
 export interface ScanOptions {
-    includePatterns?: string[];
-    excludePatterns?: string[];
+    include?: string[];
+    exclude?: string[];
     maxDepth?: number;
     respectGitignore?: boolean;
     maxFiles?: number;
     followSymlinks?: boolean;
 }
-// TODO: Update this to use global default ignore
+
 export class FileScanner {
     private gitignorePatterns: string[] = [];
-    private defaultIgnorePatterns = [
-        "node_modules/**",
-        ".git/**",
-        "dist/**",
-        "build/**",
-        "coverage/**",
-        ".next/**",
-        ".nuxt/**",
-        ".cache/**",
-        "*.log",
-        "*.lock",
-        ".DS_Store",
-        "Thumbs.db",
-        "*.pyc",
-        "__pycache__/**",
-        ".pytest_cache/**",
-        ".mypy_cache/**",
-        "*.class",
-        "target/**",
-        "*.o",
-        "*.obj",
-        "*.exe",
-        "*.dll",
-        "*.so",
-        "*.dylib",
-        "*.jpg",
-        "*.jpeg",
-        "*.png",
-        "*.gif",
-        "*.ico",
-        "*.svg",
-        "*.mp3",
-        "*.mp4",
-        "*.avi",
-        "*.mov",
-        "*.pdf",
-        "*.zip",
-        "*.tar",
-        "*.gz",
-        "*.rar",
-        "*.7z",
-        ".dex/**",
-        ".opencode/**",
-        ".workarea/**",
-    ];
+    private defaultIgnorePatterns = getCombineExcludes();
 
     async scan(
         rootPath: string,
         options: ScanOptions = {},
     ): Promise<FileInfo[]> {
         const {
-            includePatterns = [],
-            excludePatterns = [],
+            include = [],
+            exclude = [],
             maxDepth = 10,
             respectGitignore = true,
             maxFiles = 1000,
@@ -97,8 +54,8 @@ export class FileScanner {
             visited,
             0,
             maxDepth,
-            includePatterns,
-            excludePatterns,
+            include,
+            exclude,
             followSymlinks,
             maxFiles,
         );
@@ -113,8 +70,8 @@ export class FileScanner {
         visited: Set<string>,
         currentDepth: number,
         maxDepth: number,
-        includePatterns: string[],
-        excludePatterns: string[],
+        include: string[],
+        exclude: string[],
         followSymlinks: boolean,
         maxFiles: number,
     ): Promise<void> {
@@ -153,8 +110,8 @@ export class FileScanner {
 
                 // Check exclude patterns
                 if (
-                    excludePatterns.length > 0 &&
-                    this.matchesPatterns(relativePath, excludePatterns)
+                    exclude.length > 0 &&
+                    this.matchesPatterns(relativePath, exclude)
                 ) {
                     continue;
                 }
@@ -170,16 +127,16 @@ export class FileScanner {
                         visited,
                         currentDepth + 1,
                         maxDepth,
-                        includePatterns,
-                        excludePatterns,
+                        include,
+                        exclude,
                         followSymlinks,
                         maxFiles,
                     );
                 } else if (entry.isFile()) {
                     // Check include patterns (if specified)
                     if (
-                        includePatterns.length > 0 &&
-                        !this.matchesPatterns(relativePath, includePatterns)
+                        include.length > 0 &&
+                        !this.matchesPatterns(relativePath, include)
                     ) {
                         continue;
                     }
@@ -392,8 +349,8 @@ export class FileScanner {
         options: ScanOptions = {},
     ): Promise<FileInfo[]> {
         const {
-            includePatterns = [],
-            excludePatterns = [],
+            include = [],
+            exclude = [],
             maxDepth = 10,
             respectGitignore = true,
             maxFiles = 1000,
@@ -415,7 +372,7 @@ export class FileScanner {
             allPaths,
             0,
             maxDepth,
-            excludePatterns,
+            exclude,
             followSymlinks,
             maxFiles,
         );
@@ -434,8 +391,8 @@ export class FileScanner {
                 if (stats.isFile()) {
                     // Check include patterns (if specified)
                     if (
-                        includePatterns.length > 0 &&
-                        !this.matchesPatterns(relativePath, includePatterns)
+                        include.length > 0 &&
+                        !this.matchesPatterns(relativePath, include)
                     ) {
                         return null;
                     }
@@ -485,7 +442,7 @@ export class FileScanner {
         paths: string[],
         currentDepth: number,
         maxDepth: number,
-        excludePatterns: string[],
+        exclude: string[],
         followSymlinks: boolean,
         maxFiles: number,
     ): Promise<void> {
@@ -516,8 +473,8 @@ export class FileScanner {
 
                 // Check exclude patterns
                 if (
-                    excludePatterns.length > 0 &&
-                    this.matchesPatterns(relativePath, excludePatterns)
+                    exclude.length > 0 &&
+                    this.matchesPatterns(relativePath, exclude)
                 ) {
                     continue;
                 }
@@ -529,7 +486,7 @@ export class FileScanner {
                         paths,
                         currentDepth + 1,
                         maxDepth,
-                        excludePatterns,
+                        exclude,
                         followSymlinks,
                         maxFiles,
                     );
