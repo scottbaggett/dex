@@ -1,6 +1,7 @@
 import { getLanguageRegistry, ProcessingOptions } from "../languages/index.js";
 import { detectLanguage } from "../../utils/language-detection.js";
 import { countTokens } from "../../utils/tokens.js";
+import { toDependencies, toExtractedAPI } from "./normalize.js";
 
 interface WorkerInput {
 	filePath: string;
@@ -43,38 +44,10 @@ export default async function processFile({
 			processingOptions,
 		);
 
-		// Convert to ExtractedAPI format
-		const extracted = {
-			file: filePath,
-			imports: result.imports.map((i: any) => i.source),
-			exports: result.exports.map((e: any) => ({
-				name: e.name,
-				type: mapExportKind(e.kind),
-				signature: e.signature,
-				visibility: e.visibility || "public",
-				location: {
-					startLine: e.line || 0,
-					endLine: e.line || 0,
-				},
-				members: e.members?.map((m: any) => ({
-					name: m.name,
-					signature: m.signature,
-					type:
-						m.kind === "constructor" ||
-						m.kind === "getter" ||
-						m.kind === "setter"
-							? "method"
-							: (m.kind as "property" | "method"),
-				})),
-			})),
-		};
+			const extracted = toExtractedAPI(filePath, result);
+			const dependencies = toDependencies(result);
 
-		const dependencies = {
-			imports: result.imports.map((i: any) => i.source),
-			exports: result.exports.map((e: any) => e.name),
-		};
-
-		return { api: extracted, dependencies, originalTokens, language };
+			return { api: extracted, dependencies, originalTokens, language };
 	} catch (error) {
 		if (process.env.DEBUG) {
 			console.warn(`Failed to distill ${filePath}:`, error);
@@ -86,26 +59,5 @@ export default async function processFile({
 			language,
 			error: error instanceof Error ? error.message : String(error)
 		};
-	}
-}
-
-function mapExportKind(
-	kind: string,
-): "function" | "class" | "interface" | "const" | "type" | "enum" {
-	switch (kind) {
-		case "function":
-		case "class":
-		case "interface":
-		case "type":
-		case "enum":
-			return kind as any;
-		case "const":
-		case "let":
-		case "var":
-		case "namespace":
-		case "module":
-			return "const";
-		default:
-			return "const";
 	}
 }
