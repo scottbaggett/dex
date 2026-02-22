@@ -5,6 +5,7 @@ import {
     ImportNode,
     SkippedItem,
 } from "../types.js";
+import { matchesAnyPattern, matchesGlobPattern } from "../../../utils/patterns.js";
 
 /**
  * Python processor
@@ -297,7 +298,7 @@ export class PythonProcessor {
         line: string,
         lineNumber: number,
         indent: number,
-        options: ProcessingOptions,
+        _options: ProcessingOptions,
     ): ExportNode {
         const match = line.match(/class\s+(\w+)(?:\(([^)]*)\))?:/);
         const name = match ? match[1] : "Anonymous";
@@ -326,7 +327,7 @@ export class PythonProcessor {
         line: string,
         lineNumber: number,
         indent: number,
-        options: ProcessingOptions,
+        _options: ProcessingOptions,
     ): ExportNode {
         const isAsync = line.trim().startsWith("async ");
         const funcPattern = isAsync
@@ -360,7 +361,7 @@ export class PythonProcessor {
     private parseConstant(
         line: string,
         lineNumber: number,
-        options: ProcessingOptions,
+        _options: ProcessingOptions,
     ): ExportNode | null {
         // Match CONSTANT_NAME = value or regular assignment
         const match = line.match(
@@ -378,7 +379,7 @@ export class PythonProcessor {
 
         const isPrivate = name.startsWith("_");
 
-        let signature = line.trim();
+        const signature = line.trim();
 
         return {
             name,
@@ -435,36 +436,25 @@ export class PythonProcessor {
         node: ExportNode,
         options: ProcessingOptions,
     ): boolean {
-        // Check visibility
-        if (node.visibility === "private") {
-            // Python convention: _ prefix means private (except __special__)
-            const isSpecial =
-                node.name.startsWith("__") && node.name.endsWith("__");
+        const isSpecial =
+            node.name.startsWith("__") && node.name.endsWith("__");
 
-            // Include if private is enabled, or if it's a special method
-            if (!options.private && !isSpecial) {
-                return false;
-            }
-        }
-
-        // Check visibility
-        if (node.visibility === "private" && !options.private) {
+        // Python dunder methods are public API surface despite underscore naming.
+        if (node.visibility === "private" && !options.private && !isSpecial) {
             return false;
         }
 
         // Check patterns
         if (options.exclude) {
             for (const pattern of options.exclude) {
-                if (this.matchesPattern(node.name, pattern)) {
+                if (matchesGlobPattern(node.name, pattern)) {
                     return false;
                 }
             }
         }
 
         if (options.include && options.include.length > 0) {
-            return options.include.some((pattern) =>
-                this.matchesPattern(node.name, pattern),
-            );
+            return matchesAnyPattern(node.name, options.include);
         }
 
         return true;
@@ -474,10 +464,11 @@ export class PythonProcessor {
         node: ExportNode,
         options: ProcessingOptions,
     ): boolean {
-        // For Python, check if it's a private method
         const isPrivate = node.name?.startsWith("_") || false;
+        const isSpecial =
+            node.name.startsWith("__") && node.name.endsWith("__");
 
-        if (isPrivate && !options.private) {
+        if (isPrivate && !options.private && !isSpecial) {
             return false;
         }
 
@@ -495,16 +486,14 @@ export class PythonProcessor {
 
         if (options.exclude) {
             for (const pattern of options.exclude) {
-                if (this.matchesPattern(node.name, pattern)) {
+                if (matchesGlobPattern(node.name, pattern)) {
                     return "pattern";
                 }
             }
         }
 
         if (options.include && options.include.length > 0) {
-            const matches = options.include.some((pattern) =>
-                this.matchesPattern(node.name, pattern),
-            );
+            const matches = matchesAnyPattern(node.name, options.include);
             if (!matches) return "pattern";
         }
 
@@ -515,7 +504,7 @@ export class PythonProcessor {
         exports: ExportNode[],
         options: ProcessingOptions,
     ): ExportNode[] {
-        const filtered = exports;
+        const filtered = [...exports];
 
         // Sort if not preserving order
         if (!options.preserveOrder) {
@@ -535,28 +524,4 @@ export class PythonProcessor {
         return filtered;
     }
 
-    private matchesPattern(name: string, pattern: string): boolean {
-        // Convert glob pattern to regex
-        // First escape regex special chars except * and ?
-        let regexPattern = "";
-        for (let i = 0; i < pattern.length; i++) {
-            const char = pattern[i];
-            if (char === "*") {
-                regexPattern += ".*";
-            } else if (char === "?") {
-                regexPattern += ".";
-            } else if (char && "^+${}()|[]\\".includes(char)) {
-                regexPattern += "\\" + char;
-            } else {
-                regexPattern += char;
-            }
-        }
-
-        try {
-            return new RegExp(`^${regexPattern}$`).test(name);
-        } catch {
-            // If regex is invalid, fall back to simple string matching
-            return name.includes(pattern.replace(/\*/g, ""));
-        }
-    }
 }

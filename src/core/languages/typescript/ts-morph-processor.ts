@@ -1,4 +1,4 @@
-import { Project, SourceFile, Node, SyntaxKind } from "ts-morph";
+import { Project, SourceFile, SyntaxKind } from "ts-morph";
 import {
     ProcessingOptions,
     ProcessResult,
@@ -7,6 +7,17 @@ import {
     MemberNode,
     SkippedItem,
 } from "../types.js";
+import { matchesAnyPattern, matchesGlobPattern } from "../../../utils/patterns.js";
+
+type LegacyProcessingOptions = ProcessingOptions & {
+    depth?: "public" | "protected" | "all";
+    includePrivate?: boolean;
+    includeProtected?: boolean;
+    includeImports?: boolean;
+    includeDocstrings?: boolean;
+    includeComments?: boolean;
+    compact?: boolean;
+};
 
 /**
  * TypeScript processor using ts-morph
@@ -34,6 +45,8 @@ export class TsMorphProcessor {
         filePath: string,
         options: ProcessingOptions,
     ): ProcessResult {
+        const normalizedOptions = this.normalizeOptions(options);
+
         // Create source file in memory
         const sourceFile = this.project.createSourceFile(filePath, source, {
             overwrite: true,
@@ -43,8 +56,8 @@ export class TsMorphProcessor {
         const imports: ImportNode[] = [];
         const skipped: SkippedItem[] = [];
 
-        // Process imports - always include them for context
-        {
+        // Process imports unless explicitly disabled.
+        if ((normalizedOptions as LegacyProcessingOptions).includeImports !== false) {
             sourceFile.getImportDeclarations().forEach((importDecl) => {
                 const moduleSpecifier = importDecl.getModuleSpecifierValue();
                 const namedImports = importDecl.getNamedImports();
@@ -86,13 +99,13 @@ export class TsMorphProcessor {
         sourceFile.getFunctions().forEach((func) => {
             if (!func.isExported()) return;
 
-            const node = this.extractFunction(func, sourceFile, options);
-            if (this.shouldInclude(node, options)) {
+            const node = this.extractFunction(func, sourceFile, normalizedOptions);
+            if (this.shouldInclude(node, normalizedOptions)) {
                 exports.push(node);
             } else {
                 skipped.push({
                     name: node.name,
-                    reason: this.getSkipReason(node, options),
+                    reason: this.getSkipReason(node, normalizedOptions),
                     line: node.line,
                 });
             }
@@ -102,13 +115,13 @@ export class TsMorphProcessor {
         sourceFile.getClasses().forEach((cls) => {
             if (!cls.isExported()) return;
 
-            const node = this.extractClass(cls, sourceFile, options);
-            if (this.shouldInclude(node, options)) {
+            const node = this.extractClass(cls, sourceFile, normalizedOptions);
+            if (this.shouldInclude(node, normalizedOptions)) {
                 exports.push(node);
             } else {
                 skipped.push({
                     name: node.name,
-                    reason: this.getSkipReason(node, options),
+                    reason: this.getSkipReason(node, normalizedOptions),
                     line: node.line,
                 });
             }
@@ -118,13 +131,13 @@ export class TsMorphProcessor {
         sourceFile.getInterfaces().forEach((iface) => {
             if (!iface.isExported()) return;
 
-            const node = this.extractInterface(iface, sourceFile, options);
-            if (this.shouldInclude(node, options)) {
+            const node = this.extractInterface(iface, sourceFile, normalizedOptions);
+            if (this.shouldInclude(node, normalizedOptions)) {
                 exports.push(node);
             } else {
                 skipped.push({
                     name: node.name,
-                    reason: this.getSkipReason(node, options),
+                    reason: this.getSkipReason(node, normalizedOptions),
                     line: node.line,
                 });
             }
@@ -134,13 +147,13 @@ export class TsMorphProcessor {
         sourceFile.getTypeAliases().forEach((typeAlias) => {
             if (!typeAlias.isExported()) return;
 
-            const node = this.extractTypeAlias(typeAlias, sourceFile, options);
-            if (this.shouldInclude(node, options)) {
+            const node = this.extractTypeAlias(typeAlias, sourceFile, normalizedOptions);
+            if (this.shouldInclude(node, normalizedOptions)) {
                 exports.push(node);
             } else {
                 skipped.push({
                     name: node.name,
-                    reason: this.getSkipReason(node, options),
+                    reason: this.getSkipReason(node, normalizedOptions),
                     line: node.line,
                 });
             }
@@ -150,13 +163,13 @@ export class TsMorphProcessor {
         sourceFile.getEnums().forEach((enumDecl) => {
             if (!enumDecl.isExported()) return;
 
-            const node = this.extractEnum(enumDecl, sourceFile, options);
-            if (this.shouldInclude(node, options)) {
+            const node = this.extractEnum(enumDecl, sourceFile, normalizedOptions);
+            if (this.shouldInclude(node, normalizedOptions)) {
                 exports.push(node);
             } else {
                 skipped.push({
                     name: node.name,
-                    reason: this.getSkipReason(node, options),
+                    reason: this.getSkipReason(node, normalizedOptions),
                     line: node.line,
                 });
             }
@@ -167,13 +180,13 @@ export class TsMorphProcessor {
             const statement = varDecl.getVariableStatement();
             if (!statement?.isExported()) return;
 
-            const node = this.extractVariable(varDecl, sourceFile, options);
-            if (this.shouldInclude(node, options)) {
+            const node = this.extractVariable(varDecl, sourceFile, normalizedOptions);
+            if (this.shouldInclude(node, normalizedOptions)) {
                 exports.push(node);
             } else {
                 skipped.push({
                     name: node.name,
-                    reason: this.getSkipReason(node, options),
+                    reason: this.getSkipReason(node, normalizedOptions),
                     line: node.line,
                 });
             }
@@ -214,11 +227,49 @@ export class TsMorphProcessor {
 
         return {
             imports,
-            exports: this.filterExports(exports, options),
+            exports: this.filterExports(exports, normalizedOptions),
             metadata: {
                 skipped: skipped.length > 0 ? skipped : undefined,
             },
         };
+    }
+
+    private normalizeOptions(options: ProcessingOptions): LegacyProcessingOptions {
+        const normalized: LegacyProcessingOptions = {
+            ...options,
+        };
+
+        // Backward-compatibility aliases used by existing tests/callers.
+        if (normalized.includePrivate !== undefined) {
+            normalized.private = normalized.private ?? normalized.includePrivate;
+        }
+        if (normalized.includeProtected !== undefined) {
+            normalized.protected = normalized.protected ?? normalized.includeProtected;
+        }
+        if (normalized.includeDocstrings !== undefined) {
+            normalized.docstrings =
+                normalized.docstrings ?? normalized.includeDocstrings;
+        }
+        if (normalized.includeComments !== undefined) {
+            normalized.comments = normalized.comments ?? normalized.includeComments;
+        }
+
+        // Legacy depth semantics.
+        if (normalized.depth === "public") {
+            normalized.public = true;
+            normalized.protected = false;
+            normalized.private = false;
+        } else if (normalized.depth === "protected") {
+            normalized.public = true;
+            normalized.protected = true;
+            normalized.private = false;
+        } else if (normalized.depth === "all") {
+            normalized.public = true;
+            normalized.protected = true;
+            normalized.private = true;
+        }
+
+        return normalized;
     }
 
     private extractFunction(
@@ -286,7 +337,9 @@ export class TsMorphProcessor {
             signature += ` implements ${_implements.map((i: any) => i.getText()).join(", ")}`;
         }
 
-        const members = this.extractClassMembers(cls, options);
+        const members = (options as LegacyProcessingOptions).compact
+            ? undefined
+            : this.extractClassMembers(cls, options);
         const docstring = options.docstrings
             ? this.extractDocstring(cls)
             : undefined;
@@ -316,7 +369,9 @@ export class TsMorphProcessor {
             signature += ` extends ${baseInterfaces.map((b: any) => b.getText()).join(", ")}`;
         }
 
-        const members = this.extractInterfaceMembers(iface, options);
+        const members = (options as LegacyProcessingOptions).compact
+            ? undefined
+            : this.extractInterfaceMembers(iface, options);
         const docstring = options.docstrings
             ? this.extractDocstring(iface)
             : undefined;
@@ -389,14 +444,20 @@ export class TsMorphProcessor {
 
     private extractVariable(
         varDecl: any,
-        sourceFile: SourceFile,
-        options: ProcessingOptions,
+        _sourceFile: SourceFile,
+        _options: ProcessingOptions,
     ): ExportNode {
         const name = varDecl.getName();
         const statement = varDecl.getVariableStatement();
-        const isConst = statement?.getDeclarationKind() === "const";
+        const declarationKind = statement?.getDeclarationKind() ?? "let";
+        const kind: ExportNode["kind"] =
+            declarationKind === "const"
+                ? "const"
+                : declarationKind === "var"
+                  ? "var"
+                  : "let";
 
-        let signature = isConst ? "const " : "let ";
+        let signature = `${declarationKind} `;
         signature += name;
 
         const type = varDecl.getType().getText();
@@ -409,7 +470,7 @@ export class TsMorphProcessor {
 
         return {
             name,
-            kind: "const",
+            kind,
             signature,
             line: varDecl.getStartLineNumber(),
             isExported: true,
@@ -559,7 +620,7 @@ export class TsMorphProcessor {
 
     private extractInterfaceMembers(
         iface: any,
-        options: ProcessingOptions,
+        _options: ProcessingOptions,
     ): MemberNode[] {
         const members: MemberNode[] = [];
 
@@ -625,16 +686,14 @@ export class TsMorphProcessor {
         // Check patterns
         if (options.exclude) {
             for (const pattern of options.exclude) {
-                if (this.matchesPattern(node.name, pattern)) {
+                if (matchesGlobPattern(node.name, pattern)) {
                     return false;
                 }
             }
         }
 
         if (options.include && options.include.length > 0) {
-            return options.include.some((pattern) =>
-                this.matchesPattern(node.name, pattern),
-            );
+            return matchesAnyPattern(node.name, options.include);
         }
 
         return true;
@@ -646,34 +705,18 @@ export class TsMorphProcessor {
     ): "private" | "pattern" | "depth" | "comment" {
         if (options.exclude) {
             for (const pattern of options.exclude) {
-                if (this.matchesPattern(node.name, pattern)) {
+                if (matchesGlobPattern(node.name, pattern)) {
                     return "pattern";
                 }
             }
         }
 
         if (options.include && options.include.length > 0) {
-            const matches = options.include.some((pattern) =>
-                this.matchesPattern(node.name, pattern),
-            );
+            const matches = matchesAnyPattern(node.name, options.include);
             if (!matches) return "pattern";
         }
 
         return "pattern";
-    }
-
-    private matchesPattern(name: string, pattern: string): boolean {
-        // Convert glob pattern to regex
-        const regexPattern = pattern
-            .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-            .replace(/\*/g, ".*")
-            .replace(/\?/g, ".");
-
-        try {
-            return new RegExp(`^${regexPattern}$`).test(name);
-        } catch {
-            return name.includes(pattern.replace(/\*/g, ""));
-        }
     }
 
     private filterExports(
@@ -685,20 +728,24 @@ export class TsMorphProcessor {
         }
 
         // Sort by kind, then name
-        return exports.sort((a, b) => {
+        return [...exports].sort((a, b) => {
             const kindOrder = [
                 "interface",
                 "type",
                 "class",
                 "function",
                 "const",
+                "let",
+                "var",
                 "enum",
             ];
-            const aOrder = kindOrder.indexOf(a.kind) ?? 999;
-            const bOrder = kindOrder.indexOf(b.kind) ?? 999;
+            const aOrder = kindOrder.indexOf(a.kind);
+            const bOrder = kindOrder.indexOf(b.kind);
+            const aRank = aOrder === -1 ? 999 : aOrder;
+            const bRank = bOrder === -1 ? 999 : bOrder;
 
-            if (aOrder !== bOrder) {
-                return aOrder - bOrder;
+            if (aRank !== bRank) {
+                return aRank - bRank;
             }
             return a.name.localeCompare(b.name);
         });

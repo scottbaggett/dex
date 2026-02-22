@@ -59,8 +59,8 @@ export class TypeScriptProcessor {
 
     private processBasic(
         source: string,
-        filePath: string,
-        options: ProcessingOptions,
+        _filePath: string,
+        _options: ProcessingOptions,
     ): ProcessResult {
         // Very basic fallback - just extract obvious exports
         const lines = source.split("\n");
