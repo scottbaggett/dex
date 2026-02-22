@@ -94,6 +94,24 @@ describe("combine command", () => {
         expect(output).toContain("This is file 2 content");
     });
 
+    test("should expose safety options", () => {
+        const command = createCombineCommand();
+        const options = command.options.map((option) => option.long);
+        const targetOption = command.options.find(
+            (option) => option.long === "--target",
+        );
+
+        expect(options).toContain("--include-sensitive");
+        expect(options).toContain("--target");
+        expect(options).toContain("--yes");
+        expect(targetOption?.argChoices).toEqual([
+            "claude",
+            "gpt",
+            "local",
+            "custom",
+        ]);
+    });
+
     test("should combine files with markdown format", async () => {
         const program = new Command();
         program.addCommand(createCombineCommand());

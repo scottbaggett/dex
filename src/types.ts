@@ -2,6 +2,8 @@
 export {
     OutputFormat,
     OutputFormatSchema,
+    ModelTarget,
+    ModelTargetSchema,
     DexOptions,
     DexOptionsSchema,
     GitChange,

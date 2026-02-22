@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import clipboardy from "clipboardy";
@@ -77,6 +77,20 @@ export function createCombineCommand(): Command {
             "1000",
         )
         .option("--no-gitignore", "Do not respect .gitignore patterns")
+        .option(
+            "--include-sensitive",
+            "Include sensitive content without redaction safeguards",
+        )
+        .addOption(
+            new Option(
+                "--target <target>",
+                "Target model destination",
+            ).choices(["claude", "gpt", "local", "custom"]),
+        )
+        .option(
+            "--yes",
+            "Skip confirmation prompts for non-interactive unsafe operations",
+        )
         .action(async (...args: unknown[]) => {
             // Handle optional paths argument - if no paths provided, args[0] will be the command object
             const paths = Array.isArray(args[0])

@@ -411,6 +411,20 @@ export function createExtractCommand(): Command {
         )
         .option("--optimize <types...>", "Optimizations: aid, symbols")
         .option("--no-metadata", "Exclude metadata from output")
+        .option(
+            "--include-sensitive",
+            "Include sensitive content without redaction safeguards",
+        )
+        .addOption(
+            new Option(
+                "--target <target>",
+                "Target model destination",
+            ).choices(["claude", "gpt", "local", "custom"]),
+        )
+        .option(
+            "--yes",
+            "Skip confirmation prompts for non-interactive unsafe operations",
+        )
         .option("--select", "Interactive file selection mode")
         .option(
             "--sort-by <option>",

@@ -1,9 +1,9 @@
 // TODO: Move all chalk console messages to @messages.ts
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import chalk from "chalk";
 import { Distiller } from "../../core/distiller/index.js";
-import type { DistillerOptions, OutputFormat } from "../../types.js";
+import type { DistillerOptions, ModelTarget, OutputFormat } from "../../types.js";
 import { promises as fs, statSync } from "fs";
 import { resolve, basename } from "path";
 import * as path from "path";
@@ -41,6 +41,9 @@ interface DistillCommandOptions {
     workers?: string;
     format?: OutputFormat;
     since?: string;
+    includeSensitive?: boolean;
+    yes?: boolean;
+    target?: ModelTarget;
 }
 
 export function createDistillCommand(): Command {
@@ -88,6 +91,20 @@ export function createDistillCommand(): Command {
         .option(
             "--workers <number>",
             "Number of worker threads (0-1=sequential, 2-8=parallel, default=4)",
+        )
+        .option(
+            "--include-sensitive",
+            "Include sensitive content without redaction safeguards",
+        )
+        .addOption(
+            new Option(
+                "--target <target>",
+                "Target model destination",
+            ).choices(["claude", "gpt", "local", "custom"]),
+        )
+        .option(
+            "--yes",
+            "Skip confirmation prompts for non-interactive unsafe operations",
         )
         .action((...args: unknown[]) => {
             const targetPath = typeof args[0] === "string" ? args[0] : ".";

@@ -24,6 +24,9 @@ describe("extract command", () => {
         expect(options).toContain("--clipboard");
         expect(options).toContain("--include-untracked");
         expect(options).toContain("--optimize");
+        expect(options).toContain("--include-sensitive");
+        expect(options).toContain("--target");
+        expect(options).toContain("--yes");
         expect(options).toContain("--select");
     });
 
@@ -46,6 +49,21 @@ describe("extract command", () => {
 
         expect(optimizeOption).toBeDefined();
         expect(optimizeOption?.variadic).toBe(true);
+    });
+
+    test("should configure target option choices", () => {
+        const command = createExtractCommand();
+        const targetOption = command.options.find(
+            (option) => option.long === "--target",
+        );
+
+        expect(targetOption).toBeDefined();
+        expect(targetOption?.argChoices).toEqual([
+            "claude",
+            "gpt",
+            "local",
+            "custom",
+        ]);
     });
 
     test("should include sorting and filtering options", () => {

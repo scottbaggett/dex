@@ -95,6 +95,23 @@ function setupProgram(): void {
                         extractOptions.includeUntracked = true;
                     } else if (arg === "--untracked-pattern") {
                         extractOptions.untrackedPattern = args[++i];
+                    } else if (arg === "--include-sensitive") {
+                        extractOptions.includeSensitive = true;
+                    } else if (arg === "--target") {
+                        const target = args[++i];
+                        if (
+                            target &&
+                            ["claude", "gpt", "local", "custom"].includes(
+                                target,
+                            )
+                        ) {
+                            extractOptions.target =
+                                target as ExtractOptions["target"];
+                        } else {
+                            throw new Error(`Invalid target: ${target}`);
+                        }
+                    } else if (arg === "--yes") {
+                        extractOptions.yes = true;
                     } else if (arg === "--no-metadata") {
                         extractOptions.noMetadata = true;
                     } else if (arg === "--select") {

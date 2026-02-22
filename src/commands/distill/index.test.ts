@@ -196,6 +196,26 @@ export default function main() {
         expect(result.output).toContain("PublicClass");
     });
 
+    test("should accept safety flags", () => {
+        const result = runDistill([
+            "--stdout",
+            "--include-sensitive",
+            "--yes",
+            "--target",
+            "claude",
+        ]);
+
+        expect(result.status).toBe(0);
+        expect(result.output).toContain("PublicClass");
+    });
+
+    test("--target should validate allowed values", () => {
+        const result = runDistill(["--stdout", "--target", "invalid-target"]);
+
+        expect(result.status).toBe(1);
+        expect(result.output).toContain("Allowed choices are");
+    });
+
     test("should handle non-existent path gracefully", () => {
         const result = runDistill([], "/non/existent/path");
         expect(result.status).toBe(1);
