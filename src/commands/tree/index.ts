@@ -105,22 +105,27 @@ export async function treeCommand(
             internal: options.internal ?? true,
             protected: options.protected ?? true,
             format: "txt",
+            // Tree output favors deterministic, low-latency behavior over worker parallelism.
+            // This avoids worker startup edge cases in short-lived CLI runs.
+            workers: 1,
         };
 
-        // Create progress bar
-        const progress = new ProgressBar({
-            label: "Generating tree",
-            showTokens: false,
-            showSize: true,
-            unit: "files",
-        });
+        // Create progress bar only for interactive/non-stdout runs.
+        const progress = options.stdout
+            ? undefined
+            : new ProgressBar({
+                  label: "Generating tree",
+                  showTokens: false,
+                  showSize: true,
+                  unit: "files",
+              });
 
         // Create distiller and extract APIs
         const distiller = new Distiller(distillerOptions);
         const result = await distiller.distill(resolvedPath, progress);
 
         // Complete progress
-        progress.complete();
+        progress?.complete();
 
         if (!("apis" in result)) {
             console.error(treeNoApis());
@@ -167,7 +172,7 @@ export function generateTree(
     basePath: string,
     forTerminal: boolean = false,
 ): string {
-    const { groupBy, includePrivate, showTypes, showParams, outline } = options;
+    const { groupBy, includePrivate, showTypes, showParams, outline: _outline } = options;
 
     // Flatten exports from all APIs and filter based on options
     const allExports = apis.flatMap((api) =>
@@ -576,7 +581,7 @@ function generateFlatTree(
     return lines.join("\n");
 }
 
-function generateOutline(
+function _generateOutline(
     exports: any[],
     basePath: string,
     showTypes?: boolean,
@@ -650,7 +655,7 @@ function generateOutline(
     return lines.join("\n");
 }
 
-function getTypeIcon(type: string, forTerminal: boolean = false): string {
+function getTypeIcon(type: string, _forTerminal: boolean = false): string {
     return "";
 }
 
