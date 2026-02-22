@@ -7,11 +7,12 @@ import { encode } from 'gpt-tokenizer';
  */
 export function countTokens(text: string): number {
     try {
-        const tokens = encode(text);
+        // Allow special tokens to be encoded properly
+        const tokens = encode(text, { allowedSpecial: 'all' });
         return tokens.length;
     } catch (error) {
         // Fallback to rough estimation if encoding fails
-        console.error(error);
+        console.error('Token encoding failed:', error);
         return Math.ceil(text.length / 4);
     }
 }
