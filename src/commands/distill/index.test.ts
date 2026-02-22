@@ -87,7 +87,7 @@ export default function main() {
     function runDistill(args: string[] = [], targetPath: string = testDir): DistillRun {
         const result = spawnSync(
             "bun",
-            ["run", "dex", "distill", targetPath, ...args],
+            ["run", "src/cli.ts", "distill", targetPath, ...args],
             {
                 cwd: repoRoot,
                 encoding: "utf-8",
