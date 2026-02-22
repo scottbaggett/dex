@@ -26,7 +26,7 @@ export class TextFormatter implements DistillFormatter {
         // Group files by directory
         const filesByDir = this.groupFilesByDirectory(result.apis);
 
-        for (const [dir, files] of filesByDir.entries()) {
+        for (const [_dir, files] of filesByDir.entries()) {
             for (const api of files) {
                 output += this.formatFile(api, options) + "\n";
             }
@@ -37,7 +37,7 @@ export class TextFormatter implements DistillFormatter {
 
     formatCompression(
         result: CompressionResult,
-        options: DistillFormatterOptions = {},
+        _options: DistillFormatterOptions = {},
     ): string {
         let output = "";
 
@@ -193,7 +193,7 @@ export class TextFormatter implements DistillFormatter {
 
     private formatInterface(
         exp: any,
-        options: DistillFormatterOptions,
+        _options: DistillFormatterOptions,
     ): string {
         let output = `export interface ${exp.name}`;
 
@@ -215,7 +215,7 @@ export class TextFormatter implements DistillFormatter {
         return output;
     }
 
-    private formatClass(exp: any, options: DistillFormatterOptions): string {
+    private formatClass(exp: any, _options: DistillFormatterOptions): string {
         let output = `export class ${exp.name}`;
 
         // Add extends/implements
@@ -263,7 +263,7 @@ export class TextFormatter implements DistillFormatter {
         return output;
     }
 
-    private formatFunction(exp: any, options: DistillFormatterOptions): string {
+    private formatFunction(exp: any, _options: DistillFormatterOptions): string {
         // Clean up the signature - remove duplicate 'export' if present
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
@@ -274,7 +274,7 @@ export class TextFormatter implements DistillFormatter {
         return `export ${signature}\n`;
     }
 
-    private formatType(exp: any, options: DistillFormatterOptions): string {
+    private formatType(exp: any, _options: DistillFormatterOptions): string {
         // Clean up the signature
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
@@ -285,7 +285,7 @@ export class TextFormatter implements DistillFormatter {
         return `export ${signature}\n`;
     }
 
-    private formatConst(exp: any, options: DistillFormatterOptions): string {
+    private formatConst(exp: any, _options: DistillFormatterOptions): string {
         // Clean up the signature
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
@@ -296,7 +296,7 @@ export class TextFormatter implements DistillFormatter {
         return `export ${signature}\n`;
     }
 
-    private formatEnum(exp: any, options: DistillFormatterOptions): string {
+    private formatEnum(exp: any, _options: DistillFormatterOptions): string {
         // Clean up the signature
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {

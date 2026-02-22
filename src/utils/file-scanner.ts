@@ -103,13 +103,25 @@ export class FileScanner {
                     visited.add(fullPath);
                 }
 
-                // Check if path should be ignored
-                if (this.shouldIgnore(relativePath)) {
-                    continue;
+                // For directories, check if we should skip them entirely
+                if (entry.isDirectory()) {
+                    // Check if directory should be ignored
+                    if (this.shouldIgnore(relativePath) || this.shouldIgnore(relativePath + "/")) {
+                        continue;
+                    }
+                    
+                    // Check exclude patterns for directories
+                    if (
+                        exclude.length > 0 &&
+                        this.matchesPatterns(relativePath, exclude)
+                    ) {
+                        continue;
+                    }
                 }
 
-                // Check exclude patterns
+                // Check exclude patterns for files
                 if (
+                    !entry.isDirectory() &&
                     exclude.length > 0 &&
                     this.matchesPatterns(relativePath, exclude)
                 ) {
@@ -133,6 +145,11 @@ export class FileScanner {
                         maxFiles,
                     );
                 } else if (entry.isFile()) {
+                    // Check if file should be ignored
+                    if (this.shouldIgnore(relativePath)) {
+                        continue;
+                    }
+                    
                     // Check include patterns (if specified)
                     if (
                         include.length > 0 &&
@@ -203,18 +220,51 @@ export class FileScanner {
             ...this.defaultIgnorePatterns,
             ...this.gitignorePatterns,
         ];
-        return this.matchesPatterns(relativePath, allIgnorePatterns);
+        const isIgnored = this.matchesPatterns(relativePath, allIgnorePatterns);
+        if (process.env.DEBUG_SCANNER && isIgnored) {
+            console.log(`Ignoring ${relativePath} (matched pattern)`);
+        }
+        return isIgnored;
     }
 
     private matchesPatterns(filePath: string, patterns: string[]): boolean {
         return patterns.some((pattern) => {
+            // Handle ** patterns (matches any depth)
+            if (pattern.includes("**")) {
+                // For patterns like **/node_modules/**
+                if (pattern.startsWith("**/") && pattern.endsWith("/**")) {
+                    const dirName = pattern.slice(3, -3); // Extract directory name
+                    // Check if path contains this directory
+                    return filePath.includes(`/${dirName}/`) || 
+                           filePath.startsWith(`${dirName}/`) ||
+                           filePath === dirName;
+                }
+                
+                // For patterns like **/something
+                if (pattern.startsWith("**/")) {
+                    const subPattern = pattern.slice(3);
+                    // Check if path ends with or contains this pattern
+                    return filePath.endsWith(subPattern) || 
+                           filePath.includes(`/${subPattern}/`) ||
+                           basename(filePath) === subPattern;
+                }
+                
+                // General ** handling - convert to regex
+                const regex = new RegExp(
+                    pattern
+                        .replace(/\./g, "\\.")
+                        .replace(/\*\*/g, ".*")
+                        .replace(/\*/g, "[^/]*"),
+                );
+                return regex.test(filePath);
+            }
+            
             // Simple glob matching
             if (pattern.includes("*")) {
                 const regex = new RegExp(
                     "^" +
                         pattern
                             .replace(/\./g, "\\.")
-                            .replace(/\*\*/g, ".*")
                             .replace(/\*/g, "[^/]*") +
                         "$",
                 );
@@ -507,37 +557,27 @@ export class FileScanner {
         processor: (item: T) => Promise<R>,
         maxConcurrency: number,
     ): Promise<R[]> {
-        const results: R[] = [];
-        const executing: Promise<void>[] = [];
+        const results = new Array<R>(items.length);
+        const inFlight = new Set<Promise<void>>();
+        const concurrencyLimit = Math.max(1, Math.floor(maxConcurrency));
 
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
+            const task = (async () => {
+                results[i] = await processor(item as T);
+            })();
 
-            // Create a promise for this item
-            const promise = processor(item as T).then((result) => {
-                results[i] = result;
+            inFlight.add(task);
+            task.finally(() => {
+                inFlight.delete(task);
             });
 
-            executing.push(promise);
-
-            // If we've reached max concurrency, wait for one to complete
-            if (executing.length >= maxConcurrency) {
-                await Promise.race(executing);
-                // Remove completed promises
-                const stillExecuting = [];
-                for (const p of executing) {
-                    try {
-                        await Promise.race([p, Promise.resolve()]);
-                    } catch {
-                        stillExecuting.push(p);
-                    }
-                }
-                executing.length = 0;
-                executing.push(...stillExecuting);
+            if (inFlight.size >= concurrencyLimit) {
+                await Promise.race(inFlight);
             }
         }
 
-        await Promise.all(executing);
+        await Promise.all(inFlight);
 
         return results;
     }

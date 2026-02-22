@@ -212,6 +212,7 @@ async function combineCommand(
                     `Would process ${allFiles.length} files (dry-run mode)`,
                 ),
             );
+            let estimatedTokens = 0;
             for (const file of allFiles) {
                 const size = formatFileSize(statSync(file).size);
                 console.log(
@@ -219,15 +220,19 @@ async function combineCommand(
                         `  • ${relative(process.cwd(), file)} (${size})`,
                     ),
                 );
+                try {
+                    const content = readFileSync(file, "utf-8");
+                    estimatedTokens += countTokens(content);
+                } catch {
+                    // Fall back to a rough size-based estimate if the file can't be read.
+                    estimatedTokens += Math.ceil(statSync(file).size / 4);
+                }
             }
             spinner.warn(
                 chalk.yellow(
-                    `Total: ${allFiles.length} files, ~${formatEstimatedTokens(
-                        allFiles.reduce(
-                            (total, file) => total + statSync(file).size,
-                            0,
-                        ),
-                    )} tokens`,
+                    `Total: ${allFiles.length} files, ${formatEstimatedTokens(
+                        estimatedTokens,
+                    )}`,
                 ),
             );
             return;
@@ -250,21 +255,9 @@ async function combineCommand(
                 process.exit(1);
             }
 
-            // Count total tokens first for display
-            let totalTokens = 0;
-            for (const file of allFiles) {
-                try {
-                    const fileContent = readFileSync(file, "utf-8");
-                    totalTokens += countTokens(fileContent);
-                } catch {
-                    // Skip unreadable files
-                }
-            }
-
             // Launch interactive file selection
             console.log(
-                chalk.cyan(`\nFound ${allFiles.length} files `) +
-                    chalk.gray(`(~${Math.round(totalTokens / 1000)}k tokens)`),
+                chalk.cyan(`\nFound ${allFiles.length} files`),
             );
             console.log(
                 chalk.cyan(
@@ -356,7 +349,7 @@ async function combineCommand(
                 if (!isStdout) {
                     progress.update(i + 1, totalSize, totalSize);
                 }
-            } catch (error) {
+            } catch {
                 const relativePath = relative(process.cwd(), file);
                 if (relativePath) {
                     failedFiles.push(relativePath);

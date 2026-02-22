@@ -3,8 +3,6 @@
  * Each language defines its own parser type and processing strategy
  */
 
-import { PrivateIdentifier } from "ts-morph";
-
 export type ParserType = "tree-sitter" | "line-based" | "regex" | "custom";
 
 /**
@@ -20,6 +18,7 @@ export interface ProcessingOptions {
     internal?: boolean; // Include internal members
 
     // Depth control
+    depth?: "public" | "protected" | "all"; // Legacy visibility depth alias
     maxDepth?: number; // Maximum nesting depth
 
     // Filtering
@@ -28,6 +27,14 @@ export interface ProcessingOptions {
 
     // Output format hints
     preserveOrder?: boolean; // Maintain source order
+    compact?: boolean; // Prefer compact signatures over detailed members
+
+    // Legacy compatibility aliases
+    includePrivate?: boolean;
+    includeProtected?: boolean;
+    includeImports?: boolean;
+    includeDocstrings?: boolean;
+    includeComments?: boolean;
 
     // Performance
     maxFileSize?: number; // Skip files larger than this

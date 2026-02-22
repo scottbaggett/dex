@@ -7,6 +7,7 @@ import {
     MemberNode,
     SkippedItem,
 } from "../types.js";
+import { matchesAnyPattern } from "../../../utils/patterns.js";
 
 /**
  * TypeScript AST processor using TypeScript compiler API
@@ -28,6 +29,8 @@ export class TypeScriptASTProcessor {
         const exports: ExportNode[] = [];
         const imports: ImportNode[] = [];
         const skipped: SkippedItem[] = [];
+
+        // hi
 
         const visit = (node: ts.Node) => {
             // Process imports
@@ -190,7 +193,7 @@ export class TypeScriptASTProcessor {
 
     private getClassSignature(
         node: ts.ClassDeclaration,
-        options: ProcessingOptions,
+        _options: ProcessingOptions,
     ): string {
         let signature = `class ${node.name?.text || "Anonymous"}`;
 
@@ -222,7 +225,7 @@ export class TypeScriptASTProcessor {
 
     private getInterfaceSignature(
         node: ts.InterfaceDeclaration,
-        options: ProcessingOptions,
+        _options: ProcessingOptions,
     ): string {
         let signature = `interface ${node.name.text}`;
 
@@ -267,7 +270,7 @@ export class TypeScriptASTProcessor {
 
     private getEnumSignature(
         node: ts.EnumDeclaration,
-        options: ProcessingOptions,
+        _options: ProcessingOptions,
     ): string {
         const members = node.members.map((m) => m.getText()).join(", ");
         return `enum ${node.name.text} { ${members} }`;
@@ -361,8 +364,8 @@ export class TypeScriptASTProcessor {
 
     private getInterfaceMembers(
         node: ts.InterfaceDeclaration,
-        sourceFile: ts.SourceFile,
-        options: ProcessingOptions,
+        _sourceFile: ts.SourceFile,
+        _options: ProcessingOptions,
     ): MemberNode[] {
         const members: MemberNode[] = [];
 
@@ -440,28 +443,18 @@ export class TypeScriptASTProcessor {
     ): boolean {
         // Apply pattern filters
         if (options.include && options.include.length > 0) {
-            if (!this.matchesPatterns(node.name, options.include)) {
+            if (!matchesAnyPattern(node.name, options.include)) {
                 return false;
             }
         }
 
         if (options.exclude && options.exclude.length > 0) {
-            if (this.matchesPatterns(node.name, options.exclude)) {
+            if (matchesAnyPattern(node.name, options.exclude)) {
                 return false;
             }
         }
 
         return true;
-    }
-
-    private matchesPatterns(name: string, patterns: string[]): boolean {
-        return patterns.some((pattern) => {
-            // Convert glob pattern to regex
-            const regex = new RegExp(
-                "^" + pattern.replace(/\*/g, ".*").replace(/\?/g, ".") + "$",
-            );
-            return regex.test(name);
-        });
     }
 
     private filterExports(

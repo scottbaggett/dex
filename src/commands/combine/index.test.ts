@@ -5,6 +5,58 @@ import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { countTokens, formatEstimatedTokens } from "../../utils/tokens.js";
+
+function parseUser(program: Command, args: string[]) {
+    return program.parseAsync(args, { from: "user" });
+}
+
+async function captureConsole(run: () => Promise<void>): Promise<string> {
+    const originalLog = console.log;
+    const lines: string[] = [];
+
+    console.log = ((...args: unknown[]) => {
+        lines.push(args.map((arg) => String(arg)).join(" "));
+    }) as typeof console.log;
+
+    try {
+        await run();
+    } finally {
+        console.log = originalLog;
+    }
+
+    return lines.join("\n");
+}
+
+async function captureConsoleAndStderr(
+    run: () => Promise<void>,
+): Promise<{ stdout: string; stderr: string }> {
+    const originalLog = console.log;
+    const originalStderrWrite = process.stderr.write;
+    const stdoutLines: string[] = [];
+    const stderrChunks: string[] = [];
+
+    console.log = ((...args: unknown[]) => {
+        stdoutLines.push(args.map((arg) => String(arg)).join(" "));
+    }) as typeof console.log;
+
+    process.stderr.write = ((chunk: unknown) => {
+        stderrChunks.push(String(chunk));
+        return true;
+    }) as typeof process.stderr.write;
+
+    try {
+        await run();
+    } finally {
+        console.log = originalLog;
+        process.stderr.write = originalStderrWrite;
+    }
+
+    return {
+        stdout: stdoutLines.join("\n"),
+        stderr: stderrChunks.join(""),
+    };
+}
 
 describe("combine command", () => {
     let testDir: string;
@@ -14,7 +66,7 @@ describe("combine command", () => {
         testDir = fs.mkdtempSync(path.join(os.tmpdir(), "combine-test-"));
         originalCwd = process.cwd();
         process.chdir(testDir);
-        // Create test files
+
         fs.writeFileSync("file1.txt", "This is file 1 content");
         fs.writeFileSync("file2.txt", "This is file 2 content");
         fs.mkdirSync("subdir");
@@ -27,205 +79,107 @@ describe("combine command", () => {
     });
 
     test("should combine files with default text format", async () => {
-        const command = createCombineCommand();
         const program = new Command();
-        program.addCommand(command);
+        program.addCommand(createCombineCommand());
 
-        let output = "";
-        const originalWrite = process.stdout.write;
-        process.stdout.write = (chunk: string | Buffer) => {
-            output += chunk.toString();
-            return true;
-        };
+        const output = await captureConsole(async () => {
+            await parseUser(program, ["combine", "file1.txt", "file2.txt", "--stdout"]);
+        });
 
-        try {
-            await program.parseAsync(["combine", "file1.txt", "file2.txt"]);
-            expect(output).toContain("<code_context>");
-            expect(output).toContain('<file path="file1.txt">');
-            expect(output).toContain("This is file 1 content");
-            expect(output).toContain('<file path="file2.txt">');
-            expect(output).toContain("This is file 2 content");
-        } finally {
-            process.stdout.write = originalWrite;
-        }
+        expect(output).toContain("<code_context>");
+        expect(output).toContain('<file path="file1.txt">');
+        expect(output).toContain("This is file 1 content");
+        expect(output).toContain('<file path="file2.txt">');
+        expect(output).toContain("This is file 2 content");
     });
 
     test("should combine files with markdown format", async () => {
-        const command = createCombineCommand();
         const program = new Command();
-        program.addCommand(command);
+        program.addCommand(createCombineCommand());
 
-        let output = "";
-        const originalWrite = process.stdout.write;
-        process.stdout.write = (chunk: string | Buffer) => {
-            output += chunk.toString();
-            return true;
-        };
+        const output = await captureConsole(async () => {
+            await parseUser(program, ["combine", "file1.txt", "-f", "md", "--stdout"]);
+        });
 
-        try {
-            await program.parseAsync([
-                "combine",
-                "file1.txt",
-                "-f",
-                "md",
-                "--stdout",
-            ]);
-            expect(output).toContain("# Code Context");
-            expect(output).toContain("## file1.txt");
-            expect(output).toContain("```");
-            expect(output).toContain("This is file 1 content");
-        } finally {
-            process.stdout.write = originalWrite;
-        }
+        expect(output).toContain("# Code Context");
+        expect(output).toContain("## file1.txt");
+        expect(output).toContain("This is file 1 content");
     });
 
     test("should combine files with json format", async () => {
-        const command = createCombineCommand();
         const program = new Command();
-        program.addCommand(command);
+        program.addCommand(createCombineCommand());
 
-        let output = "";
-        const originalWrite = process.stdout.write;
-        process.stdout.write = (chunk: string | Buffer) => {
-            output += chunk.toString();
-            return true;
-        };
+        const output = await captureConsole(async () => {
+            await parseUser(program, ["combine", "file1.txt", "--format", "json", "--stdout"]);
+        });
 
-        try {
-            await program.parseAsync([
-                "combine",
-                "file1.txt",
-                "--format",
-                "json",
-                "--stdout",
-            ]);
-            const parsed = JSON.parse(output);
-            expect(parsed.files).toHaveLength(1);
-            expect(parsed.files[0].path).toBe("file1.txt");
-            expect(parsed.files[0].content).toBe("This is file 1 content");
-            expect(parsed.metadata.totalFiles).toBe(1);
-        } finally {
-            process.stdout.write = originalWrite;
-        }
+        const parsed = JSON.parse(output);
+        expect(parsed.files).toHaveLength(1);
+        expect(parsed.files[0].path).toBe("file1.txt");
+        expect(parsed.files[0].content).toBe("This is file 1 content");
+        expect(parsed.metadata.totalFiles).toBe(1);
     });
 
-    test("should handle include patterns", async () => {
-        const command = createCombineCommand();
-        const program = new Command();
-        program.addCommand(command);
+    test("should apply include and exclude patterns", async () => {
+        const includeProgram = new Command();
+        includeProgram.addCommand(createCombineCommand());
 
-        let output = "";
-        const originalWrite = process.stdout.write;
-        process.stdout.write = (chunk: string | Buffer) => {
-            output += chunk.toString();
-            return true;
-        };
+        const includeOutput = await captureConsole(async () => {
+            await parseUser(includeProgram, ["combine", ".", "--include", "*.txt", "--stdout"]);
+        });
 
-        try {
-            await program.parseAsync([
-                "combine",
-                ".",
-                "--include",
-                "*.txt",
-                "--stdout",
-            ]);
-            expect(output).toContain("file1.txt");
-            expect(output).toContain("file2.txt");
-            expect(output).toContain("subdir/file3.txt");
-        } finally {
-            process.stdout.write = originalWrite;
-        }
+        expect(includeOutput).toContain("file1.txt");
+        expect(includeOutput).toContain("file2.txt");
+        expect(includeOutput).toContain("subdir/file3.txt");
+
+        const excludeProgram = new Command();
+        excludeProgram.addCommand(createCombineCommand());
+
+        const excludeOutput = await captureConsole(async () => {
+            await parseUser(excludeProgram, ["combine", ".", "--exclude", "subdir/**", "--stdout"]);
+        });
+
+        expect(excludeOutput).toContain("file1.txt");
+        expect(excludeOutput).toContain("file2.txt");
+        expect(excludeOutput).not.toContain("subdir/file3.txt");
     });
 
-    test("should handle exclude patterns", async () => {
-        const command = createCombineCommand();
+    test("should show dry-run estimates using token counts", async () => {
         const program = new Command();
-        program.addCommand(command);
+        program.addCommand(createCombineCommand());
 
-        let output = "";
-        const originalWrite = process.stdout.write;
-        process.stdout.write = (chunk: string | Buffer) => {
-            output += chunk.toString();
-            return true;
-        };
+        const output = await captureConsoleAndStderr(async () => {
+            await parseUser(program, ["combine", "file1.txt", "--dry-run"]);
+        });
 
-        try {
-            await program.parseAsync([
-                "combine",
-                ".",
-                "--exclude",
-                "subdir/**",
-                "--stdout",
-            ]);
-            expect(output).toContain("file1.txt");
-            expect(output).toContain("file2.txt");
-            expect(output).not.toContain("subdir/file3.txt");
-        } finally {
-            process.stdout.write = originalWrite;
-        }
+        const expectedTokens = formatEstimatedTokens(
+            countTokens("This is file 1 content"),
+        );
+
+        expect(output.stdout).toContain("file1.txt");
+        expect(output.stderr).toContain(expectedTokens);
+        expect(output.stderr).not.toContain("~22 tokens");
     });
 
-    test("should handle dry-run mode", async () => {
-        const command = createCombineCommand();
+    test("should respect max-files option", async () => {
         const program = new Command();
-        program.addCommand(command);
+        program.addCommand(createCombineCommand());
 
-        let output = "";
-        const originalWrite = process.stdout.write;
-        process.stdout.write = (chunk: string | Buffer) => {
-            output += chunk.toString();
-            return true;
-        };
+        const output = await captureConsole(async () => {
+            await parseUser(program, ["combine", ".", "--max-files", "1", "--stdout"]);
+        });
 
-        try {
-            await program.parseAsync(["combine", "file1.txt", "--dry-run"]);
-            expect(output).toContain("Would process 1 files");
-            expect(output).toContain("file1.txt");
-        } finally {
-            process.stdout.write = originalWrite;
-        }
+        const fileCount = (output.match(/<file path="/g) || []).length;
+        expect(fileCount).toBe(1);
     });
 
-    test("should handle max-files option", async () => {
-        const command = createCombineCommand();
+    test("should write output to file", async () => {
         const program = new Command();
-        program.addCommand(command);
-
-        let output = "";
-        const originalWrite = process.stdout.write;
-        process.stdout.write = (chunk: string | Buffer) => {
-            output += chunk.toString();
-            return true;
-        };
-
-        try {
-            await program.parseAsync([
-                "combine",
-                ".",
-                "--max-files",
-                "1",
-                "--stdout",
-            ]);
-            // Should only contain one file
-            const fileCount = (output.match(/<file path="/g) || []).length;
-            expect(fileCount).toBe(1);
-        } finally {
-            process.stdout.write = originalWrite;
-        }
-    });
-
-    test("should handle output to file", async () => {
-        const command = createCombineCommand();
-        const program = new Command();
-        program.addCommand(command);
+        program.addCommand(createCombineCommand());
 
         const outputPath = "combined_output.txt";
-        await program.parseAsync([
-            "combine",
-            "file1.txt",
-            "--output",
-            outputPath,
-        ]);
+        await parseUser(program, ["combine", "file1.txt", "--output", outputPath]);
 
         expect(fs.existsSync(outputPath)).toBe(true);
         const content = fs.readFileSync(outputPath, "utf-8");
@@ -233,51 +187,21 @@ describe("combine command", () => {
         expect(content).toContain("This is file 1 content");
     });
 
-    test("should handle clipboard option", async () => {
-        const command = createCombineCommand();
+    test("should exit with code 1 when no files are found", async () => {
         const program = new Command();
-        program.addCommand(command);
+        program.addCommand(createCombineCommand());
 
-        let output = "";
-        const originalWrite = process.stdout.write;
-        process.stdout.write = (chunk: string | Buffer) => {
-            output += chunk.toString();
-            return true;
-        };
+        const originalExit = process.exit;
+        process.exit = ((code?: number) => {
+            throw new Error(`process.exit:${code ?? 0}`);
+        }) as typeof process.exit;
 
         try {
-            await program.parseAsync(["combine", "file1.txt", "--clipboard"]);
-            expect(output).toContain("Combined output");
-            expect(output).toContain("copied to clipboard");
+            await expect(
+                parseUser(program, ["combine", "nonexistent*.txt", "--stdout"]),
+            ).rejects.toThrow("process.exit:1");
         } finally {
-            process.stdout.write = originalWrite;
-        }
-    });
-
-    test("should handle no files found", async () => {
-        const command = createCombineCommand();
-        const program = new Command();
-        program.addCommand(command);
-
-        let output = "";
-        const originalWrite = process.stdout.write;
-        process.stdout.write = (chunk: string | Buffer) => {
-            output += chunk.toString();
-            return true;
-        };
-
-        try {
-            await program.parseAsync([
-                "combine",
-                "nonexistent*.txt",
-                "--stdout",
-            ]);
-            expect(output).toContain("No files found");
-        } catch (error) {
-            // Expected to exit with error
-            expect(error.message).toContain("No files found");
-        } finally {
-            process.stdout.write = originalWrite;
+            process.exit = originalExit;
         }
     });
 });

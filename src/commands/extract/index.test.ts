@@ -1,7 +1,6 @@
 // @ts-expect-error - bun:test types not available in this environment
 import { test, expect, describe } from "bun:test";
 import { createExtractCommand } from "./index.js";
-import { Command } from "commander";
 
 describe("extract command", () => {
     test("should create extract command with correct name and description", () => {
@@ -13,136 +12,56 @@ describe("extract command", () => {
         );
     });
 
-    test("should accept range argument", () => {
+    test("should expose expected core options", () => {
         const command = createExtractCommand();
-        const program = new Command();
-        program.addCommand(command);
+        const options = command.options.map((option) => option.long);
 
-        // This should not throw when parsing with a range argument
-        expect(() => {
-            program.parse(["extract", "HEAD~1..HEAD"]);
-        }).not.toThrow();
+        expect(options).toContain("--staged");
+        expect(options).toContain("--all");
+        expect(options).toContain("--path");
+        expect(options).toContain("--type");
+        expect(options).toContain("--format");
+        expect(options).toContain("--clipboard");
+        expect(options).toContain("--include-untracked");
+        expect(options).toContain("--optimize");
+        expect(options).toContain("--select");
     });
 
-    test("should have all required options", () => {
+    test("should configure format option choices", () => {
         const command = createExtractCommand();
+        const formatOption = command.options.find(
+            (option) => option.long === "--format",
+        );
 
-        // Test that key options exist by trying to parse them
-        const program = new Command();
-        program.addCommand(command);
-
-        // This should not throw for valid options
-        expect(() => {
-            program.parse(["extract", "--help"]);
-        }).not.toThrow();
+        expect(formatOption).toBeDefined();
+        expect(formatOption?.defaultValue).toBe("txt");
+        expect(formatOption?.argChoices).toEqual(["txt", "md", "json"]);
     });
 
-    test("should validate format options", () => {
+    test("should register optimize option as variadic", () => {
         const command = createExtractCommand();
-        const program = new Command();
-        program.addCommand(command);
+        const optimizeOption = command.options.find(
+            (option) => option.long === "--optimize",
+        );
 
-        // Test valid formats
-        expect(() => {
-            program.parse(["extract", "--format", "txt"]);
-        }).not.toThrow();
-
-        expect(() => {
-            program.parse(["extract", "--format", "json"]);
-        }).not.toThrow();
-
-        expect(() => {
-            program.parse(["extract", "--format", "markdown"]);
-        }).not.toThrow();
+        expect(optimizeOption).toBeDefined();
+        expect(optimizeOption?.variadic).toBe(true);
     });
 
-    test("should handle optimize flags parsing", () => {
+    test("should include sorting and filtering options", () => {
         const command = createExtractCommand();
-        const program = new Command();
-        program.addCommand(command);
+        const options = command.options.map((option) => option.long);
 
-        // Test optimize flags
-        expect(() => {
-            program.parse(["extract", "--optimize", "aid", "symbols"]);
-        }).not.toThrow();
+        expect(options).toContain("--sort-by");
+        expect(options).toContain("--sort-order");
+        expect(options).toContain("--filter-by");
     });
 
-    test("should handle sort and filter options", () => {
-        const command = createExtractCommand();
-        const program = new Command();
-        program.addCommand(command);
+    test("should create independent command instances", () => {
+        const commandA = createExtractCommand();
+        const commandB = createExtractCommand();
 
-        // Test sort options
-        expect(() => {
-            program.parse([
-                "extract",
-                "--sort-by",
-                "name",
-                "--sort-order",
-                "asc",
-            ]);
-        }).not.toThrow();
-
-        expect(() => {
-            program.parse(["extract", "--filter-by", "staged"]);
-        }).not.toThrow();
-    });
-
-    test("should handle boolean flags", () => {
-        const command = createExtractCommand();
-        const program = new Command();
-        program.addCommand(command);
-
-        // Test boolean flags
-        expect(() => {
-            program.parse([
-                "extract",
-                "--staged",
-                "--all",
-                "--clipboard",
-                "--no-metadata",
-            ]);
-        }).not.toThrow();
-    });
-
-    test("should handle interactive selection flag", () => {
-        const command = createExtractCommand();
-        const program = new Command();
-        program.addCommand(command);
-
-        expect(() => {
-            program.parse(["extract", "--select"]);
-        }).not.toThrow();
-    });
-
-    test("should handle path and type filters", () => {
-        const command = createExtractCommand();
-        const program = new Command();
-        program.addCommand(command);
-
-        expect(() => {
-            program.parse([
-                "extract",
-                "--path",
-                "*.ts",
-                "--type",
-                "typescript,javascript",
-            ]);
-        }).not.toThrow();
-    });
-
-    test("should handle untracked files options", () => {
-        const command = createExtractCommand();
-        const program = new Command();
-        program.addCommand(command);
-
-        expect(() => {
-            program.parse([
-                "extract",
-                "--include-untracked",
-                "--untracked-pattern",
-                "*.test.ts",
-            ]);
-        }).not.toThrow();
+        expect(commandA).not.toBe(commandB);
+        expect(commandA.options.length).toBe(commandB.options.length);
     });
 });

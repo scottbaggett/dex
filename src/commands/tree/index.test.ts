@@ -1,5 +1,5 @@
 // @ts-expect-error - bun:test types not available in this environment
-import { test, expect, mock } from "bun:test";
+import { test, expect, mock, afterEach } from "bun:test";
 import {
     createTreeCommand,
     treeCommand,
@@ -14,12 +14,29 @@ import { promises as fs } from "fs";
 import { resolve } from "path";
 import { ExtractedAPI } from "../../types.js";
 
-// Mock dependencies
-mock("../../core/distiller/index.js");
-mock("../../utils/output-manager.js");
-mock("../../utils/progress.js");
-mock("clipboardy");
-mock("fs");
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+const originalProcessExit = process.exit;
+const originalFsAccess = fs.access;
+const originalFsWriteFile = fs.writeFile;
+const originalDistill = Distiller.prototype.distill;
+const originalProgressComplete = ProgressBar.prototype.complete;
+const originalSaveOutput = OutputManager.prototype.saveOutput;
+const originalGetFilePath = OutputManager.prototype.getFilePath;
+const originalClipboardWrite = clipboardy.write;
+
+afterEach(() => {
+    console.log = originalConsoleLog;
+    console.error = originalConsoleError;
+    process.exit = originalProcessExit;
+    fs.access = originalFsAccess;
+    fs.writeFile = originalFsWriteFile;
+    Distiller.prototype.distill = originalDistill;
+    ProgressBar.prototype.complete = originalProgressComplete;
+    OutputManager.prototype.saveOutput = originalSaveOutput;
+    OutputManager.prototype.getFilePath = originalGetFilePath;
+    clipboardy.write = originalClipboardWrite;
+});
 
 test("createTreeCommand creates a commander command with correct options", () => {
     const command = createTreeCommand();
@@ -121,9 +138,12 @@ test("treeCommand with stdout option", async () => {
     // Mock fs.access
     fs.access = mock(() => Promise.resolve());
 
+    let observedWorkers: number | undefined;
     // Mock Distiller
-    Distiller.prototype.distill = mock(() =>
-        Promise.resolve({
+    Distiller.prototype.distill = mock(function () {
+        observedWorkers = (this as { options?: { workers?: number } }).options
+            ?.workers;
+        return Promise.resolve({
             apis: [
                 {
                     file: "test.ts",
@@ -139,10 +159,11 @@ test("treeCommand with stdout option", async () => {
                 },
             ],
             structure: undefined,
-        }),
-    );
+        });
+    });
 
-    ProgressBar.prototype.complete = mock(() => {});
+    const mockComplete = mock(() => {});
+    ProgressBar.prototype.complete = mockComplete;
 
     // Mock console.log
     const mockLog = mock(() => {});
@@ -151,6 +172,8 @@ test("treeCommand with stdout option", async () => {
     try {
         await treeCommand(".", { stdout: true });
         expect(mockLog).toHaveBeenCalled();
+        expect(mockComplete).not.toHaveBeenCalled();
+        expect(observedWorkers).toBe(1);
     } finally {
         console.log = mockLog;
     }

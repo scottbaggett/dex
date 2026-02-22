@@ -96,7 +96,7 @@ def test_function():
 
         // Without includePrivate
         const result1 = await registry.processFile("test.ts", source, {
-            includePrivate: false,
+            private: false,
         });
 
         const classExport1 = result1.exports[0];
@@ -108,7 +108,7 @@ def test_function():
 
         // With includePrivate
         const result2 = await registry.processFile("test.ts", source, {
-            includePrivate: true,
+            private: true,
         });
 
         const classExport2 = result2.exports[0];

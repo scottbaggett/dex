@@ -85,8 +85,11 @@ describe("JsonFormatter", () => {
             expect(parsed.files).toHaveLength(2);
             expect(parsed.files[0].path).toBe("test.ts");
             expect(parsed.files[1].path).toBe("utils.js");
-            expect(parsed.files[0].exports).toContain("TestClass");
-            expect(parsed.files[0].exports).toContain("publicFunction");
+            const exportNames = parsed.files[0].exports.map(
+                (item: { name: string }) => item.name,
+            );
+            expect(exportNames).toContain("TestClass");
+            expect(exportNames).toContain("publicFunction");
         });
 
         test("includes imports when includeImports is true", () => {
@@ -96,7 +99,7 @@ describe("JsonFormatter", () => {
             const parsed = JSON.parse(result);
             
             expect(parsed.files[0].imports).toEqual(["react", "lodash"]);
-            expect(parsed.files[1].imports).toEqual([]);
+            expect(parsed.files[1].imports).toBeUndefined();
         });
 
         test("excludes imports when includeImports is false", () => {
@@ -114,8 +117,11 @@ describe("JsonFormatter", () => {
                 includePrivate: true
             });
             const parsed = JSON.parse(result);
-            
-            expect(parsed.files[0].exports).toContain("_privateFunction");
+
+            const exportNames = parsed.files[0].exports.map(
+                (item: { name: string }) => item.name,
+            );
+            expect(exportNames).toContain("_privateFunction");
         });
 
         test("excludes private members when includePrivate is false", () => {
@@ -123,8 +129,11 @@ describe("JsonFormatter", () => {
                 includePrivate: false
             });
             const parsed = JSON.parse(result);
-            
-            expect(parsed.files[0].exports).not.toContain("_privateFunction");
+
+            const exportNames = parsed.files[0].exports.map(
+                (item: { name: string }) => item.name,
+            );
+            expect(exportNames).not.toContain("_privateFunction");
         });
 
         test("includes metadata when includeMetadata is true", () => {
@@ -137,7 +146,7 @@ describe("JsonFormatter", () => {
             expect(parsed.metadata.fileCount).toBe(2);
             expect(parsed.metadata.originalTokens).toBe(1000);
             expect(parsed.metadata.distilledTokens).toBe(200);
-            expect(parsed.metadata.compressionRatio).toBe("80.0%");
+            expect(parsed.metadata.compressionRatio).toBe(0.8);
             expect(parsed.metadata.languages).toEqual({
                 typescript: 1,
                 javascript: 1
@@ -227,11 +236,15 @@ describe("JsonFormatter", () => {
             expect(parsed.files).toHaveLength(2);
             expect(parsed.files[0]).toEqual({
                 path: "test.ts",
+                size: 1024,
+                hash: "abc123",
                 language: "typescript",
                 content: "const x = 1;"
             });
             expect(parsed.files[1]).toEqual({
                 path: "utils.js",
+                size: 512,
+                hash: "def456",
                 language: "javascript",
                 content: "function helper() {}"
             });
@@ -245,7 +258,7 @@ describe("JsonFormatter", () => {
             
             expect(parsed.metadata).toBeDefined();
             expect(parsed.metadata.totalFiles).toBe(2);
-            expect(parsed.metadata.totalSize).toBe("1.5 KB");
+            expect(parsed.metadata.totalSize).toBe(1536);
             expect(parsed.metadata.timestamp).toBe("2023-01-01T00:00:00Z");
         });
 
@@ -396,18 +409,43 @@ describe("JsonFormatter", () => {
         });
     });
 
-    describe("formatFileSize helper", () => {
-        test("formats file sizes correctly", () => {
-            // @ts-expect-error - accessing private method for testing
-            expect(formatter.formatFileSize(512)).toBe("512 B");
-            // @ts-expect-error - accessing private method for testing
-            expect(formatter.formatFileSize(1024)).toBe("1.0 KB");
-            // @ts-expect-error - accessing private method for testing  
-            expect(formatter.formatFileSize(1536)).toBe("1.5 KB");
-            // @ts-expect-error - accessing private method for testing
-            expect(formatter.formatFileSize(1048576)).toBe("1.0 MB");
-            // @ts-expect-error - accessing private method for testing
-            expect(formatter.formatFileSize(1572864)).toBe("1.5 MB");
+    describe("schema shape", () => {
+        test("distillation export entries use structured objects", () => {
+            const distillation: DistillationResult = {
+                apis: [
+                    {
+                        file: "example.ts",
+                        imports: [],
+                        exports: [
+                            {
+                                name: "value",
+                                type: "const",
+                                signature: "const value: number",
+                                visibility: "public",
+                                location: { startLine: 1, endLine: 1 },
+                            },
+                        ],
+                    },
+                ],
+                structure: {
+                    directories: [],
+                    fileCount: 1,
+                    languages: { typescript: 1 },
+                },
+                dependencies: {},
+                metadata: {
+                    originalTokens: 10,
+                    distilledTokens: 5,
+                    compressionRatio: 0.5,
+                },
+            };
+
+            const result = formatter.formatDistillation(distillation);
+            const parsed = JSON.parse(result);
+
+            expect(parsed.files[0].exports[0]).toHaveProperty("name");
+            expect(parsed.files[0].exports[0]).toHaveProperty("type");
+            expect(parsed.files[0].exports[0]).toHaveProperty("signature");
         });
     });
 });

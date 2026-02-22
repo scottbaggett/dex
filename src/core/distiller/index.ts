@@ -19,6 +19,7 @@ import { getDistillExcludes } from "../../utils/default-excludes.js";
 import { Piscina } from "piscina";
 import { fileURLToPath } from "url";
 import { resolve } from "path";
+import { toDependencies, toExtractedAPI } from "./normalize.js";
 
 /**
  * Core distillation engine that extracts and compresses API signatures from source code.
@@ -39,12 +40,22 @@ export class Distiller {
             docstrings: true,
             comments: false,
             format: "txt",
-            workers: 4, // Sweet spot: 4 workers balances parallelism with overhead
+            // Default to sequential mode for predictable behavior in short-lived CLI
+            // runs and test environments. Parallel workers can still be explicitly enabled.
+            workers: 1,
             exclude: [],
             include: [],
             ...options,
         } as DistillerOptions;
-        
+
+        // Normalize workers: treat undefined/NaN as sequential mode.
+        const normalizedWorkers =
+            typeof this.options.workers === "number" &&
+            Number.isFinite(this.options.workers)
+                ? this.options.workers
+                : 1;
+        this.options.workers = normalizedWorkers;
+
         // Initialize worker pool if using parallel processing
         if (this.options.workers && this.options.workers > 1) {
             this.initializeWorkerPool();
@@ -146,13 +157,15 @@ export class Distiller {
             this.progress.start(selectedFiles.length);
         }
 
-        // Distill the selected files
-        const distillationResult = await this.distillFiles(
-            selectedFiles,
-            basePath,
-        );
-
-        return distillationResult;
+        try {
+            // Distill the selected files
+            return await this.distillFiles(
+                selectedFiles,
+                basePath,
+            );
+        } finally {
+            await this.cleanup();
+        }
     }
 
     /**
@@ -295,36 +308,8 @@ export class Distiller {
                             processingOptions,
                         );
 
-                        // Convert to ExtractedAPI format
-                        const extracted: ExtractedAPI = {
-                            file: file.path,
-                            imports: processResult.imports.map((i: any) => i.source),
-                            exports: processResult.exports.map((e: any) => ({
-                                name: e.name,
-                                type: this.mapExportKind(e.kind),
-                                signature: e.signature,
-                                visibility: e.visibility || "public",
-                                location: {
-                                    startLine: e.line || 0,
-                                    endLine: e.line || 0,
-                                },
-                                members: e.members?.map((m: any) => ({
-                                    name: m.name,
-                                    signature: m.signature,
-                                    type:
-                                        m.kind === "constructor" ||
-                                        m.kind === "getter" ||
-                                        m.kind === "setter"
-                                            ? "method"
-                                            : (m.kind as "property" | "method"),
-                                })),
-                            })),
-                        };
-
-                        const deps = {
-                            imports: processResult.imports.map((i: any) => i.source),
-                            exports: processResult.exports.map((e: any) => e.name),
-                        };
+                        const extracted = toExtractedAPI(file.path, processResult);
+                        const deps = toDependencies(processResult);
 
                         result = { api: extracted, dependencies: deps, originalTokens: origTokens, language };
                     } catch (error) {
@@ -501,38 +486,6 @@ export class Distiller {
     }
 
     /**
-     * Maps language-specific export kinds to standardized types.
-     *
-     * Different language processors may use different terminology for similar
-     * constructs. This method normalizes them to a consistent set of types.
-     *
-     * @param kind - Language-specific kind string from a processor
-     * @returns Normalized export kind
-     * @private
-     */
-    private mapExportKind(
-        kind: string,
-    ): "function" | "class" | "interface" | "const" | "type" | "enum" {
-        // Map language-specific kinds to ExtractedAPI types
-        switch (kind) {
-            case "function":
-            case "class":
-            case "interface":
-            case "type":
-            case "enum":
-                return kind as any;
-            case "const":
-            case "let":
-            case "var":
-            case "namespace":
-            case "module":
-                return "const";
-            default:
-                return "const";
-        }
-    }
-
-    /**
      * Formats the distillation result for output.
      *
      * Applies the configured formatter (txt, json, md, xml) to transform
@@ -551,7 +504,7 @@ export class Distiller {
      * console.log(JSON.parse(json));
      * ```
      */
-    formatResult(result: DistillationResult, originalPath?: string): string {
+    formatResult(result: DistillationResult, _originalPath?: string): string {
         // Handle null/undefined result
         if (!result) {
             return "# Distillation Result\n\nNo content was distilled.";

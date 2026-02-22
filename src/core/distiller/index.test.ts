@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll } from "bun:test";
+import { describe, test, expect, mock } from "bun:test";
 import { Distiller } from "./index.js";
 import { promises as fs } from "fs";
 import { resolve, join } from "path";
@@ -7,6 +7,15 @@ describe("Distiller", () => {
     const fixturesPath = resolve("tests/fixtures");
     const tsFixtures = join(fixturesPath, "typescript/src");
     const pyFixtures = join(fixturesPath, "python/src");
+
+    test("defaults to sequential workers when worker count is not provided", () => {
+        const distiller = new Distiller({
+            path: tsFixtures,
+            format: "txt",
+        });
+
+        expect((distiller as any).options.workers).toBe(1);
+    });
 
     describe("TypeScript Processing", () => {
         describe("Visibility Filtering", () => {
@@ -95,10 +104,6 @@ describe("Distiller", () => {
                 const result = await distiller.distill(join(tsFixtures, "greeter.ts"));
                 
                 // Check for docstrings in exports (if processor supports it)
-                const hasDocstrings = result.apis.some(api => 
-                    api.exports.some(exp => exp.docstring && exp.docstring.length > 0)
-                );
-                
                 // This might be false if ts-morph doesn't extract JSDoc
                 // We're testing that the option is passed through correctly
                 expect(result).toBeDefined();
@@ -159,8 +164,8 @@ describe("Distiller", () => {
                 // Should NOT include private method
                 expect(formatted).not.toContain("_find_user_by_id");
                 
-                // __init__ is special - should be included even though it starts with _
-                expect(formatted).not.toContain("__init__");
+                // __init__ is a special method and should be preserved.
+                expect(formatted).toContain("__init__");
             });
 
             test("should include private methods when private option is true", async () => {
@@ -303,7 +308,9 @@ describe("Distiller", () => {
             // Create empty directory if it doesn't exist
             try {
                 await fs.mkdir(emptyDir, { recursive: true });
-            } catch {}
+            } catch {
+                // Directory may already exist from a previous run.
+            }
 
             const distiller = new Distiller({
                 path: emptyDir,
@@ -314,6 +321,55 @@ describe("Distiller", () => {
             
             expect(result.apis.length).toBe(0);
             expect(result.metadata.originalTokens).toBe(0);
+        });
+
+        test("should cleanup when distillSelectedFiles succeeds", async () => {
+            const distiller = new Distiller({
+                path: tsFixtures,
+                format: "txt",
+            });
+
+            const fakeResult = {
+                apis: [],
+                structure: { directories: [], fileCount: 0, languages: {} },
+                dependencies: {},
+                metadata: {
+                    originalTokens: 0,
+                    distilledTokens: 0,
+                    compressionRatio: 0,
+                },
+            };
+
+            const distillFilesMock = mock(async () => fakeResult);
+            const cleanupMock = mock(async () => {});
+
+            (distiller as any).distillFiles = distillFilesMock;
+            (distiller as any).cleanup = cleanupMock;
+
+            const result = await distiller.distillSelectedFiles([], tsFixtures);
+
+            expect(result).toEqual(fakeResult);
+            expect(cleanupMock).toHaveBeenCalledTimes(1);
+        });
+
+        test("should cleanup when distillSelectedFiles throws", async () => {
+            const distiller = new Distiller({
+                path: tsFixtures,
+                format: "txt",
+            });
+
+            const distillFilesMock = mock(async () => {
+                throw new Error("distill failed");
+            });
+            const cleanupMock = mock(async () => {});
+
+            (distiller as any).distillFiles = distillFilesMock;
+            (distiller as any).cleanup = cleanupMock;
+
+            await expect(
+                distiller.distillSelectedFiles([], tsFixtures),
+            ).rejects.toThrow("distill failed");
+            expect(cleanupMock).toHaveBeenCalledTimes(1);
         });
     });
 
