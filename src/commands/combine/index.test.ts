@@ -140,6 +140,25 @@ describe("combine command", () => {
         expect(parsed.metadata.totalFiles).toBe(1);
     });
 
+    test("should write audit manifest for output-producing runs", async () => {
+        const program = new Command();
+        program.addCommand(createCombineCommand());
+
+        await parseUser(program, ["combine", "file1.txt", "--stdout"]);
+
+        const manifestPath = path.join(testDir, ".dex", "audit", "manifest.jsonl");
+        expect(fs.existsSync(manifestPath)).toBe(true);
+        const lines = fs
+            .readFileSync(manifestPath, "utf-8")
+            .trim()
+            .split("\n");
+        expect(lines.length).toBeGreaterThan(0);
+        const latest = JSON.parse(lines[lines.length - 1] || "{}");
+        expect(latest.command).toBe("combine");
+        expect(latest.outputPath).toBe("stdout");
+        expect(latest.payloadHash).toBeString();
+    });
+
     test("should apply include and exclude patterns", async () => {
         const includeProgram = new Command();
         includeProgram.addCommand(createCombineCommand());
