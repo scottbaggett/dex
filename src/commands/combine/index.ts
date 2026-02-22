@@ -17,6 +17,7 @@ import { countTokens, formatEstimatedTokens } from "../../utils/tokens.js";
 import { z } from "zod";
 import { ProgressBar } from "../../utils/progress.js";
 import { runSafetyPipeline } from "../../core/safety/pipeline.js";
+import { appendSafetyAuditManifest } from "../../core/safety/audit.js";
 import {
     agentInstructions,
     combineSuccessMessage,
@@ -415,6 +416,16 @@ async function combineCommand(
         if (options.clipboard) {
             try {
                 await clipboardy.write(output);
+                await appendSafetyAuditManifest({
+                    command: "combine",
+                    outputPath: "clipboard",
+                    payload: output,
+                    target: options.target,
+                    includeSensitive: options.includeSensitive,
+                    redactionCountsByType:
+                        safetyResult.redaction.summary.countsByCategory,
+                    result: "success",
+                });
                 const sizeKB = Math.round(totalSize / 1024);
                 console.log(
                     combineSuccess(
@@ -439,6 +450,16 @@ async function combineCommand(
             const { writeFileSync } = await import("fs");
             const outputPath = resolve(options.output);
             writeFileSync(outputPath, output, "utf-8");
+            await appendSafetyAuditManifest({
+                command: "combine",
+                outputPath,
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
+            });
 
             const sizeKB = Math.round(totalSize / 1024);
             console.log(
@@ -448,6 +469,16 @@ async function combineCommand(
             console.log("\n" + agentInstructions(outputPath));
         } else if (isStdout) {
             // Print to stdout
+            await appendSafetyAuditManifest({
+                command: "combine",
+                outputPath: "stdout",
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
+            });
             console.log(output);
         } else {
             // Save to default location
@@ -479,6 +510,16 @@ async function combineCommand(
                 command: "combine",
                 context,
                 format: options.format as "txt" | "md" | "json",
+            });
+            await appendSafetyAuditManifest({
+                command: "combine",
+                outputPath: fullPath,
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
             });
 
             console.log(combineSuccessMessage(changes, tokenStr, fullPath));

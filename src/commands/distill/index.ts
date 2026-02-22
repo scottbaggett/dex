@@ -14,6 +14,7 @@ import { FileSelector } from "../../utils/file-selector.js";
 import { formatFileSize } from "../../utils/format.js";
 import { distillSaved, agentInstructions } from "../../utils/messages.js";
 import { runSafetyPipeline } from "../../core/safety/pipeline.js";
+import { appendSafetyAuditManifest } from "../../core/safety/audit.js";
 import {
     countTokens,
     formatTokenCount,
@@ -390,6 +391,16 @@ async function distillCommand(
         // Handle output based on explicit options first, then fall back to config
         if (options.clipboard) {
             await clipboardy.write(output);
+            await appendSafetyAuditManifest({
+                command: "distill",
+                outputPath: "clipboard",
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
+            });
 
             // Complete progress
             const originalTokens = result.metadata.originalTokens || 0;
@@ -404,6 +415,16 @@ async function distillCommand(
             console.log(chalk.cyan("📋 Distilled output copied to clipboard"));
         } else if (options.output) {
             await fs.writeFile(options.output, output, "utf-8");
+            await appendSafetyAuditManifest({
+                command: "distill",
+                outputPath: options.output,
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
+            });
 
             // Complete progress
             const originalTokens = result.metadata.originalTokens || 0;
@@ -420,6 +441,16 @@ async function distillCommand(
                     chalk.green(options.output),
             );
         } else if (isStdout) {
+            await appendSafetyAuditManifest({
+                command: "distill",
+                outputPath: "stdout",
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
+            });
             console.log(output);
         } else {
             // Default: save using OutputManager
@@ -439,6 +470,16 @@ async function distillCommand(
                 command: "distill",
                 context: folderName,
                 format: fileFormat as OutputFormat,
+            });
+            await appendSafetyAuditManifest({
+                command: "distill",
+                outputPath: fullPath,
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
             });
 
             // Complete progress with cool output

@@ -19,6 +19,7 @@ import {
     isCommandExitError,
 } from "../../utils/command-exit.js";
 import { runSafetyPipeline } from "../../core/safety/pipeline.js";
+import { appendSafetyAuditManifest } from "../../core/safety/audit.js";
 
 // Helper function to generate context string for filename
 function generateContextString(dexOptions: DexOptions, method: string): string {
@@ -345,6 +346,16 @@ export async function executeExtract(
         // Handle output
         if (parsedOptions.clipboard) {
             await clipboardy.write(output);
+            await appendSafetyAuditManifest({
+                command: "extract",
+                outputPath: "clipboard",
+                payload: output,
+                target: parsedOptions.target,
+                includeSensitive: parsedOptions.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
+            });
 
             // Format token display
             const tokenCount = context.metadata.tokens.estimated;
@@ -371,6 +382,16 @@ export async function executeExtract(
                 command: "extract",
                 context: contextString,
                 format: parsedOptions.format || "txt",
+            });
+            await appendSafetyAuditManifest({
+                command: "extract",
+                outputPath: fullPath,
+                payload: output,
+                target: parsedOptions.target,
+                includeSensitive: parsedOptions.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
             });
 
             // Format token display

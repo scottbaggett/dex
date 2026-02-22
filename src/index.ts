@@ -6,6 +6,8 @@ export { JsonFormatter } from "./commands/extract/formatters/json.js";
 export { TextFormatter } from "./commands/extract/formatters/text.js";
 export { SensitiveDataScanner } from "./core/safety/scanner.js";
 export { SensitiveDataRedactor } from "./core/safety/redactor.js";
+export { runSafetyPipeline } from "./core/safety/pipeline.js";
+export { appendSafetyAuditManifest } from "./core/safety/audit.js";
 
 export type {
     DexOptions,
