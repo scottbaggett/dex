@@ -1,5 +1,12 @@
 import { LanguageModule, ProcessResult, ProcessingOptions } from "./types.js";
 
+interface SyntaxNodeLike {
+    type?: string;
+    startIndex?: number;
+    endIndex?: number;
+    children?: SyntaxNodeLike[];
+}
+
 /**
  * Base class for language modules
  * Provides common functionality and utilities
@@ -10,8 +17,8 @@ export abstract class BaseLanguageModule implements LanguageModule {
     abstract extensions: string[];
     
     protected initialized = false;
-    protected treeSitterLanguage: any = null;
-    protected parser: any = null;
+    protected treeSitterLanguage: unknown = null;
+    protected parser: unknown = null;
     
     /**
      * Initialize the language module
@@ -73,14 +80,14 @@ export abstract class BaseLanguageModule implements LanguageModule {
     /**
      * Get tree-sitter language if available
      */
-    getTreeSitterLanguage(): any {
+    getTreeSitterLanguage(): unknown {
         return this.treeSitterLanguage;
     }
     
     /**
      * Extract text from a node
      */
-    protected getNodeText(node: any, source: string): string {
+    protected getNodeText(node: SyntaxNodeLike | null, source: string): string {
         if (!node) return '';
         
         const startIndex = node.startIndex || 0;
@@ -92,7 +99,10 @@ export abstract class BaseLanguageModule implements LanguageModule {
     /**
      * Find first child of a specific type
      */
-    protected findChildByType(node: any, type: string): any {
+    protected findChildByType(
+        node: SyntaxNodeLike | null,
+        type: string,
+    ): SyntaxNodeLike | null {
         if (!node || !node.children) return null;
         
         for (const child of node.children) {
@@ -107,10 +117,13 @@ export abstract class BaseLanguageModule implements LanguageModule {
     /**
      * Find all children of a specific type
      */
-    protected findChildrenByType(node: any, type: string): any[] {
+    protected findChildrenByType(
+        node: SyntaxNodeLike | null,
+        type: string,
+    ): SyntaxNodeLike[] {
         if (!node || !node.children) return [];
         
-        return node.children.filter((child: any) => child.type === type);
+        return node.children.filter((child) => child.type === type);
     }
     
     /**

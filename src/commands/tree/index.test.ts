@@ -13,10 +13,10 @@ import clipboardy from "clipboardy";
 import { promises as fs } from "fs";
 import { resolve } from "path";
 import { ExtractedAPI } from "../../types.js";
+import { CommandExitError } from "../../utils/command-exit.js";
 
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
-const originalProcessExit = process.exit;
 const originalFsAccess = fs.access;
 const originalFsWriteFile = fs.writeFile;
 const originalDistill = Distiller.prototype.distill;
@@ -28,7 +28,6 @@ const originalClipboardWrite = clipboardy.write;
 afterEach(() => {
     console.log = originalConsoleLog;
     console.error = originalConsoleError;
-    process.exit = originalProcessExit;
     fs.access = originalFsAccess;
     fs.writeFile = originalFsWriteFile;
     Distiller.prototype.distill = originalDistill;
@@ -117,20 +116,19 @@ test("treeCommand with invalid path", async () => {
     const mockAccess = mock(() => Promise.reject(new Error("ENOENT")));
     fs.access = mockAccess;
 
-    // Mock console.error and process.exit
+    // Mock console.error
     const originalError = console.error;
-    const originalExit = process.exit;
     console.error = mock(() => {});
-    process.exit = mock(() => {
-        throw new Error("exit");
-    });
 
     try {
-        await expect(treeCommand("/invalid/path", {})).rejects.toThrow("exit");
+        await expect(
+            treeCommand("/invalid/path", {}),
+        ).rejects.toMatchObject<Partial<CommandExitError>>({
+            exitCode: 1,
+        });
         expect(mockAccess).toHaveBeenCalledWith(resolve("/invalid/path"));
     } finally {
         console.error = originalError;
-        process.exit = originalExit;
     }
 });
 
@@ -417,18 +415,17 @@ test("treeCommand handles error from distiller", async () => {
     ProgressBar.prototype.complete = mock(() => {});
 
     const mockError = mock(() => {});
-    const mockExit = mock(() => {
-        throw new Error("exit");
-    });
     console.error = mockError;
-    process.exit = mockExit;
 
     try {
-        await expect(treeCommand(".", {})).rejects.toThrow("exit");
+        await expect(treeCommand(".", {})).rejects.toMatchObject<
+            Partial<CommandExitError>
+        >({
+            exitCode: 1,
+        });
         expect(mockError).toHaveBeenCalled();
     } finally {
         console.error = mockError;
-        process.exit = mockExit;
     }
 });
 
@@ -443,18 +440,17 @@ test("treeCommand handles no APIs found", async () => {
     ProgressBar.prototype.complete = mock(() => {});
 
     const mockError = mock(() => {});
-    const mockExit = mock(() => {
-        throw new Error("exit");
-    });
     console.error = mockError;
-    process.exit = mockExit;
 
     try {
-        await expect(treeCommand(".", {})).rejects.toThrow("exit");
+        await expect(treeCommand(".", {})).rejects.toMatchObject<
+            Partial<CommandExitError>
+        >({
+            exitCode: 1,
+        });
         expect(mockError).toHaveBeenCalled();
     } finally {
         console.error = mockError;
-        process.exit = mockExit;
     }
 });
 
@@ -516,20 +512,19 @@ test("treeCommand with invalid path", async () => {
     const mockAccess = mock(() => Promise.reject(new Error("ENOENT")));
     fs.access = mockAccess;
 
-    // Mock console.error and process.exit
+    // Mock console.error
     const originalError = console.error;
-    const originalExit = process.exit;
     console.error = mock(() => {});
-    process.exit = mock(() => {
-        throw new Error("exit");
-    });
 
     try {
-        await expect(treeCommand("/invalid/path", {})).rejects.toThrow("exit");
+        await expect(
+            treeCommand("/invalid/path", {}),
+        ).rejects.toMatchObject<Partial<CommandExitError>>({
+            exitCode: 1,
+        });
         expect(mockAccess).toHaveBeenCalledWith(resolve("/invalid/path"));
     } finally {
         console.error = originalError;
-        process.exit = originalExit;
     }
 });
 
@@ -793,18 +788,17 @@ test("treeCommand handles error from distiller", async () => {
     ProgressBar.prototype.complete = mock(() => {});
 
     const mockError = mock(() => {});
-    const mockExit = mock(() => {
-        throw new Error("exit");
-    });
     console.error = mockError;
-    process.exit = mockExit;
 
     try {
-        await expect(treeCommand(".", {})).rejects.toThrow("exit");
+        await expect(treeCommand(".", {})).rejects.toMatchObject<
+            Partial<CommandExitError>
+        >({
+            exitCode: 1,
+        });
         expect(mockError).toHaveBeenCalled();
     } finally {
         console.error = mockError;
-        process.exit = mockExit;
     }
 });
 
@@ -819,17 +813,16 @@ test("treeCommand handles no APIs found", async () => {
     ProgressBar.prototype.complete = mock(() => {});
 
     const mockError = mock(() => {});
-    const mockExit = mock(() => {
-        throw new Error("exit");
-    });
     console.error = mockError;
-    process.exit = mockExit;
 
     try {
-        await expect(treeCommand(".", {})).rejects.toThrow("exit");
+        await expect(treeCommand(".", {})).rejects.toMatchObject<
+            Partial<CommandExitError>
+        >({
+            exitCode: 1,
+        });
         expect(mockError).toHaveBeenCalled();
     } finally {
         console.error = mockError;
-        process.exit = mockExit;
     }
 });

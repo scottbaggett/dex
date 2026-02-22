@@ -1,7 +1,7 @@
 /**
  * Convert a glob-like pattern to a RegExp.
  * Supports:
- * - `*` => any sequence
+ * - `*` => wildcard sequence
  * - `?` => single character
  */
 export function globPatternToRegExp(pattern: string): RegExp {

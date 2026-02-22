@@ -1,4 +1,9 @@
-import { ProcessResult, ProcessingOptions } from "../types.js";
+import {
+    ProcessResult,
+    ProcessingOptions,
+    ExportNode,
+    ImportNode,
+} from "../types.js";
 import { TsMorphProcessor } from "./ts-morph-processor.js";
 import { TypeScriptASTProcessor } from "./ast-processor.js";
 
@@ -64,8 +69,8 @@ export class TypeScriptProcessor {
     ): ProcessResult {
         // Very basic fallback - just extract obvious exports
         const lines = source.split("\n");
-        const exports: any[] = [];
-        const imports: any[] = [];
+        const exports: ExportNode[] = [];
+        const imports: ImportNode[] = [];
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -75,8 +80,12 @@ export class TypeScriptProcessor {
             if (trimmed?.startsWith("import ")) {
                 const match = trimmed.match(/from\s+['"](.+?)['"]/);
                 if (match) {
+                    const source = match[1];
+                    if (!source) {
+                        continue;
+                    }
                     imports.push({
-                        source: match[1],
+                        source,
                         specifiers: [],
                         line: i + 1,
                     });
@@ -124,7 +133,7 @@ export class TypeScriptProcessor {
         return null;
     }
 
-    private detectKind(line: string): string {
+    private detectKind(line: string): ExportNode["kind"] {
         if (line.includes("function")) return "function";
         if (line.includes("class")) return "class";
         if (line.includes("interface")) return "interface";

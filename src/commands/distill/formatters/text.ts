@@ -5,6 +5,17 @@ import {
     ExtractedAPI,
 } from "../../../types.js";
 
+type DistilledMember = {
+    name: string;
+    signature: string;
+    type?: "property" | "method";
+};
+
+type DistilledExport = ExtractedAPI["exports"][number] & {
+    kind?: ExtractedAPI["exports"][number]["type"] | string;
+    members?: DistilledMember[];
+};
+
 /**
  * Text Formatter
  * Produces clean, structured output with proper code organization
@@ -133,7 +144,7 @@ export class TextFormatter implements DistillFormatter {
                 }
             }
 
-            // Handle any items with undefined or unknown types
+            // Handle items with undefined or unknown types
             for (const [type, items] of grouped.entries()) {
                 if (!order.includes(type) && items && items.length > 0) {
                     for (const exp of items) {
@@ -152,7 +163,10 @@ export class TextFormatter implements DistillFormatter {
         return output;
     }
 
-    private formatExport(exp: any, options: DistillFormatterOptions): string {
+    private formatExport(
+        exp: DistilledExport,
+        options: DistillFormatterOptions,
+    ): string {
         let output = "";
 
         // Add docstring if available and requested
@@ -192,7 +206,7 @@ export class TextFormatter implements DistillFormatter {
     }
 
     private formatInterface(
-        exp: any,
+        exp: DistilledExport,
         _options: DistillFormatterOptions,
     ): string {
         let output = `export interface ${exp.name}`;
@@ -215,7 +229,10 @@ export class TextFormatter implements DistillFormatter {
         return output;
     }
 
-    private formatClass(exp: any, _options: DistillFormatterOptions): string {
+    private formatClass(
+        exp: DistilledExport,
+        _options: DistillFormatterOptions,
+    ): string {
         let output = `export class ${exp.name}`;
 
         // Add extends/implements
@@ -236,7 +253,7 @@ export class TextFormatter implements DistillFormatter {
         if (exp.members) {
             // Constructor first
             const constructor = exp.members.find(
-                (m: any) => m.name === "constructor",
+                (m: DistilledMember) => m.name === "constructor",
             );
             if (constructor) {
                 output += `    ${constructor.signature}\n`;
@@ -244,7 +261,7 @@ export class TextFormatter implements DistillFormatter {
 
             // Properties
             const properties = exp.members.filter(
-                (m: any) => m.type === "property",
+                (m: DistilledMember) => m.type === "property",
             );
             for (const prop of properties) {
                 output += `    ${prop.signature};\n`;
@@ -252,7 +269,8 @@ export class TextFormatter implements DistillFormatter {
 
             // Methods
             const methods = exp.members.filter(
-                (m: any) => m.type === "method" && m.name !== "constructor",
+                (m: DistilledMember) =>
+                    m.type === "method" && m.name !== "constructor",
             );
             for (const method of methods) {
                 output += `    ${method.signature}\n`;
@@ -263,7 +281,10 @@ export class TextFormatter implements DistillFormatter {
         return output;
     }
 
-    private formatFunction(exp: any, _options: DistillFormatterOptions): string {
+    private formatFunction(
+        exp: DistilledExport,
+        _options: DistillFormatterOptions,
+    ): string {
         // Clean up the signature - remove duplicate 'export' if present
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
@@ -274,7 +295,10 @@ export class TextFormatter implements DistillFormatter {
         return `export ${signature}\n`;
     }
 
-    private formatType(exp: any, _options: DistillFormatterOptions): string {
+    private formatType(
+        exp: DistilledExport,
+        _options: DistillFormatterOptions,
+    ): string {
         // Clean up the signature
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
@@ -285,7 +309,10 @@ export class TextFormatter implements DistillFormatter {
         return `export ${signature}\n`;
     }
 
-    private formatConst(exp: any, _options: DistillFormatterOptions): string {
+    private formatConst(
+        exp: DistilledExport,
+        _options: DistillFormatterOptions,
+    ): string {
         // Clean up the signature
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
@@ -296,7 +323,10 @@ export class TextFormatter implements DistillFormatter {
         return `export ${signature}\n`;
     }
 
-    private formatEnum(exp: any, _options: DistillFormatterOptions): string {
+    private formatEnum(
+        exp: DistilledExport,
+        _options: DistillFormatterOptions,
+    ): string {
         // Clean up the signature
         let signature = exp.signature.trim();
         if (signature.startsWith("export ")) {
@@ -311,8 +341,10 @@ export class TextFormatter implements DistillFormatter {
         return `export enum ${exp.name} {}\n`;
     }
 
-    private groupExportsByType(exports: any[]): Map<string, any[]> {
-        const grouped = new Map<string, any[]>();
+    private groupExportsByType(
+        exports: DistilledExport[],
+    ): Map<string, DistilledExport[]> {
+        const grouped = new Map<string, DistilledExport[]>();
 
         for (const exp of exports) {
             const type = exp.type;

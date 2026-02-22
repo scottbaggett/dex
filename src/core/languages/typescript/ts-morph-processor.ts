@@ -1,4 +1,22 @@
-import { Project, SourceFile, SyntaxKind } from "ts-morph";
+import {
+    Project,
+    SourceFile,
+    SyntaxKind,
+    FunctionDeclaration,
+    ClassDeclaration,
+    InterfaceDeclaration,
+    TypeAliasDeclaration,
+    EnumDeclaration,
+    VariableDeclaration,
+    ParameterDeclaration,
+    PropertyDeclaration,
+    MethodDeclaration,
+    GetAccessorDeclaration,
+    SetAccessorDeclaration,
+    PropertySignature,
+    MethodSignature,
+    Node,
+} from "ts-morph";
 import {
     ProcessingOptions,
     ProcessResult,
@@ -273,8 +291,8 @@ export class TsMorphProcessor {
     }
 
     private extractFunction(
-        func: any,
-        sourceFile: SourceFile,
+        func: FunctionDeclaration,
+        _sourceFile: SourceFile,
         options: ProcessingOptions,
     ): ExportNode {
         const name = func.getName() || "anonymous";
@@ -288,12 +306,12 @@ export class TsMorphProcessor {
 
         signature += name;
 
-        const params = func
-            .getParameters()
-            .map((p: any) => {
-                const paramName = p.getName();
-                const type = p.getType().getText();
-                const isOptional = p.isOptional();
+            const params = func
+                .getParameters()
+                .map((p: ParameterDeclaration) => {
+                    const paramName = p.getName();
+                    const type = p.getType().getText();
+                    const isOptional = p.isOptional();
                 return `${paramName}${isOptional ? "?" : ""}: ${type}`;
             })
             .join(", ");
@@ -316,8 +334,8 @@ export class TsMorphProcessor {
     }
 
     private extractClass(
-        cls: any,
-        sourceFile: SourceFile,
+        cls: ClassDeclaration,
+        _sourceFile: SourceFile,
         options: ProcessingOptions,
     ): ExportNode {
         const name = cls.getName() || "anonymous";
@@ -334,7 +352,7 @@ export class TsMorphProcessor {
             signature += ` extends ${baseClass.getText()}`;
         }
         if (_implements.length > 0) {
-            signature += ` implements ${_implements.map((i: any) => i.getText()).join(", ")}`;
+            signature += ` implements ${_implements.map((i) => i.getText()).join(", ")}`;
         }
 
         const members = (options as LegacyProcessingOptions).compact
@@ -356,8 +374,8 @@ export class TsMorphProcessor {
     }
 
     private extractInterface(
-        iface: any,
-        sourceFile: SourceFile,
+        iface: InterfaceDeclaration,
+        _sourceFile: SourceFile,
         options: ProcessingOptions,
     ): ExportNode {
         const name = iface.getName();
@@ -366,7 +384,7 @@ export class TsMorphProcessor {
 
         const baseInterfaces = iface.getExtends();
         if (baseInterfaces.length > 0) {
-            signature += ` extends ${baseInterfaces.map((b: any) => b.getText()).join(", ")}`;
+            signature += ` extends ${baseInterfaces.map((b) => b.getText()).join(", ")}`;
         }
 
         const members = (options as LegacyProcessingOptions).compact
@@ -388,8 +406,8 @@ export class TsMorphProcessor {
     }
 
     private extractTypeAlias(
-        typeAlias: any,
-        sourceFile: SourceFile,
+        typeAlias: TypeAliasDeclaration,
+        _sourceFile: SourceFile,
         options: ProcessingOptions,
     ): ExportNode {
         const name = typeAlias.getName();
@@ -398,7 +416,7 @@ export class TsMorphProcessor {
 
         const typeParams = typeAlias.getTypeParameters();
         if (typeParams.length > 0) {
-            signature += `<${typeParams.map((t: any) => t.getName()).join(", ")}>`;
+            signature += `<${typeParams.map((t) => t.getName()).join(", ")}>`;
         }
         signature += ` = ${typeAlias.getType().getText()}`;
 
@@ -417,8 +435,8 @@ export class TsMorphProcessor {
     }
 
     private extractEnum(
-        enumDecl: any,
-        sourceFile: SourceFile,
+        enumDecl: EnumDeclaration,
+        _sourceFile: SourceFile,
         options: ProcessingOptions,
     ): ExportNode {
         const name = enumDecl.getName();
@@ -443,7 +461,7 @@ export class TsMorphProcessor {
     }
 
     private extractVariable(
-        varDecl: any,
+        varDecl: VariableDeclaration,
         _sourceFile: SourceFile,
         _options: ProcessingOptions,
     ): ExportNode {
@@ -478,13 +496,13 @@ export class TsMorphProcessor {
     }
 
     private extractClassMembers(
-        cls: any,
+        cls: ClassDeclaration,
         options: ProcessingOptions,
     ): MemberNode[] {
         const members: MemberNode[] = [];
 
         // Extract properties
-        cls.getProperties().forEach((prop: any) => {
+        cls.getProperties().forEach((prop: PropertyDeclaration) => {
             // Check visibility modifiers
             const isPrivate = prop.hasModifier(SyntaxKind.PrivateKeyword);
             const isProtected = prop.hasModifier(SyntaxKind.ProtectedKeyword);
@@ -516,7 +534,7 @@ export class TsMorphProcessor {
         });
 
         // Extract methods
-        cls.getMethods().forEach((method: any) => {
+        cls.getMethods().forEach((method: MethodDeclaration) => {
             // Check visibility modifiers
             const isPrivate = method.hasModifier(SyntaxKind.PrivateKeyword);
             const isProtected = method.hasModifier(SyntaxKind.ProtectedKeyword);
@@ -537,7 +555,7 @@ export class TsMorphProcessor {
 
             const params = method
                 .getParameters()
-                .map((p: any) => {
+                .map((p: ParameterDeclaration) => {
                     const paramName = p.getName();
                     const type = p.getType().getText();
                     const isOptional = p.isOptional();
@@ -558,7 +576,7 @@ export class TsMorphProcessor {
         });
 
         // Extract getters and setters
-        cls.getGetAccessors().forEach((getter: any) => {
+        cls.getGetAccessors().forEach((getter: GetAccessorDeclaration) => {
             // Check visibility modifiers
             const isPrivate = getter.hasModifier(SyntaxKind.PrivateKeyword);
             const isProtected = getter.hasModifier(SyntaxKind.ProtectedKeyword);
@@ -583,7 +601,7 @@ export class TsMorphProcessor {
             });
         });
 
-        cls.getSetAccessors().forEach((setter: any) => {
+        cls.getSetAccessors().forEach((setter: SetAccessorDeclaration) => {
             // Check visibility modifiers
             const isPrivate = setter.hasModifier(SyntaxKind.PrivateKeyword);
             const isProtected = setter.hasModifier(SyntaxKind.ProtectedKeyword);
@@ -598,7 +616,7 @@ export class TsMorphProcessor {
 
             const params = setter
                 .getParameters()
-                .map((p: any) => {
+                .map((p: ParameterDeclaration) => {
                     const paramName = p.getName();
                     const type = p.getType().getText();
                     return `${paramName}: ${type}`;
@@ -619,15 +637,18 @@ export class TsMorphProcessor {
     }
 
     private extractInterfaceMembers(
-        iface: any,
+        iface: InterfaceDeclaration,
         _options: ProcessingOptions,
     ): MemberNode[] {
         const members: MemberNode[] = [];
 
         // Extract properties
-        iface.getProperties().forEach((prop: any) => {
+        iface.getProperties().forEach((prop: PropertySignature) => {
             const name = prop.getName();
-            const isOptional = prop.isOptional();
+            const isOptional =
+                typeof prop.hasQuestionToken === "function"
+                    ? prop.hasQuestionToken()
+                    : false;
 
             let signature = name;
             if (isOptional) signature += "?";
@@ -643,14 +664,14 @@ export class TsMorphProcessor {
         });
 
         // Extract methods
-        iface.getMethods().forEach((method: any) => {
+        iface.getMethods().forEach((method: MethodSignature) => {
             const name = method.getName();
 
             let signature = name;
 
             const params = method
                 .getParameters()
-                .map((p: any) => {
+                .map((p: ParameterDeclaration) => {
                     const paramName = p.getName();
                     const type = p.getType().getText();
                     const isOptional = p.isOptional();
@@ -671,10 +692,13 @@ export class TsMorphProcessor {
         return members;
     }
 
-    private extractDocstring(node: any): string | undefined {
+    private extractDocstring(node: Node): string | undefined {
+        if (!("getJsDocs" in node) || typeof node.getJsDocs !== "function") {
+            return undefined;
+        }
         const docs = node.getJsDocs();
         if (docs.length > 0) {
-            return docs[0].getInnerText();
+            return docs[0]?.getInnerText();
         }
         return undefined;
     }

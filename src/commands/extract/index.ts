@@ -7,13 +7,17 @@ import { GitExtractor } from "../../core/git.js";
 import { MarkdownFormatter } from "./formatters/markdown.js";
 import { JsonFormatter } from "./formatters/json.js";
 import { TextFormatter } from "./formatters/text.js";
-import type { DexOptions } from "../../types.js";
+import type { DexOptions, GitChange } from "../../types.js";
 import { ExtractOptionsSchema } from "../../schemas.js";
 import { OutputManager } from "../../utils/output-manager.js";
 import {
     agentInstructions,
     extractSuccessMessage,
 } from "../../utils/messages.js";
+import {
+    CommandExitError,
+    isCommandExitError,
+} from "../../utils/command-exit.js";
 
 // Helper function to generate context string for filename
 function generateContextString(dexOptions: DexOptions, method: string): string {
@@ -36,9 +40,15 @@ function generateContextString(dexOptions: DexOptions, method: string): string {
     return "current";
 }
 
+type ExtractRawOptions = Partial<DexOptions> & {
+    metadata?: boolean;
+    optimize?: string[];
+    type?: string | string[];
+};
+
 export async function executeExtract(
     range: string,
-    rawOptions: Record<string, any>,
+    rawOptions: ExtractRawOptions,
 ) {
     const spinner = ora("Analyzing changes...").start();
 
@@ -49,7 +59,7 @@ export async function executeExtract(
 
         if (!isGitRepo) {
             spinner.fail(chalk.red("Error: Not in a git repository"));
-            process.exit(1);
+            throw new CommandExitError(1);
         }
 
         // Check if the range argument looks like a path instead of a git range
@@ -76,7 +86,7 @@ export async function executeExtract(
             );
             console.log(chalk.green("  dex HEAD~1..HEAD"));
             console.log(chalk.green("  dex --staged"));
-            process.exit(1);
+            throw new CommandExitError(1);
         }
 
         // Parse and validate options using schema
@@ -84,7 +94,10 @@ export async function executeExtract(
             range: range,
             ...rawOptions,
             // Handle special cases
-            type: rawOptions.type ? rawOptions.type.split(",") : undefined,
+            type:
+                typeof rawOptions.type === "string"
+                    ? rawOptions.type.split(",")
+                    : rawOptions.type,
             aid: rawOptions.optimize?.includes("aid"),
             symbols: rawOptions.optimize?.includes("symbols"),
             noMetadata: !rawOptions.metadata,
@@ -95,7 +108,7 @@ export async function executeExtract(
             spinner.fail(
                 chalk.red("Error: Cannot use --staged and --all together"),
             );
-            process.exit(1);
+            throw new CommandExitError(1);
         }
 
         // Validate format
@@ -109,7 +122,7 @@ export async function executeExtract(
                     `Error: Invalid format '${parsedOptions.format}'. Valid formats are: txt, md, json`,
                 ),
             );
-            process.exit(1);
+            throw new CommandExitError(1);
         }
 
         // Handle interactive selection if requested - do this BEFORE context extraction
@@ -124,7 +137,7 @@ export async function executeExtract(
                 );
                 const fileSelector = new FileSelector();
                 fileSelector.showTTYError();
-                process.exit(1);
+                throw new CommandExitError(1);
             }
 
             spinner.text = chalk.gray("Scanning files for selection...");
@@ -176,7 +189,7 @@ export async function executeExtract(
 
                 if (allFiles.length === 0) {
                     spinner.fail(chalk.red("No valid files found"));
-                    process.exit(1);
+                    throw new CommandExitError(1);
                 }
 
                 spinner.stop();
@@ -196,7 +209,7 @@ export async function executeExtract(
 
                 // Update parsedOptions to include selected files for context extraction
                 parsedOptions.selectedFiles = result.files.map(
-                    (change: any) => change.file,
+                    (change: GitChange) => change.file,
                 );
 
                 spinner.start("Extracting context from selected files...");
@@ -206,7 +219,7 @@ export async function executeExtract(
                     error.message === "File selection cancelled"
                 ) {
                     console.log(chalk.yellow("\nFile selection cancelled."));
-                    process.exit(0);
+                    throw new CommandExitError(0);
                 }
                 throw error;
             }
@@ -224,7 +237,7 @@ export async function executeExtract(
                 chalk.yellow("No changes found") +
                     chalk.gray(" - try --staged or --all"),
             );
-            process.exit(0);
+            throw new CommandExitError(0);
         }
 
         // Show detection feedback message with progress bar
@@ -263,7 +276,7 @@ export async function executeExtract(
 
             spinner.succeed(message);
 
-            // Show skipped files if any
+            // Show skipped files if present
             if (
                 context.additionalContext?.notIncluded &&
                 typeof context.additionalContext.notIncluded === "number" &&
@@ -358,12 +371,15 @@ export async function executeExtract(
             console.log(agentInstructions(fullPath));
         }
     } catch (error) {
+        if (isCommandExitError(error)) {
+            throw error;
+        }
         spinner.fail(
             chalk.red(
                 `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
             ),
         );
-        process.exit(1);
+        throw new CommandExitError(1);
     }
 }
 

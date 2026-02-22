@@ -6,7 +6,7 @@ export const DEFAULT_EXCLUDES = {
     // Version control (recursive)
     git: ["**/.git/**"],
     
-    // Dependencies (recursive - matches in any subdirectory)
+    // Dependencies (recursive - matches in all subdirectories)
     dependencies: ["**/node_modules/**", "**/vendor/**", "**/bower_components/**"],
     
     // Build outputs (recursive for submodules/monorepos)
