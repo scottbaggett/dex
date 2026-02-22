@@ -28,14 +28,17 @@ test("hello world", () => {
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
 
 ---
+
 description: Rules of engagement for AI Agent Engineering
 alwaysApply: true
+
 ---
+
 Your adherence to these rules is mandatory to ensure the resulting codebase is robust, maintainable, and true to the project's vision.
 
 ## 1\. The Golden Rule
 
-**The [P0 Charter](docs/P0_CHARTER.md) is your non-negotiable sources of truth.** Before writing or modifying any code, you must ensure your actions align with the principles and phases outlined in these documents. Do not improvise the architecture.
+**The [P0 Charter](docs/internal/P0_CHARTER.md) is your non-negotiable sources of truth.** Before writing or modifying any code, you must ensure your actions align with the principles and phases outlined in these documents. Do not improvise the architecture.
 
 ## 3. Coding & Implementation Standards
 
@@ -47,7 +50,6 @@ Your adherence to these rules is mandatory to ensure the resulting codebase is r
 
 4. **Error Handling:** Implement robust error handling. Use `try/catch` blocks for operations that can fail (e.g., parsing, layout calculation). Provide clear, informative error messages.
 
-
 ## 4\. Interaction Protocol
 
 1. **Work Incrementally:** Follow the phased **Development Roadmap**. Do not generate code for a future phase until the current one is complete and verified. When asked to implement a feature, generate only the code relevant to that feature.
@@ -56,12 +58,15 @@ Your adherence to these rules is mandatory to ensure the resulting codebase is r
 
 3. **Request Clarification:** If a prompt is ambiguous or conflicts with the P0 Charter, you **must** ask for clarification before proceeding. Do not make architectural assumptions.
 
-4. **Git Strategy:** All agents must follow the git strategy [documented  here](docs/P0_GIT_STRATEGY.md).
+4. **Git Strategy:** All agents must follow the git strategy [documented here](docs/internal/P0_GIT_STRATEGY.md).
 
-5. **Always leverage the bash command `dex distill . --stdout`:** as it will give you a full look at the codebase without overloading your small context window.  DO IT NOW.
+5. **Always leverage the bash command `dex distill . --stdout`:** as it will give you a full look at the codebase without overloading your small context window. DO IT NOW.
 
 ---
+
 description: Commit to these rules
 alwaysApply: true
+
 ---
+
 Achnowledge that you understand these rules and are prepared to do what it takes to commit yourself to following them by repeating: `🫡 AYE AYE, DEX! I commit myself to these rules`.

@@ -24,8 +24,8 @@
         // Some stricter flags (disabled by default)
         "noUnusedLocals": false,
         "noUnusedParameters": false,
-        "noPropertyAccessFromIndexSignature": false
+        "noPropertyAccessFromIndexSignature": false,
     },
     "include": ["src/**/*"],
-    "exclude": ["node_modules", "dist", "test", "**/*.test.ts", "**/*.spec.ts"]
+    "exclude": ["node_modules", "dist", "test", "**/*.test.ts", "**/*.spec.ts"],
 }
