@@ -229,7 +229,7 @@ export class FileScanner {
 
     private matchesPatterns(filePath: string, patterns: string[]): boolean {
         return patterns.some((pattern) => {
-            // Handle ** patterns (matches any depth)
+            // Handle ** patterns (matches at all depths)
             if (pattern.includes("**")) {
                 // For patterns like **/node_modules/**
                 if (pattern.startsWith("**/") && pattern.endsWith("/**")) {

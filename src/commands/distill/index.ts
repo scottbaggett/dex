@@ -19,6 +19,29 @@ import {
     formatEstimatedTokens,
     calculateTokenSavings,
 } from "../../utils/tokens.js";
+import {
+    CommandExitError,
+    isCommandExitError,
+} from "../../utils/command-exit.js";
+
+interface DistillCommandOptions {
+    output?: string;
+    clipboard?: boolean;
+    stdout?: boolean;
+    select?: boolean;
+    comments?: string;
+    docstrings?: string;
+    private?: string;
+    protected?: string;
+    internal?: string;
+    exclude?: string[];
+    include?: string[];
+    dryRun?: boolean;
+    staged?: boolean;
+    workers?: string;
+    format?: OutputFormat;
+    since?: string;
+}
 
 export function createDistillCommand(): Command {
     const command = new Command("distill");
@@ -66,12 +89,15 @@ export function createDistillCommand(): Command {
             "--workers <number>",
             "Number of worker threads (0-1=sequential, 2-8=parallel, default=4)",
         )
-        .action((...args: any[]) => {
+        .action((...args: unknown[]) => {
             const targetPath = typeof args[0] === "string" ? args[0] : ".";
-            const cmdObject = args[args.length - 1];
+            const cmdObject = args[args.length - 1] as Command;
             const localOptions = cmdObject.opts();
             const parentOptions = cmdObject.parent?.opts() || {};
-            const options = { ...parentOptions, ...localOptions };
+            const options = {
+                ...parentOptions,
+                ...localOptions,
+            } as DistillCommandOptions;
 
             return distillCommand(targetPath, options);
         });
@@ -79,7 +105,10 @@ export function createDistillCommand(): Command {
     return command;
 }
 
-async function distillCommand(targetPath: string, options: any): Promise<void> {
+async function distillCommand(
+    targetPath: string,
+    options: DistillCommandOptions,
+): Promise<void> {
     // Determine if we should show progress
     const isStdout = options.stdout;
 
@@ -100,14 +129,14 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             await fs.access(resolvedPath);
         } catch {
             console.error(chalk.red(`Path not found: ${targetPath}`));
-            process.exit(1);
+            throw new CommandExitError(1);
         }
         const cliExcludes = options.exclude || [];
 
         const distillerOptions: DistillerOptions = {
             path: resolvedPath,
             exclude: cliExcludes,
-            include: options.include,
+            include: options.include || [],
             comments: options.comments === "1",
             docstrings: options.docstrings !== "0",
             format: options.format || "txt",
@@ -130,7 +159,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                 );
                 const fileSelector = new FileSelector();
                 fileSelector.showTTYError();
-                process.exit(1);
+                throw new CommandExitError(1);
             }
 
             try {
@@ -153,7 +182,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
 
                 if (allFiles.length === 0) {
                     console.error(chalk.red("No valid files found"));
-                    process.exit(1);
+                    throw new CommandExitError(1);
                 }
 
                 // Convert to GitChange objects for selection
@@ -175,7 +204,7 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
                     error.message === "File selection cancelled"
                 ) {
                     console.log(chalk.yellow("\nFile selection cancelled."));
-                    process.exit(0);
+                    throw new CommandExitError(0);
                 }
                 throw error;
             }
@@ -369,11 +398,14 @@ async function distillCommand(targetPath: string, options: any): Promise<void> {
             console.log("\n" + agentInstructions(fullPath));
         }
     } catch (error) {
+        if (isCommandExitError(error)) {
+            throw error;
+        }
         progress.fail(error instanceof Error ? error.message : String(error));
         if (process.env.DEBUG) {
             console.error(error);
         }
-        process.exit(1);
+        throw new CommandExitError(1);
     }
 }
 

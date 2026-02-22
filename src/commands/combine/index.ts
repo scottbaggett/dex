@@ -30,6 +30,10 @@ import {
     formatTokenCount,
     interactiveCancelled,
 } from "../../utils/messages.js";
+import {
+    CommandExitError,
+    isCommandExitError,
+} from "../../utils/command-exit.js";
 
 function collectPatterns(value: string, previous: string[]): string[] {
     return previous.concat([value]);
@@ -119,7 +123,7 @@ async function combineCommand(
                         "Error: Not in a git repository (--staged requires git)",
                     ),
                 );
-                process.exit(1);
+                throw new CommandExitError(1);
             }
 
             const hasStagedChanges = await gitExtractor.hasStagedChanges();
@@ -130,7 +134,7 @@ async function combineCommand(
                         'Tip: Use "git add <files>" to stage files first',
                     ),
                 );
-                process.exit(1);
+                throw new CommandExitError(1);
             }
 
             // Get staged files
@@ -202,7 +206,7 @@ async function combineCommand(
 
         if (allFiles.length === 0) {
             spinner.fail(noFilesFound());
-            process.exit(1);
+            throw new CommandExitError(1);
         }
 
         // Handle dry-run mode
@@ -252,7 +256,7 @@ async function combineCommand(
                         "Try running without --select or use a different terminal",
                     ),
                 );
-                process.exit(1);
+                throw new CommandExitError(1);
             }
 
             // Launch interactive file selection
@@ -281,7 +285,7 @@ async function combineCommand(
 
                 if (!result || result.files.length === 0) {
                     console.log(interactiveCancelled());
-                    process.exit(0);
+                    throw new CommandExitError(0);
                 }
 
                 allFiles = result.files.map((f) =>
@@ -299,7 +303,7 @@ async function combineCommand(
                         `Interactive mode failed: ${error instanceof Error ? error.message : "Unknown error"}`,
                     ),
                 );
-                process.exit(1);
+                throw new CommandExitError(1);
             }
 
             spinner.start("Processing selected files...");
@@ -370,7 +374,7 @@ async function combineCommand(
 
         if (changes.length === 0) {
             console.error(chalk.red("No files could be read"));
-            process.exit(1);
+            throw new CommandExitError(1);
         }
 
         // Format output based on specified format
@@ -454,8 +458,11 @@ async function combineCommand(
             console.log(agentInstructions(fullPath));
         }
     } catch (error) {
+        if (isCommandExitError(error)) {
+            throw error;
+        }
         spinner.fail(genericError(error));
-        process.exit(1);
+        throw new CommandExitError(1);
     }
 }
 

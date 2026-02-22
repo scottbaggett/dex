@@ -6,6 +6,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { countTokens, formatEstimatedTokens } from "../../utils/tokens.js";
+import { CommandExitError } from "../../utils/command-exit.js";
 
 function parseUser(program: Command, args: string[]) {
     return program.parseAsync(args, { from: "user" });
@@ -191,17 +192,10 @@ describe("combine command", () => {
         const program = new Command();
         program.addCommand(createCombineCommand());
 
-        const originalExit = process.exit;
-        process.exit = ((code?: number) => {
-            throw new Error(`process.exit:${code ?? 0}`);
-        }) as typeof process.exit;
-
-        try {
-            await expect(
-                parseUser(program, ["combine", "nonexistent*.txt", "--stdout"]),
-            ).rejects.toThrow("process.exit:1");
-        } finally {
-            process.exit = originalExit;
-        }
+        await expect(
+            parseUser(program, ["combine", "nonexistent*.txt", "--stdout"]),
+        ).rejects.toMatchObject<Partial<CommandExitError>>({
+            exitCode: 1,
+        });
     });
 });

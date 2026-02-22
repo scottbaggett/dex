@@ -2,6 +2,7 @@ import { getLanguageRegistry, ProcessingOptions } from "../languages/index.js";
 import { detectLanguage } from "../../utils/language-detection.js";
 import { countTokens } from "../../utils/tokens.js";
 import { toDependencies, toExtractedAPI } from "./normalize.js";
+import type { ExtractedAPI } from "../../types.js";
 
 interface WorkerInput {
 	filePath: string;
@@ -10,7 +11,7 @@ interface WorkerInput {
 }
 
 interface WorkerOutput {
-	api: any | null;
+	api: ExtractedAPI | null;
 	dependencies: { imports: string[]; exports: string[] } | null;
 	originalTokens: number;
 	language: string | null;

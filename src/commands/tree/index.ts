@@ -20,6 +20,10 @@ import {
     agentInstructions,
     genericError,
 } from "../../utils/messages.js";
+import {
+    CommandExitError,
+    isCommandExitError,
+} from "../../utils/command-exit.js";
 
 export interface TreeOptions {
     depth?: string;
@@ -33,6 +37,14 @@ export interface TreeOptions {
     groupBy?: "file" | "type" | "none";
     outline?: boolean;
 }
+
+type TreeExport = ExtractedAPI["exports"][number] & { file: string };
+type TreeCommandOptions = TreeOptions & {
+    private?: boolean;
+    public?: boolean;
+    internal?: boolean;
+    protected?: boolean;
+};
 
 export function createTreeCommand(): Command {
     const command = new Command("tree");
@@ -57,15 +69,18 @@ export function createTreeCommand(): Command {
             "Group APIs by file, type, or none",
             "file",
         )
-        .action((...args: any[]) => {
+        .action((...args: unknown[]) => {
             // Handle optional path argument - if no path provided, args[0] will be the command object
             const targetPath = typeof args[0] === "string" ? args[0] : ".";
-            const cmdObject = args[args.length - 1]; // Commander puts the command object last
+            const cmdObject = args[args.length - 1] as Command; // Commander puts the command object last
             const localOptions = cmdObject.opts();
             const parentOptions = cmdObject.parent?.opts() || {};
 
             // Merge parent and local options
-            const options = { ...parentOptions, ...localOptions };
+            const options = {
+                ...parentOptions,
+                ...localOptions,
+            } as TreeCommandOptions;
 
             return treeCommand(targetPath, options);
         });
@@ -75,7 +90,7 @@ export function createTreeCommand(): Command {
 
 export async function treeCommand(
     targetPath: string,
-    options: any,
+    options: TreeCommandOptions,
 ): Promise<void> {
     try {
         // Resolve path
@@ -86,7 +101,7 @@ export async function treeCommand(
             await fs.access(resolvedPath);
         } catch {
             console.error(pathNotFound(targetPath));
-            process.exit(1);
+            throw new CommandExitError(1);
         }
 
         // Build distiller options
@@ -129,7 +144,7 @@ export async function treeCommand(
 
         if (!("apis" in result)) {
             console.error(treeNoApis());
-            process.exit(1);
+            throw new CommandExitError(1);
         }
 
         // Determine if output should be formatted for terminal (with colors/icons)
@@ -157,11 +172,14 @@ export async function treeCommand(
         // Handle output
         await handleOutput(tree, options, resolvedPath);
     } catch (error) {
+        if (isCommandExitError(error)) {
+            throw error;
+        }
         console.error(genericError(error));
         if (process.env.DEBUG) {
             console.error(error);
         }
-        process.exit(1);
+        throw new CommandExitError(1);
     }
 }
 
@@ -202,7 +220,7 @@ export function generateTree(
 }
 
 function generateTreeFormat(
-    exports: any[],
+    exports: TreeExport[],
     structure: ProjectStructure | undefined,
     groupBy: string,
     basePath: string,
@@ -226,7 +244,7 @@ function generateTreeFormat(
 }
 
 function generateTreeByFile(
-    exports: any[],
+    exports: TreeExport[],
     basePath: string,
     showTypes?: boolean,
     showParams?: boolean,
@@ -235,7 +253,7 @@ function generateTreeByFile(
     const lines: string[] = [];
 
     // Group exports by file
-    const exportsByFile = new Map<string, any[]>();
+    const exportsByFile = new Map<string, TreeExport[]>();
 
     for (const exp of exports) {
         // exp.file is already a relative path from the distiller
@@ -291,15 +309,21 @@ function buildDirectoryTree(filePaths: string[]): TreeNode {
         // Build directory structure
         for (let i = 0; i < parts.length - 1; i++) {
             const part = parts[i];
-            if (!current.children.has(part as any)) {
-                current.children.set(part as any, {
-                    name: part || "",
+            if (!part) {
+                continue;
+            }
+            if (!current.children.has(part)) {
+                current.children.set(part, {
+                    name: part,
                     children: new Map(),
                     files: [],
                     isDirectory: true,
                 });
             }
-            current = current.children.get(part as any)!;
+            const next = current.children.get(part);
+            if (next) {
+                current = next;
+            }
         }
 
         // Add the file
@@ -313,7 +337,7 @@ function buildDirectoryTree(filePaths: string[]): TreeNode {
 
 function renderDirectoryTree(
     node: TreeNode,
-    exportsByFile: Map<string, any[]>,
+    exportsByFile: Map<string, TreeExport[]>,
     lines: string[],
     prefix: string,
     isLast: boolean,
@@ -386,6 +410,9 @@ function renderDirectoryTree(
 
         for (let j = 0; j < sortedExports.length; j++) {
             const exp = sortedExports[j];
+            if (!exp) {
+                continue;
+            }
             const isLastExport = j === sortedExports.length - 1;
             const baseIndent = prefix + (isLastItem ? "    " : "│   ");
             const exportPrefix = isLastExport ? "└── " : "├── ";
@@ -428,7 +455,7 @@ function renderDirectoryTree(
 }
 
 function generateTreeByType(
-    exports: any[],
+    exports: TreeExport[],
     showTypes?: boolean,
     showParams?: boolean,
     forTerminal: boolean = false,
@@ -436,7 +463,7 @@ function generateTreeByType(
     const lines: string[] = [];
 
     // Group exports by type
-    const exportsByType = new Map<string, any[]>();
+    const exportsByType = new Map<string, TreeExport[]>();
 
     for (const exp of exports) {
         if (!exportsByType.has(exp.type)) {
@@ -482,6 +509,9 @@ function generateTreeByType(
 
         for (let j = 0; j < sortedExports.length; j++) {
             const exp = sortedExports[j];
+            if (!exp) {
+                continue;
+            }
             const isLastExport = j === sortedExports.length - 1;
             const baseIndent = isLast ? "    " : "│   ";
             const exportPrefix = isLastExport ? "└── " : "├── ";
@@ -516,7 +546,7 @@ function generateTreeByType(
 }
 
 function generateFlatTree(
-    exports: any[],
+    exports: TreeExport[],
     showTypes?: boolean,
     showParams?: boolean,
     forTerminal: boolean = false,
@@ -545,6 +575,9 @@ function generateFlatTree(
 
     for (let i = 0; i < sortedExports.length; i++) {
         const exp = sortedExports[i];
+        if (!exp) {
+            continue;
+        }
         const isLast = i === sortedExports.length - 1;
         const prefix = isLast ? "└── " : "├── ";
 
@@ -582,7 +615,7 @@ function generateFlatTree(
 }
 
 function _generateOutline(
-    exports: any[],
+    exports: TreeExport[],
     basePath: string,
     showTypes?: boolean,
     showParams?: boolean,
@@ -593,7 +626,7 @@ function _generateOutline(
     lines.push(`# API Outline for ${basename(basePath)}\n`);
 
     // Group by file
-    const exportsByFile = new Map<string, any[]>();
+    const exportsByFile = new Map<string, TreeExport[]>();
 
     for (const exp of exports) {
         // exp.file is already a relative path from the distiller

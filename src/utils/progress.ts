@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import ora from "ora";
+import ora, { type Ora } from "ora";
 import { 
     distillSuccess, 
     combineSuccess, 
@@ -26,7 +26,7 @@ export class ProgressBar {
     private originalSize = 0;
     private processedSize = 0;
     private startTime = Date.now();
-    private spinner: any;
+    private spinner: Ora;
     public isSpinning = false;
     private options: ProgressOptions;
 

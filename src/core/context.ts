@@ -13,7 +13,7 @@ export class ContextEngine {
     async extract(options: DexOptions): Promise<ExtractedContext> {
         let changes: GitChange[] = [];
         let detectionMethod = "";
-        let additionalContext: any = {};
+        let additionalContext: Record<string, unknown> = {};
 
         // Selected files (from --select flag)
         if (options.selectedFiles && options.selectedFiles.length > 0) {
@@ -376,7 +376,7 @@ export class ContextEngine {
     private async smartDetectChanges(): Promise<{
         changes: GitChange[];
         method: string;
-        additionalContext?: any;
+        additionalContext?: Record<string, unknown>;
     }> {
         // 1. Check if on feature branch
         const isFeatureBranch = await this.gitExtractor.isFeatureBranch();
@@ -400,7 +400,7 @@ export class ContextEngine {
             const staged = await this.gitExtractor.getCurrentChanges(true);
             const unstaged = await this.gitExtractor.getCurrentChanges(false);
 
-            const additionalContext: any = {};
+            const additionalContext: Record<string, unknown> = {};
             if (unstaged.length > 0) {
                 additionalContext.totalChanges =
                     staged.length + unstaged.length;
