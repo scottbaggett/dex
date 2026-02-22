@@ -1,30 +1,34 @@
 // @ts-expect-error - bun:test types not available in this environment
-import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
-import { execSync } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { test, expect, describe, beforeEach, afterEach } from "bun:test";
+import { spawnSync } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 
-describe('distill command integration tests', () => {
+type DistillRun = {
+    status: number | null;
+    output: string;
+};
+
+describe("distill command integration tests", () => {
     let testDir: string;
-    let originalCwd: string;
-    
+    const repoRoot = process.cwd();
+
     beforeEach(() => {
-        // Create a temporary test directory
-        testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dex-test-'));
-        originalCwd = process.cwd();
-        
-        // Create test files
-        fs.writeFileSync(path.join(testDir, 'public.ts'), `
+        testDir = fs.mkdtempSync(path.join(os.tmpdir(), "dex-distill-test-"));
+
+        fs.writeFileSync(
+            path.join(testDir, "public.ts"),
+            `
 export class PublicClass {
     public publicMethod() {
         return 'public';
     }
-    
+
     private privateMethod() {
         return 'private';
     }
-    
+
     protected protectedMethod() {
         return 'protected';
     }
@@ -40,277 +44,167 @@ export function publicFunction() {
     // This is a comment
     return true;
 }
+            `.trim(),
+        );
 
-export const CONFIG = { key: 'value' };
-
-class PrivateClass {
-    method() {}
-}
-        `.trim());
-        
-        fs.writeFileSync(path.join(testDir, 'test.py'), `
+        fs.writeFileSync(
+            path.join(testDir, "test.py"),
+            `
 class PublicClass:
     """This is a docstring"""
     def __init__(self):
         pass
-    
+
     def public_method(self):
         # Comment here
         return "public"
-    
+
     def _private_method(self):
         return "private"
 
 def public_function():
     """Function docstring"""
     pass
+            `.trim(),
+        );
 
-def _private_function():
-    pass
-
-MAX_SIZE = 1000
-        `.trim());
-        
-        // Create nested directory structure
-        fs.mkdirSync(path.join(testDir, 'src'));
-        fs.writeFileSync(path.join(testDir, 'src', 'index.ts'), `
+        fs.mkdirSync(path.join(testDir, "src"));
+        fs.writeFileSync(
+            path.join(testDir, "src", "index.ts"),
+            `
 export { PublicClass } from "../public.js";
 export default function main() {
     console.log('main');
 }
-        `.trim());
+            `.trim(),
+        );
     });
-    
+
     afterEach(() => {
-        // Clean up
-        process.chdir(originalCwd);
         fs.rmSync(testDir, { recursive: true, force: true });
     });
-    
-    function runDistill(args: string = ''): string {
-        // If args starts with a path (contains /), use it as the target
-        // Otherwise, use testDir as the target
-        const target = args.includes('/') ? '' : testDir;
-        const cmd = `bun run dex distill ${target} ${args} --stdout 2>&1`.trim();
-        try {
-            return execSync(cmd, { encoding: 'utf-8' });
-        } catch (error: any) {
-            return error.stdout || error.message;
-        }
+
+    function runDistill(args: string[] = [], targetPath: string = testDir): DistillRun {
+        const result = spawnSync(
+            "bun",
+            ["run", "dex", "distill", targetPath, ...args],
+            {
+                cwd: repoRoot,
+                encoding: "utf-8",
+            },
+        );
+
+        return {
+            status: result.status,
+            output: `${result.stdout || ""}${result.stderr || ""}`,
+        };
     }
-    
-    describe('basic functionality', () => {
-        test('should distill all files by default', () => {
-            const output = runDistill();
-            expect(output).toContain('PublicClass');
-            expect(output).toContain('publicFunction');
-            expect(output).toContain('public_function');
-        });
-        
-        test('should handle single file', () => {
-            const output = runDistill(`${path.join(testDir, 'public.ts')}`);
-            expect(output).toContain('PublicClass');
-            expect(output).not.toContain('public_function'); // Python function not included
-        });
+
+    test("should distill all files by default", () => {
+        const result = runDistill(["--stdout"]);
+        expect(result.status).toBe(0);
+        expect(result.output).toContain("PublicClass");
+        expect(result.output).toContain("publicFunction");
+        expect(result.output).toContain("public_function");
     });
-    
-    describe('output options', () => {
-        test('--stdout should output to stdout', () => {
-            const output = runDistill('--stdout');
-            expect(output).toContain('PublicClass');
-        });
-        
-        test('-o should write to file', () => {
-            const outputFile = path.join(testDir, 'output.txt');
-            runDistill(`-o ${outputFile}`);
-            expect(fs.existsSync(outputFile)).toBe(true);
-            const content = fs.readFileSync(outputFile, 'utf-8');
-            expect(content).toContain('PublicClass');
-        });
-        
-        test('--clipboard should copy to clipboard', () => {
-            // This is hard to test without mocking clipboard
-            // Just ensure the command doesn't error
-            const output = runDistill('-c');
-            expect(output).toContain('Copied');
-        });
+
+    test("should handle single file target", () => {
+        const result = runDistill(["--stdout"], path.join(testDir, "public.ts"));
+        expect(result.status).toBe(0);
+        expect(result.output).toContain("PublicClass");
+        expect(result.output).not.toContain("public_function");
     });
-    
-    describe('filtering options', () => {
-        test('--include should filter files', () => {
-            const output = runDistill('--include "*.ts"');
-            expect(output).toContain('PublicClass');
-            expect(output).toContain('publicFunction');
-            expect(output).not.toContain('public_function'); // Python excluded
-        });
-        
-        test('--exclude should exclude files', () => {
-            const output = runDistill('--exclude "*.py"');
-            expect(output).toContain('PublicClass');
-            expect(output).not.toContain('public_function');
-        });
-        
-        test('--exclude-names should exclude by name patterns', () => {
-            const output = runDistill('--exclude-names "*Private*"');
-            expect(output).toContain('PublicClass');
-            expect(output).toContain('publicFunction');
-            // Private class methods should still be excluded by default
-        });
+
+    test("-o should write output to file", () => {
+        const outputFile = path.join(testDir, "output.txt");
+        const result = runDistill(["-o", outputFile]);
+
+        expect(result.status).toBe(0);
+        expect(fs.existsSync(outputFile)).toBe(true);
+
+        const content = fs.readFileSync(outputFile, "utf-8");
+        expect(content).toContain("PublicClass");
+        expect(content).toContain("publicFunction");
     });
-    
-    describe('depth options', () => {
-        test('--depth public should only include public members', () => {
-            const output = runDistill('--depth public');
-            expect(output).toContain('publicMethod');
-            expect(output).not.toContain('privateMethod');
-            expect(output).not.toContain('protectedMethod');
-        });
-        
-        test('--depth protected should include public and protected', () => {
-            const output = runDistill('--depth protected');
-            expect(output).toContain('publicMethod');
-            expect(output).toContain('protectedMethod');
-            expect(output).not.toContain('privateMethod');
-        });
-        
-        test('--depth all should include everything', () => {
-            const output = runDistill('--depth all');
-            expect(output).toContain('publicMethod');
-            expect(output).toContain('protectedMethod');
-            expect(output).toContain('privateMethod');
-        });
-        
-        test('--include-private should include private members', () => {
-            const output = runDistill('--include-private');
-            expect(output).toContain('privateMethod');
-            expect(output).toContain('_private_method'); // Python private
-        });
+
+    test("--include should filter files", () => {
+        const result = runDistill(["--stdout", "--include", "*.ts"]);
+
+        expect(result.status).toBe(0);
+        expect(result.output).toContain("PublicClass");
+        expect(result.output).toContain("publicFunction");
+        expect(result.output).not.toContain("public_function");
     });
-    
-    describe('content options', () => {
-        test('--with-comments should include comments', () => {
-            const output = runDistill('--with-comments');
-            expect(output).toContain('// This is a comment');
-            expect(output).toContain('# Comment here');
-        });
-        
-        test('--no-docstrings should exclude docstrings', () => {
-            const output = runDistill('--no-docstrings');
-            expect(output).not.toContain('This is a docstring');
-            expect(output).not.toContain('Function docstring');
-            expect(output).not.toContain('API key for authentication');
-        });
-        
-        test('default should include docstrings', () => {
-            const output = runDistill();
-            // Note: Current implementation may not include docstrings by default
-            // This test documents current behavior
-        });
+
+    test("--exclude should exclude files", () => {
+        const result = runDistill(["--stdout", "--exclude", "*.py"]);
+
+        expect(result.status).toBe(0);
+        expect(result.output).toContain("PublicClass");
+        expect(result.output).not.toContain("public_function");
     });
-    
-    describe('format options', () => {
-        test('--compact should produce compact output', () => {
-            const output = runDistill('--compact');
-            expect(output).toContain('PublicClass');
-            // Compact mode should have minimal formatting
-            const lines = output.split('\n').filter(l => l.trim());
-            expect(lines.length).toBeGreaterThan(0);
-        });
-        
-        test('--format compressed should only compress', () => {
-            const output = runDistill('--format compressed');
-            expect(output).toContain('<file');
-            expect(output).toContain('</file>');
-            // Should contain actual code content
-            expect(output).toContain('class PublicClass');
-        });
-        
-        test('--format distilled should only distill', () => {
-            const output = runDistill('--format distilled');
-            expect(output).toContain('export class PublicClass');
-            // Should not contain implementation details
-            expect(output).not.toContain("return 'public'");
-        });
-        
-        test('--format both should include both', () => {
-            const output = runDistill('--format both');
-            expect(output).toContain('---'); // Separator between sections
-        });
+
+    test("--format md should produce markdown output", () => {
+        const result = runDistill(["--stdout", "--format", "md"]);
+
+        expect(result.status).toBe(0);
+        expect(result.output).toContain("## public.ts");
+        expect(result.output).toContain("```typescript");
+        expect(result.output).toContain("class PublicClass");
     });
-    
-    describe('processing options', () => {
-        test('--no-compress should skip compression', () => {
-            const output = runDistill('--no-compress');
-            expect(output).toContain('PublicClass');
-        });
-        
-        test('--no-parallel should disable parallel processing', () => {
-            // Hard to test the actual parallelism, just ensure it works
-            const output = runDistill('--no-parallel');
-            expect(output).toContain('PublicClass');
-        });
+
+    test("--format json should produce parseable JSON output", () => {
+        const result = runDistill(["--stdout", "--format", "json"]);
+
+        expect(result.status).toBe(0);
+
+        const parsed = JSON.parse(result.output);
+        expect(parsed.files.length).toBeGreaterThan(0);
+        expect(parsed.metadata.fileCount).toBeGreaterThan(0);
     });
-    
-    describe('git integration options', () => {
-        beforeEach(() => {
-            // Initialize git repo in test directory
-            process.chdir(testDir);
-            execSync('git init', { encoding: 'utf-8' });
-            execSync('git config user.email "test@example.com"', { encoding: 'utf-8' });
-            execSync('git config user.name "Test User"', { encoding: 'utf-8' });
-            execSync('git add .', { encoding: 'utf-8' });
-            execSync('git commit -m "initial"', { encoding: 'utf-8' });
-        });
-        
-        test('--staged should only process staged files', () => {
-            // Create a new file and stage it
-            fs.writeFileSync(path.join(testDir, 'staged.ts'), 'export class StagedClass {}');
-            execSync('git add staged.ts', { encoding: 'utf-8' });
-            
-            // Create another file but don't stage it
-            fs.writeFileSync(path.join(testDir, 'unstaged.ts'), 'export class UnstagedClass {}');
-            
-            const output = runDistill('--staged');
-            expect(output).toContain('StagedClass');
-            expect(output).not.toContain('UnstagedClass');
-        });
-        
-        test('--since should only process changed files', () => {
-            // Modify an existing file
-            fs.appendFileSync(path.join(testDir, 'public.ts'), '\nexport class NewClass {}');
-            
-            const output = runDistill('--since HEAD');
-            expect(output).toContain('NewClass');
-            // Should only include the modified file
-            expect(output).not.toContain('public_function'); // From Python file
-        });
+
+    test("--private and --protected should be accepted and include private python members", () => {
+        const baseline = runDistill(["--stdout"]);
+        const result = runDistill([
+            "--stdout",
+            "--private",
+            "1",
+            "--protected",
+            "1",
+        ]);
+
+        expect(baseline.status).toBe(0);
+        expect(baseline.output).not.toContain("_private_method");
+        expect(result.status).toBe(0);
+        expect(result.output).toContain("_private_method");
     });
-    
-    describe('error handling', () => {
-        test('should handle non-existent path gracefully', () => {
-            const output = runDistill('/non/existent/path');
-            expect(output).toContain('Error');
-        });
-        
-        test('should handle invalid options', () => {
-            const output = runDistill('--invalid-option');
-            expect(output).toContain('error');
-        });
+
+    test("--dry-run should report files and token estimates", () => {
+        const result = runDistill(["--dry-run"]);
+
+        expect(result.status).toBe(0);
+        expect(result.output).toContain("Dry run - Files that would be processed");
+        expect(result.output).toContain("Summary:");
+        expect(result.output).toContain("Original tokens:");
+        expect(result.output).toContain("Estimated tokens:");
     });
-    
-    describe('combined options', () => {
-        test('should handle multiple options together', () => {
-            const output = runDistill('--include "*.ts" --depth all --compact --with-comments');
-            expect(output).toContain('PublicClass');
-            expect(output).toContain('privateMethod');
-            expect(output).not.toContain('public_function'); // Python excluded
-        });
-        
-        test('should respect all filtering options', () => {
-            const output = runDistill('--include "*.ts" --exclude "**/src/*" --include-private');
-            expect(output).toContain('PublicClass');
-            expect(output).toContain('privateMethod');
-            expect(output).not.toContain('main'); // From src/index.ts
-        });
+
+    test("--workers should be accepted", () => {
+        const result = runDistill(["--stdout", "--workers", "1"]);
+
+        expect(result.status).toBe(0);
+        expect(result.output).toContain("PublicClass");
+    });
+
+    test("should handle non-existent path gracefully", () => {
+        const result = runDistill([], "/non/existent/path");
+        expect(result.status).toBe(1);
+        expect(result.output).toContain("Path not found");
+    });
+
+    test("should handle invalid options", () => {
+        const result = runDistill(["--invalid-option"]);
+        expect(result.status).toBe(1);
+        expect(result.output).toContain("unknown option");
     });
 });

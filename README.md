@@ -28,10 +28,6 @@ bun link
 # Now use dex globally
 dex --help
 
-# Initialize project scaffolding
-cd your-project
-dex init
-
 # Extract your current changes (txt by default)
 dex -s --format md --clipboard
 ```
@@ -57,10 +53,8 @@ Key options:
 - --diff-only: Force diffs (disable Smart Context)
 - -p, --path <pattern>: Filter by file path
 - -t, --type <csv>: Filter by file types (e.g. ts,tsx,js)
-- -f, --format <fmt>: markdown | json | txt (default: txt)
+- -f, --format <fmt>: md | json | txt (default: txt)
 - -c, --clipboard: Copy output to clipboard
-- --task <source>: Description, file path, URL, or '-' for stdin
-- -i, --interactive: Prompt for task description (TTY)
 - -u, --include-untracked: Include untracked files
 - --untracked-pattern <glob>: Pattern for untracked files
 - --optimize <flags...>: aid, symbols
@@ -85,7 +79,7 @@ dex distill . --stdout                 # Print to stdout
 ```
 
 Key options:
-- -f, --format <type>: txt | markdown | json (default: txt)
+- -f, --format <type>: txt | md | json (default: txt)
 - -o, --output <file>: Write to a specific file
 - -c, --clipboard: Copy output to clipboard
 - --stdout: Print to stdout
@@ -95,9 +89,10 @@ Key options:
 - --comments <0|1>: Include comments (default: 0)
 - --docstrings <0|1>: Include docstrings (default: 1)
 - --private <0|1>: Include private members (default: 0)
-- --workers <number>: Number of parallel worker threads (default: 4, optimal: 2-8)
+- --protected <0|1>: Include protected members (default: 0)
+- --internal <0|1>: Include internal members (default: 0)
+- --workers <number>: Number of worker threads (default: 1)
 - --dry-run: Preview what would be processed
-- --since <ref>: Only process files changed since git ref
 - --staged: Only process staged files
 
 ## `Combine`
@@ -114,7 +109,6 @@ dex combine --staged -c                # Use staged files; copy to clipboard
 - -f, --format <fmt>: txt | md | json (default: txt)
 - --staged: Use all staged files (full contents)
 - -c, --clipboard: Copy to clipboard
-- --no-metadata: Omit metadata block
 - -o, --output <file>: Write to file instead of saving to `.dex/`
 - --include <patterns...>: Include patterns, e.g. "*.ts" "*.js"
 - --exclude <patterns...>: Exclude patterns, e.g. "*.test.*" "*.spec.*"
@@ -130,12 +124,11 @@ Generate a beautiful API tree or outline for quick understanding.
 
 ```bash
 dex tree src/                          # Tree view
-dex tree . --format outline            # Outline view
+dex tree . --outline                   # Outline view
 dex tree . --group-by type --show-types --show-params
 ```
 
 Key options:
-- -f, --format <type>: tree | outline | json (default: tree)
 - -o, --output <file>: Write to file
 - --stdout: Print to stdout
 - -c, --clipboard: Copy to clipboard
@@ -145,24 +138,10 @@ Key options:
 - --show-params: Show function parameters
 - --group-by <method>: file | type | none (default: file)
 
-### Config utilities
-
-```bash
-dex config validate           # Validate current config
-dex init                      # Scaffold .dex/ with config
-```
-
-Configuration is auto‑loaded from, in order:
-- `.dex/config.{yml,yaml,json,js}`
-- `.dexrc{,.json,.yaml,.yml,.js,.cjs}`
-- `dex.config.{js,cjs}` or `package.json` ("dex" key)
-
 
 ## Installation
 
 ### Local Installation
-
-#### Option 1: Using Bun (Recommended - Faster)
 
 ```bash
 # Clone the repository
@@ -177,68 +156,40 @@ bun link
 dex --help
 ```
 
-#### Option 2: Using npm/Node.js
-
-```bash
-# Clone the repository
-git clone https://github.com/scottbaggett/dex.git
-cd dex
-
-# Install dependencies
-npm install
-
-# Build the TypeScript code
-npm run build
-
-# Link globally
-npm link
-
-# Verify installation
-dex --help
-```
-
 ### Alternative: Run directly from source
 
 ```bash
 # With Bun (no build needed, runs TypeScript directly)
 cd /path/to/dex
-bun run src/cli/dex.ts [command] [options]
-
-# With Node.js (requires build first)
-cd /path/to/dex
-npm run build
-node dist/cli/dex.js [command] [options]
+bun run src/cli.ts [command] [options]
 ```
 
 DEX saves outputs to `.dex/` with descriptive, timestamped filenames. Use `--clipboard`, `--stdout` (where available), or `--output <file>` to override.
 
 ## Performance & Parallel Processing
 
-DEX uses worker threads for true CPU parallelism when processing large codebases:
+DEX supports worker threads for CPU parallelism during `distill`:
 
 ```bash
-# Default: 4 worker threads (optimal for most systems)
+# Default: sequential worker mode
 dex distill .
 
 # Sequential processing for small projects
 dex distill . --workers 1
 
-# More workers for large codebases (diminishing returns beyond 8)
-dex distill . --workers 8
+# Parallel processing for larger codebases
+dex distill . --workers 4
 ```
 
 **Performance Notes:**
-- **Sweet spot**: 4 workers balances speed with overhead
-- **Small projects** (<100 files): Use 1-2 workers to avoid overhead
-- **Large projects** (1000+ files): Use 4-8 workers for best performance
-- **Memory-intensive**: Each worker uses ~50-100MB RAM
-- **CPU architecture matters**: More workers ≠ always faster due to memory bandwidth limits
+- **Default safety**: Sequential mode avoids worker startup overhead in small runs
+- **Small projects** (<100 files): Keep `--workers 1`
+- **Large projects** (1000+ files): Try `--workers 2` to `--workers 8`
+- **Memory-intensive**: Each worker has independent parser state
 
 ## Requirements
 
-- **Either** Bun 1.0+ **or** Node.js 24.6+
-  - Bun is recommended for faster installation and direct TypeScript execution
-  - Node.js works fine but requires building TypeScript to JavaScript first
+- Bun 1.0+
 - Git (for change tracking)
 
 ## Tips

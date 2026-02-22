@@ -527,7 +527,7 @@ describe("StructuredFormatter", () => {
                         exports: [
                             {
                                 name: "unknown",
-                                // @ts-ignore - testing edge case
+                                // @ts-expect-error - testing edge case
                                 type: undefined,
                                 signature: "export const unknown",
                                 visibility: "public",
