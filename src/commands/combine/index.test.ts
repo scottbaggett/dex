@@ -206,6 +206,22 @@ describe("combine command", () => {
         expect(content).toContain("This is file 1 content");
     });
 
+    test("should require --yes for non-tty unsafe override", async () => {
+        const program = new Command();
+        program.addCommand(createCombineCommand());
+
+        await expect(
+            parseUser(program, [
+                "combine",
+                "file1.txt",
+                "--include-sensitive",
+                "--stdout",
+            ]),
+        ).rejects.toMatchObject<Partial<CommandExitError>>({
+            exitCode: 1,
+        });
+    });
+
     test("should exit with code 1 when no files are found", async () => {
         const program = new Command();
         program.addCommand(createCombineCommand());

@@ -18,6 +18,7 @@ import {
     CommandExitError,
     isCommandExitError,
 } from "../../utils/command-exit.js";
+import { runSafetyPipeline } from "../../core/safety/pipeline.js";
 
 // Helper function to generate context string for filename
 function generateContextString(dexOptions: DexOptions, method: string): string {
@@ -321,7 +322,19 @@ export async function executeExtract(
                 throw new Error(`Invalid format: ${parsedOptions.format}`);
         }
 
-        const output = formatter.format({ context, options: parsedOptions });
+        const rawOutput = formatter.format({ context, options: parsedOptions });
+        const safetyResult = runSafetyPipeline({
+            command: "extract",
+            payload: rawOutput,
+            files: context.changes.map((change: GitChange) => ({
+                path: change.file,
+                content: change.content || change.diff || "",
+            })),
+            includeSensitive: parsedOptions.includeSensitive,
+            yes: parsedOptions.yes,
+            target: parsedOptions.target,
+        });
+        const output = safetyResult.output;
 
         // Generate context string for filename
         const contextString = generateContextString(

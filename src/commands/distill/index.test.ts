@@ -209,6 +209,20 @@ export default function main() {
         expect(result.output).toContain("PublicClass");
     });
 
+    test("should require --yes for non-tty unsafe override", () => {
+        const result = runDistill([
+            "--stdout",
+            "--include-sensitive",
+            "--target",
+            "claude",
+        ]);
+
+        expect(result.status).toBe(1);
+        expect(result.output).toContain(
+            "Non-interactive unsafe override requires --yes",
+        );
+    });
+
     test("--target should validate allowed values", () => {
         const result = runDistill(["--stdout", "--target", "invalid-target"]);
 

@@ -13,6 +13,7 @@ import { OutputManager } from "../../utils/output-manager.js";
 import { FileSelector } from "../../utils/file-selector.js";
 import { formatFileSize } from "../../utils/format.js";
 import { distillSaved, agentInstructions } from "../../utils/messages.js";
+import { runSafetyPipeline } from "../../core/safety/pipeline.js";
 import {
     countTokens,
     formatTokenCount,
@@ -342,7 +343,46 @@ async function distillCommand(
         }
 
         const formatted = distiller.formatResult(result, resolvedPath);
-        const output = formatted;
+
+        const resolvedStats = await fs.stat(resolvedPath);
+        const basePath = resolvedStats.isFile()
+            ? path.dirname(resolvedPath)
+            : resolvedPath;
+
+        const discoveredFiles: string[] = filesToProcess
+            ? [...filesToProcess]
+            : await distiller
+                  .getFilesToProcess(resolvedPath)
+                  .then((files: string[]) =>
+                      files.map((file: string) =>
+                          path.isAbsolute(file)
+                              ? file
+                              : path.join(basePath, file),
+                      ),
+                  );
+
+        const scannableFiles: Array<{ path: string; content: string }> = [];
+        for (const filePath of discoveredFiles) {
+            try {
+                const fileContent = await fs.readFile(filePath, "utf-8");
+                scannableFiles.push({
+                    path: path.relative(basePath, filePath),
+                    content: fileContent,
+                });
+            } catch {
+                // Best-effort scan input assembly; unreadable files are skipped.
+            }
+        }
+
+        const safetyResult = runSafetyPipeline({
+            command: "distill",
+            payload: formatted,
+            files: scannableFiles,
+            includeSensitive: options.includeSensitive,
+            yes: options.yes,
+            target: options.target,
+        });
+        const output = safetyResult.output;
 
         // Calculate actual tokens from the formatted output
         const actualDistilledTokens = countTokens(output);

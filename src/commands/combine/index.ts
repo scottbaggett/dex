@@ -16,6 +16,7 @@ import { GitExtractor } from "../../core/git.js";
 import { countTokens, formatEstimatedTokens } from "../../utils/tokens.js";
 import { z } from "zod";
 import { ProgressBar } from "../../utils/progress.js";
+import { runSafetyPipeline } from "../../core/safety/pipeline.js";
 import {
     agentInstructions,
     combineSuccessMessage,
@@ -393,7 +394,19 @@ async function combineCommand(
 
         // Format output based on specified format
         const formatter = getFormatter(options.format);
-        const output = formatter.format(changes);
+        const rawOutput = formatter.format(changes);
+        const safetyResult = runSafetyPipeline({
+            command: "combine",
+            payload: rawOutput,
+            files: changes.map((change: GitChange) => ({
+                path: change.file,
+                content: change.content || "",
+            })),
+            includeSensitive: options.includeSensitive,
+            yes: options.yes,
+            target: options.target,
+        });
+        const output = safetyResult.output;
 
         // Handle output based on options
         const totalTokens = countTokens(output);
