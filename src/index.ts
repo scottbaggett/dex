@@ -5,6 +5,7 @@ export { MarkdownFormatter } from "./commands/extract/formatters/markdown.js";
 export { JsonFormatter } from "./commands/extract/formatters/json.js";
 export { TextFormatter } from "./commands/extract/formatters/text.js";
 export { SensitiveDataScanner } from "./core/safety/scanner.js";
+export { SensitiveDataRedactor } from "./core/safety/redactor.js";
 
 export type {
     DexOptions,
@@ -22,3 +23,4 @@ export type {
     FindingCategory,
     FindingSeverity,
 } from "./core/safety/scanner.js";
+export type { RedactionResult, RedactionSummary } from "./core/safety/redactor.js";
