@@ -18,6 +18,8 @@ import {
     CommandExitError,
     isCommandExitError,
 } from "../../utils/command-exit.js";
+import { runSafetyPipeline } from "../../core/safety/pipeline.js";
+import { appendSafetyAuditManifest } from "../../core/safety/audit.js";
 
 // Helper function to generate context string for filename
 function generateContextString(dexOptions: DexOptions, method: string): string {
@@ -321,7 +323,19 @@ export async function executeExtract(
                 throw new Error(`Invalid format: ${parsedOptions.format}`);
         }
 
-        const output = formatter.format({ context, options: parsedOptions });
+        const rawOutput = formatter.format({ context, options: parsedOptions });
+        const safetyResult = runSafetyPipeline({
+            command: "extract",
+            payload: rawOutput,
+            files: context.changes.map((change: GitChange) => ({
+                path: change.file,
+                content: change.content || change.diff || "",
+            })),
+            includeSensitive: parsedOptions.includeSensitive,
+            yes: parsedOptions.yes,
+            target: parsedOptions.target,
+        });
+        const output = safetyResult.output;
 
         // Generate context string for filename
         const contextString = generateContextString(
@@ -332,6 +346,16 @@ export async function executeExtract(
         // Handle output
         if (parsedOptions.clipboard) {
             await clipboardy.write(output);
+            await appendSafetyAuditManifest({
+                command: "extract",
+                outputPath: "clipboard",
+                payload: output,
+                target: parsedOptions.target,
+                includeSensitive: parsedOptions.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
+            });
 
             // Format token display
             const tokenCount = context.metadata.tokens.estimated;
@@ -358,6 +382,16 @@ export async function executeExtract(
                 command: "extract",
                 context: contextString,
                 format: parsedOptions.format || "txt",
+            });
+            await appendSafetyAuditManifest({
+                command: "extract",
+                outputPath: fullPath,
+                payload: output,
+                target: parsedOptions.target,
+                includeSensitive: parsedOptions.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
             });
 
             // Format token display
@@ -411,6 +445,20 @@ export function createExtractCommand(): Command {
         )
         .option("--optimize <types...>", "Optimizations: aid, symbols")
         .option("--no-metadata", "Exclude metadata from output")
+        .option(
+            "--include-sensitive",
+            "Include sensitive content without redaction safeguards",
+        )
+        .addOption(
+            new Option(
+                "--target <target>",
+                "Target model destination",
+            ).choices(["claude", "gpt", "local", "custom"]),
+        )
+        .option(
+            "--yes",
+            "Skip confirmation prompts for non-interactive unsafe operations",
+        )
         .option("--select", "Interactive file selection mode")
         .option(
             "--sort-by <option>",

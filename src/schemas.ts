@@ -3,6 +3,8 @@ import { z } from "zod";
 // Output format schema
 export const OutputFormatSchema = z.enum(["md", "json", "xml", "txt"]);
 export type OutputFormat = z.infer<typeof OutputFormatSchema>;
+export const ModelTargetSchema = z.enum(["claude", "gpt", "local", "custom"]);
+export type ModelTarget = z.infer<typeof ModelTargetSchema>;
 
 // Git change status schema
 export const GitStatusSchema = z.enum([
@@ -57,6 +59,9 @@ export const ExtractOptionsSchema = z.object({
     format: OutputFormatSchema.optional(),
     clipboard: z.boolean().optional(),
     interactive: z.boolean().optional(),
+    includeSensitive: z.boolean().optional(),
+    yes: z.boolean().optional(),
+    target: ModelTargetSchema.optional(),
 
     // Optimization
     symbols: z.boolean().optional(),
@@ -97,6 +102,9 @@ export const CombineOptionsSchema = z.object({
     maxFiles: z.union([z.string(), z.number()]).optional().default("1000"),
     maxDepth: z.union([z.string(), z.number()]).optional().default("10"),
     noGitignore: z.boolean().optional(),
+    includeSensitive: z.boolean().optional(),
+    yes: z.boolean().optional(),
+    target: ModelTargetSchema.optional(),
 });
 export type CombineOptions = z.infer<typeof CombineOptionsSchema>;
 
@@ -119,6 +127,9 @@ export const DistillOptionsSchema = z.object({
     exclude: z.array(z.string()).optional().default([]),
     include: z.array(z.string()).optional().default([]),
     workers: z.number().min(1).max(16).optional(),
+    includeSensitive: z.boolean().optional(),
+    yes: z.boolean().optional(),
+    target: ModelTargetSchema.optional(),
 });
 export type DistillOptions = z.infer<typeof DistillOptionsSchema>;
 

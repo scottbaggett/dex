@@ -1,9 +1,9 @@
 // TODO: Move all chalk console messages to @messages.ts
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import chalk from "chalk";
 import { Distiller } from "../../core/distiller/index.js";
-import type { DistillerOptions, OutputFormat } from "../../types.js";
+import type { DistillerOptions, ModelTarget, OutputFormat } from "../../types.js";
 import { promises as fs, statSync } from "fs";
 import { resolve, basename } from "path";
 import * as path from "path";
@@ -13,6 +13,8 @@ import { OutputManager } from "../../utils/output-manager.js";
 import { FileSelector } from "../../utils/file-selector.js";
 import { formatFileSize } from "../../utils/format.js";
 import { distillSaved, agentInstructions } from "../../utils/messages.js";
+import { runSafetyPipeline } from "../../core/safety/pipeline.js";
+import { appendSafetyAuditManifest } from "../../core/safety/audit.js";
 import {
     countTokens,
     formatTokenCount,
@@ -41,6 +43,9 @@ interface DistillCommandOptions {
     workers?: string;
     format?: OutputFormat;
     since?: string;
+    includeSensitive?: boolean;
+    yes?: boolean;
+    target?: ModelTarget;
 }
 
 export function createDistillCommand(): Command {
@@ -88,6 +93,20 @@ export function createDistillCommand(): Command {
         .option(
             "--workers <number>",
             "Number of worker threads (0-1=sequential, 2-8=parallel, default=4)",
+        )
+        .option(
+            "--include-sensitive",
+            "Include sensitive content without redaction safeguards",
+        )
+        .addOption(
+            new Option(
+                "--target <target>",
+                "Target model destination",
+            ).choices(["claude", "gpt", "local", "custom"]),
+        )
+        .option(
+            "--yes",
+            "Skip confirmation prompts for non-interactive unsafe operations",
         )
         .action((...args: unknown[]) => {
             const targetPath = typeof args[0] === "string" ? args[0] : ".";
@@ -325,7 +344,46 @@ async function distillCommand(
         }
 
         const formatted = distiller.formatResult(result, resolvedPath);
-        const output = formatted;
+
+        const resolvedStats = await fs.stat(resolvedPath);
+        const basePath = resolvedStats.isFile()
+            ? path.dirname(resolvedPath)
+            : resolvedPath;
+
+        const discoveredFiles: string[] = filesToProcess
+            ? [...filesToProcess]
+            : await distiller
+                  .getFilesToProcess(resolvedPath)
+                  .then((files: string[]) =>
+                      files.map((file: string) =>
+                          path.isAbsolute(file)
+                              ? file
+                              : path.join(basePath, file),
+                      ),
+                  );
+
+        const scannableFiles: Array<{ path: string; content: string }> = [];
+        for (const filePath of discoveredFiles) {
+            try {
+                const fileContent = await fs.readFile(filePath, "utf-8");
+                scannableFiles.push({
+                    path: path.relative(basePath, filePath),
+                    content: fileContent,
+                });
+            } catch {
+                // Best-effort scan input assembly; unreadable files are skipped.
+            }
+        }
+
+        const safetyResult = runSafetyPipeline({
+            command: "distill",
+            payload: formatted,
+            files: scannableFiles,
+            includeSensitive: options.includeSensitive,
+            yes: options.yes,
+            target: options.target,
+        });
+        const output = safetyResult.output;
 
         // Calculate actual tokens from the formatted output
         const actualDistilledTokens = countTokens(output);
@@ -333,6 +391,16 @@ async function distillCommand(
         // Handle output based on explicit options first, then fall back to config
         if (options.clipboard) {
             await clipboardy.write(output);
+            await appendSafetyAuditManifest({
+                command: "distill",
+                outputPath: "clipboard",
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
+            });
 
             // Complete progress
             const originalTokens = result.metadata.originalTokens || 0;
@@ -347,6 +415,16 @@ async function distillCommand(
             console.log(chalk.cyan("📋 Distilled output copied to clipboard"));
         } else if (options.output) {
             await fs.writeFile(options.output, output, "utf-8");
+            await appendSafetyAuditManifest({
+                command: "distill",
+                outputPath: options.output,
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
+            });
 
             // Complete progress
             const originalTokens = result.metadata.originalTokens || 0;
@@ -363,6 +441,16 @@ async function distillCommand(
                     chalk.green(options.output),
             );
         } else if (isStdout) {
+            await appendSafetyAuditManifest({
+                command: "distill",
+                outputPath: "stdout",
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
+            });
             console.log(output);
         } else {
             // Default: save using OutputManager
@@ -382,6 +470,16 @@ async function distillCommand(
                 command: "distill",
                 context: folderName,
                 format: fileFormat as OutputFormat,
+            });
+            await appendSafetyAuditManifest({
+                command: "distill",
+                outputPath: fullPath,
+                payload: output,
+                target: options.target,
+                includeSensitive: options.includeSensitive,
+                redactionCountsByType:
+                    safetyResult.redaction.summary.countsByCategory,
+                result: "success",
             });
 
             // Complete progress with cool output

@@ -94,6 +94,24 @@ describe("combine command", () => {
         expect(output).toContain("This is file 2 content");
     });
 
+    test("should expose safety options", () => {
+        const command = createCombineCommand();
+        const options = command.options.map((option) => option.long);
+        const targetOption = command.options.find(
+            (option) => option.long === "--target",
+        );
+
+        expect(options).toContain("--include-sensitive");
+        expect(options).toContain("--target");
+        expect(options).toContain("--yes");
+        expect(targetOption?.argChoices).toEqual([
+            "claude",
+            "gpt",
+            "local",
+            "custom",
+        ]);
+    });
+
     test("should combine files with markdown format", async () => {
         const program = new Command();
         program.addCommand(createCombineCommand());
@@ -120,6 +138,25 @@ describe("combine command", () => {
         expect(parsed.files[0].path).toBe("file1.txt");
         expect(parsed.files[0].content).toBe("This is file 1 content");
         expect(parsed.metadata.totalFiles).toBe(1);
+    });
+
+    test("should write audit manifest for output-producing runs", async () => {
+        const program = new Command();
+        program.addCommand(createCombineCommand());
+
+        await parseUser(program, ["combine", "file1.txt", "--stdout"]);
+
+        const manifestPath = path.join(testDir, ".dex", "audit", "manifest.jsonl");
+        expect(fs.existsSync(manifestPath)).toBe(true);
+        const lines = fs
+            .readFileSync(manifestPath, "utf-8")
+            .trim()
+            .split("\n");
+        expect(lines.length).toBeGreaterThan(0);
+        const latest = JSON.parse(lines[lines.length - 1] || "{}");
+        expect(latest.command).toBe("combine");
+        expect(latest.outputPath).toBe("stdout");
+        expect(latest.payloadHash).toBeString();
     });
 
     test("should apply include and exclude patterns", async () => {
@@ -186,6 +223,22 @@ describe("combine command", () => {
         const content = fs.readFileSync(outputPath, "utf-8");
         expect(content).toContain("<code_context>");
         expect(content).toContain("This is file 1 content");
+    });
+
+    test("should require --yes for non-tty unsafe override", async () => {
+        const program = new Command();
+        program.addCommand(createCombineCommand());
+
+        await expect(
+            parseUser(program, [
+                "combine",
+                "file1.txt",
+                "--include-sensitive",
+                "--stdout",
+            ]),
+        ).rejects.toMatchObject<Partial<CommandExitError>>({
+            exitCode: 1,
+        });
     });
 
     test("should exit with code 1 when no files are found", async () => {

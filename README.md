@@ -32,6 +32,18 @@ dex --help
 dex -s --format md --clipboard
 ```
 
+## Safety Stance
+
+Dex treats AI context generation as a trust-boundary operation. When context leaves your repository and enters a model prompt, leakage risk is real.
+
+Dex is opinionated by design:
+
+1. Always scan content for secrets and obvious PII before output.
+2. Redact sensitive spans by default.
+3. Write an audit manifest entry for every generated output.
+
+Unsafe behavior should be an explicit override, not a hidden default.
+
 ## Core Commands
 
 ## `Extract` (default command)
@@ -63,6 +75,9 @@ Key options:
 - --sort-by <opt>: name | updated | size | status
 - --sort-order <ord>: asc | desc
 - --filter-by <opt>: all | staged | unstaged | untracked | modified | added | deleted
+- --include-sensitive: Include sensitive content without redaction safeguards
+- --target <target>: claude | gpt | local | custom (recorded in audit metadata)
+- --yes: Required in non-TTY usage with `--include-sensitive`
 
 Outputs are saved to `.dex/` by default unless `--clipboard`, `--stdout` (where available), or an explicit `--output` is used.
 
@@ -94,6 +109,9 @@ Key options:
 - --workers <number>: Number of worker threads (default: 1)
 - --dry-run: Preview what would be processed
 - --staged: Only process staged files
+- --include-sensitive: Include sensitive content without redaction safeguards
+- --target <target>: claude | gpt | local | custom (recorded in audit metadata)
+- --yes: Required in non-TTY usage with `--include-sensitive`
 
 ## `Combine`
 Create a single, LLM‑friendly document from many files.
@@ -118,6 +136,20 @@ dex combine --staged -c                # Use staged files; copy to clipboard
 - --stdout: Print output to stdout
 - --since <ref>: Only process files changed since git ref
 - --dry-run: Show what files would be processed
+- --include-sensitive: Include sensitive content without redaction safeguards
+- --target <target>: claude | gpt | local | custom (recorded in audit metadata)
+- --yes: Required in non-TTY usage with `--include-sensitive`
+
+## `Scan`
+Run detection-only safety scans without generating context artifacts.
+
+```bash
+dex scan .                  # Human-readable summary
+dex scan . --format json    # CI-friendly machine output
+```
+
+**Key options:**
+- -f, --format <format>: txt | json (default: txt)
 
 ### Tree
 Generate a beautiful API tree or outline for quick understanding.
